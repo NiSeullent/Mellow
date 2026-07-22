@@ -1,0 +1,57 @@
+Mellow Attribution Notice
+=========================
+
+Mellow is a modified derivative work based on:
+
+1. ChefKiss NootedGreen
+   https://github.com/ChefKissInc/NootedGreen
+
+2. The NootedGreen-UHD730 development line, including work maintained at
+   https://github.com/yanyantukebo1224/NootedGreen-UHD730
+   and the source baseline mirrored at
+   https://github.com/NiSeullent/NootedGreen-UHD730
+
+The retained source baseline was commit
+b504e723a83902a912c52f5889aad5bb5e1b7826. Mellow changes the product
+identity, limits the intended hardware scope to Intel Core Ultra iGPUs, and
+adds experimental Meteor Lake and Arrow Lake bring-up work. It is not an
+official release of, a drop-in replacement for, or endorsed by the upstream
+projects.
+
+Original copyright, attribution, and license notices remain in the source
+files and repository history from which this derivative was made. Notable
+upstream contributors credited by the source baseline include Visual
+Ehrmanntraut, Stefano Giammori, shl628, jalavoui, and the other ChefKiss and
+NootedGreen contributors. Copyright in Mellow-specific modifications remains
+with their respective contributors.
+
+Mellow is distributed under the unmodified Thou Shalt Not Profit License
+version 1.0 included in LICENSE. Consistent with section 17, the Mellow
+project represents and declares that it derives no revenue whatsoever from
+distribution of this work or derivative works, or from support or services
+relating to them. Redistributors must comply with sections 17 and 18 and all
+other license conditions.
+
+Third-party components
+----------------------
+
+The vendored Lilu development bundle is copyright vit9696 and contributors
+and is distributed under the BSD 3-Clause license reproduced in
+LICENSES/Lilu-BSD-3-Clause.txt.
+
+MacKernelSDK headers and the DisplayMergeNub source include Apple Public
+Source License 2.0 covered material. The APSL 2.0 text is reproduced in
+LICENSES/APSL-2.0.txt; the notices in the covered files remain controlling.
+These third-party components are not relicensed under TSNPL.
+
+Some retained upstream source headers (`DYLDPatches.*` and
+`kern_patcherplus.*`) historically name TSNPL version 1.5. Those notices are
+preserved as attribution; the complete TSNPL text actually supplied by this
+repository is the unmodified version 1.0 in the root LICENSE. Redistributors
+must review the retained per-file notices as well as the root license.
+
+Mellow does not redistribute the Apple GuC/HuC blobs present in the research
+baseline, nor modified or stripped Intel DMC firmware payloads. Firmware
+compatibility profiles currently use the Apple driver CSR initializer and
+experimental MMIO/power-well setup; they are not evidence of native Xe-LPG
+firmware support.
