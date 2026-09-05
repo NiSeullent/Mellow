@@ -10,14 +10,17 @@ GPU backend에 제출한다. GL/CL 제공자가 없는 장치는 Linux 드라이
 `Runtime/`의 정책과 실제 OpenCL C provider, `Tools/mellow_port/`의 분석 도구,
 `Drivers/PortedXe/`의 부분 이식은 이 계약의 일부를 구현한다. 실제 Windows OpenCL 제출과
 QEMU의 알고리즘 실행, 이식 함수를 포함한 Darwin kext 빌드를 구분해 기록한다.
-아래 Objective-C Metal 구현, JIT와 전체 XNU hardware binding은 설계 단계다.
+자체 portable C++ 객체, MSL/AIR uint compute 변환과 실제 OpenCL 드라이버 JIT는 구현되어 있다.
+Tahoe의 PCI/IOUserClient/prepared-DMA 진단 경로도 kext에 링크했다. 아래 Objective-C Metal
+프로토콜 전체와 완전한 XNU GPU 실행 owner는 여전히 설계·구현 대상이다.
 실제 상태는 [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md)를 따른다.
 기존 작성 중인 CONCEPT/MGAL/AIR 문서는 제안 자료이며 전제 검토는
 [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md)를 우선한다.
 
 ## 1. Public product boundary
 
-초기 배포 표면은 앱이 명시적으로 선택하는 `MellowCreateDevice`(예정)와
+현재 실행 표면은 `MellowMTL::Device::createOpenCL`의 portable C++ compute API다.
+Objective-C 초기 배포 표면은 앱이 명시적으로 선택하는 `MellowCreateDevice`(예정)와
 `libMellowMTL`이다. 자체 `MTLDevice`, queue, command buffer, encoder, resource,
 pipeline 객체가 Metal 의미를 수행한다. 기존 `MTLCreateSystemDefaultDevice()` 호출
 결과를 관찰하는 테스트 클라이언트는 이 구현을 대신하지 않는다.

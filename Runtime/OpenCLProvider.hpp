@@ -29,12 +29,29 @@ struct OpenCLExecution {
     bool runtimePlanned {};
     bool runtimeCompletionAccepted {};
     bool resourcesReleased {};
+    // Ordinary runtime completion does not require a caller's expected answer.
+    // This is independent of oracle-based resultsVerified/evidence acceptance.
+    bool executionCompleted {};
     uint64_t gpuStart {}, gpuEnd {}, epoch {}, sequence {}, validationRecord {};
     PlanStatus planStatus {PlanStatus::InvalidInput};
     CompletionStatus armStatus {CompletionStatus::InvalidInput};
     CompletionStatus observeStatus {CompletionStatus::InvalidInput};
     std::string buildLog, error;
     std::vector<uint32_t> output;
+};
+
+class OpenCLPipeline {
+public:
+    ~OpenCLPipeline();
+    OpenCLPipeline(const OpenCLPipeline &) = delete;
+    OpenCLPipeline &operator=(const OpenCLPipeline &) = delete;
+    uint64_t compilationSerial() const;
+    const std::string &buildLog() const;
+private:
+    friend class OpenCLProvider;
+    OpenCLPipeline();
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 
 // Actual host OpenCL provider. It owns one context, ordered profiling queue and
@@ -59,6 +76,11 @@ public:
     bool executeOpenClC(const std::string &source, const std::string &entry,
                        const std::vector<uint32_t> &input,
                        const std::vector<uint32_t> &expected, OpenCLExecution &result);
+    std::shared_ptr<OpenCLPipeline> compileOpenClC(const std::string &source,
+                                                 const std::string &entry, std::string &error);
+    bool executePipeline(const std::shared_ptr<OpenCLPipeline> &pipeline,
+                         const std::vector<uint32_t> &input, OpenCLExecution &result);
+    uint64_t pipelineBuildCount() const;
     const ProviderDescriptor &descriptor() const;
     const OpenCLDeviceInfo &device() const;
     const OpenCLExecution &bootstrapEvidence() const;
@@ -68,8 +90,9 @@ public:
     static constexpr size_t MaxElements = 4096;
     static constexpr size_t MaxSourceBytes = 65536;
 private:
+    friend class OpenCLPipeline;
     struct Impl;
-    std::unique_ptr<Impl> impl_;
+    std::shared_ptr<Impl> impl_;
 };
 
 } // namespace MellowRT

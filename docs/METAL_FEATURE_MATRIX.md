@@ -3,15 +3,15 @@
 > **Scope and precedence:** [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md),
 > [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md), and
 > [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md) govern conflicting draft assumptions.
-> Current evidence includes policy/intake, native Windows OpenCL provider execution and portable Xe tests.
-> Standalone probe results remain separate; no Metal, WindowServer or display acceptance has passed.
+> Current evidence includes portable MSL/AIR compute objects, Windows OpenCL execution and portable Xe tests.
+> Standalone probe results remain separate; Apple Metal ABI, WindowServer and display acceptance have not passed.
 > Native macOS GPU execution remains unverified; see IMPLEMENTATION-STATUS for the recorded scope.
 
 ## 한글 요약
 
 이 표는 **시험 계약**이다. 번들 이름, 기능 플래그, 부팅 성공, 화면 출력으로 지원을 추론하지 않는다.
-아래 Mellow Metal 기능 행은 **모두 하드웨어 `UNVERIFIED`**다. Windows MellowRT native
-OpenCL provider의 compute 실행은 확인됐지만 Metal 입력·JIT·시스템 가속 시험은 아니다.
+아래 Apple Metal 호환성 기능 행은 **모두 하드웨어 `UNVERIFIED`**다. 별도로 Windows 자체 C++
+객체의 제한된 MSL/raw AIR compute 변환·GPU 실행은 각각 10,000회 검증했다. 시스템 Metal 가속 시험은 아니다.
 기존 standalone OpenCL 기판 시험과 새 provider 실행 기록도 구분한다.
 확대개편에 맞춰 두 가지가 바뀌었다 — 능력별로 **어느 경로(`cl`/`gl`/`native`)가 그것을 제공하는지**
 명시하고, backend별 열을 추가했다. 능력 비트는 `F` 등급 시험 통과 후에만 켠다.
@@ -19,8 +19,8 @@ OpenCL provider의 compute 실행은 확인됐지만 Metal 입력·JIT·시스�
 ---
 
 This matrix is a test contract. It does not infer support from a bundle name, a feature flag, a
-successful boot, or a visible framebuffer. Every Metal capability row below is hardware
-`UNVERIFIED`; Windows host OpenCL provider execution is described separately after the matrix.
+successful boot, or a visible framebuffer. Apple Metal ABI conformance rows below remain hardware
+`UNVERIFIED`. The explicitly labelled portable C++ subset has separate Windows GPU evidence.
 
 Status vocabulary and evidence levels are defined in [EVIDENCE-POLICY.md](EVIDENCE-POLICY.md):
 
@@ -30,7 +30,7 @@ Status vocabulary and evidence levels are defined in [EVIDENCE-POLICY.md](EVIDEN
 - `NOT IMPLEMENTED` — no Mellow-owned or validated compatible implementation exists.
 - `BLOCKED` — a prerequisite test has not passed.
 - `VERIFIED` — reserved for a linked, deterministic experiment that excludes CPU fallback.
-  **No row currently qualifies.**
+  **No Apple Metal ABI conformance row currently qualifies.**
 
 ## Backend columns
 
@@ -38,7 +38,7 @@ Per-backend readiness is tracked in [GPU-SUPPORT-MATRIX.md](GPU-SUPPORT-MATRIX.m
 
 | Backend | Target | Overall |
 | --- | --- | --- |
-| `xe` | Intel Xe-LPG / Xe2 | Portable encoding called by XeMemory and linked in 0.4.2; full GPU IOKit owner absent |
+| `xe` | Intel Xe-LPG / Xe2 | Portable encoding and an opt-in DMA diagnostic service linked in 0.4.3; full GPU IOKit owner absent |
 | `applecompat` | Intel ICL via Apple's framebuffer | `SOURCE PATH`; TGL half `DEPRECATED` |
 | `amdgpu` | RX 9070 (Navi 48) | `NOT IMPLEMENTED` |
 | Selected NVIDIA adapter, TBD | RTX 3080 / 3090 (GA102) | `NOT IMPLEMENTED` |
@@ -51,6 +51,17 @@ result that another does not.
 
 The `Route` column names which [Plane 3](WORKLOAD-RUNTIME.md) route is intended to provide the
 capability — this is new, and it is what makes the matrix actionable under the MELLOW architecture.
+
+### Implemented portable compute subset — separate from Apple ABI conformance
+
+The explicit `MellowMTL` C++ API has Device/Buffer/Library/Function/Pipeline/Queue/CommandBuffer/
+ComputeEncoder objects, one immutable-size uint buffer, exact 1D dispatch, synchronous completion,
+and reusable driver compilation. Typed MSL and actual LLVM-decoded AIR2.7 lower to OpenCL C.
+Windows MSL and synthetic raw AIR each passed 10,000 submissions and independent readbacks,
+including two ordered encoder dispatches. These results validate the documented portable subset,
+not Objective-C Metal protocols, storage-mode equivalence, arbitrary AIR, rendering or macOS GPU
+registration. See [MetalObjects](../Runtime/MetalObjects.md), [shader contract](SHADER-JIT-IMPLEMENTATION.md)
+and [current verification](VERIFICATION-METAL-JIT-2026-09-06.md).
 
 ### Device and submission
 
@@ -79,8 +90,8 @@ capability — this is new, and it is what makes the matrix actionable under the
 
 | Capability | Route | Status | Current evidence or limitation | Hardware result | Next decisive test |
 | --- | --- | --- | --- | --- | --- |
-| AIR ingestion | any | `NOT IMPLEMENTED` | Format survey only; see [AIR-ABI.md](AIR-ABI.md). Needs a versioned SDK adapter or separately implemented frontend; framework symbols are insufficient. | **UNVERIFIED** | Parse a metallib produced by the local toolchain; recover entry points and bindings. |
-| AIR/MIR → OpenCL C; optional supported IL, compute (J1) | `cl` | `PLANNED` | The project's highest-risk component; also its cheapest early proof. | **UNVERIFIED** | Compile a Metal kernel through MellowJIT; run on Apple's OpenCL; compare every output byte. |
+| AIR ingestion | any | Portable subset implemented; general Metal ingestion incomplete | Actual LLVM decoding and exact AIR2.7 uint ABI checks; synthetic positive fixture, actual SDL render inputs rejected. | Windows subset passed; Apple ABI/macOS **UNVERIFIED** | Validate a supported Apple-compiler-produced compute fixture and target macOS execution. |
+| AIR/MIR → OpenCL C; optional supported IL, compute (J1) | `cl` | Restricted AIR SSA → OpenCL C implemented | Typed single-buffer uint lowering and reusable OpenCL driver compilation; MIR/general IL remains planned. | Windows subset passed; macOS **UNVERIFIED** | Expand shader coverage and compare a supported Apple-produced fixture on macOS. |
 | Threadgroup memory and barriers (J2) | `cl` | `PLANNED` | SIMD width, SLM layout, barrier encoding all unresolved. | **UNVERIFIED** | Multi-threadgroup reduction with adversarial scheduling, repeated. |
 | Atomics | `cl` | `PLANNED` | Width, scope, and ordering mapping unverified. | **UNVERIFIED** | Contended counters for every exposed type and scope, with exact totals. |
 | AIR → GLSL, graphics (J3) | `gl` | `PLANNED` | Bounded by OpenGL 4.1 core on macOS. | **UNVERIFIED** | Offscreen triangle; per-pixel comparison against a reference. |
@@ -93,7 +104,7 @@ capability — this is new, and it is what makes the matrix actionable under the
 | Capability | Route | Status | Current evidence or limitation | Hardware result | Next decisive test |
 | --- | --- | --- | --- | --- | --- |
 | Blit encoder | `gl`, `native` | `NOT IMPLEMENTED` | First execution primitive. | **UNVERIFIED** | GPU copy patterned buffers; prove engine progress, fence completion, byte equality. |
-| Compute pipeline and dispatch | `cl` | `NOT IMPLEMENTED` | Depends on AIR ingestion and the resource model. | **UNVERIFIED** | Vector add with randomized inputs, guard regions, exact output comparison. |
+| Compute pipeline and dispatch | `cl` | Portable C++ subset implemented; Apple ABI incomplete | One retained driver pipeline, exact 1D uint-buffer dispatch and synchronous checked completion. | Windows subset passed; Apple ABI/macOS **UNVERIFIED** | Extend resource shapes and validate the separate Apple ABI path. |
 | Render pipeline creation | `gl` | `NOT IMPLEMENTED` | — | **UNVERIFIED** | Build a pass-through vertex and solid-color fragment pipeline. |
 | Rasterization and render targets | `gl` | `NOT IMPLEMENTED` | A visible framebuffer is not render-engine evidence. | **UNVERIFIED** | Offscreen triangle; compare coverage and color against a reference. |
 | Vertex/fragment interpolation | `gl` | `NOT IMPLEMENTED` | Coordinate conventions differ between Metal and GL and must be reconciled explicitly. | **UNVERIFIED** | Vertex-color triangle with pixel tolerances and edge rules. |
@@ -133,7 +144,7 @@ subset passes.
 
 | Capability | Status | Current evidence or limitation | Hardware result | Next decisive test |
 | --- | --- | --- | --- | --- |
-| Display presentation | `SOURCE PATH` | `DisplayMergeNub` is the only live IOKitPersonality; hardware-backed presentation unproven. | **UNVERIFIED** | Present a known surface, capture scanout, correlate engine activity. |
+| Display presentation | `SOURCE PATH` | `DisplayMergeNub` has a backing display class; the new diagnostic PCI personality does not implement presentation. Hardware-backed display remains unproven. | **UNVERIFIED** | Present a known surface, capture scanout, correlate engine activity. |
 | WindowServer acceleration | `BLOCKED` | Requires [Strategy A](METAL-EMULATION.md), which requires a private ABI that has not been recovered. | **UNVERIFIED** | Correlate WindowServer's Metal device, GPU counters, frame timing, CPU-fallback checks. |
 | Fault reporting and recovery | `UNKNOWN` | — | **UNVERIFIED** | Inject a bounded invalid command on a disposable setup; verify recovery. |
 | Sleep/wake and long-duration load | `BLOCKED` | Functional milestones have not passed. | **UNVERIFIED** | Only after correctness: repeated sleep/wake and one-hour mixed load. |
@@ -168,6 +179,7 @@ planning and completion tracking. The driver reports `8086:7D41`; independent ph
 is not established by that query. Queue/event ownership, readback and ordered profiling are checked.
 See [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md) for the current source-bound records.
 
-The adapter neither accepts Metal input nor implements MSL/AIR translation. Its OpenCL allocation,
-queue, event and compute results do not promote any Metal row above. The separate portable Xe
-QEMU tests and 31-unit 0.4.2 kext build likewise do not prove GPU execution or native Metal support.
+The provider directly accepts OpenCL C. The newly implemented object/frontend layer translates
+the supported MSL/AIR subset before invoking it; that evidence is recorded separately above.
+Neither path promotes Apple Metal ABI conformance. The portable Xe QEMU tests and 33-unit 0.4.3
+diagnostic kext build do not prove native GPU execution or Metal support on Tahoe.

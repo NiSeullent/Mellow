@@ -7,11 +7,13 @@ Mellow는 Metal 요청을 자체 객체·셰이더 변환·명령 실행 계층�
 Metal 2/3의 기능을 단계적으로 구현하고, Linux 드라이버 소스를 활용해 macOS에 드라이버가
 없는 GPU까지 확장하는 것이 목표입니다.
 
-현재는 **실제 OpenCL 제공자와 Linux Xe 페이지 테이블 부분 이식을 실행·시험하는 개발 단계**입니다.
-Windows의 Intel GPU에서 MellowRT를 통한 OpenCL C 제출·readback·완료 추적을 실행했습니다.
-Linux Xe 원본 함수는 기존 kext 메모리 경로에 연결하여 Mellow.kext 0.4.2로 빌드했고,
-QEMU Linux 게스트에서도 이식 알고리즘을 실행했습니다.
-Mellow-owned Metal 장치, MSL/AIR JIT, 전체 Linux→XNU GPU driver는 아직 구현되지 않았습니다.
+현재는 **자체 C++ 객체와 제한된 MSL/AIR compute JIT를 실제 GPU에서 실행하는 개발 단계**입니다.
+Windows Intel GPU에서 MSL과 raw AIR 각각 10,000회 제출·readback을 검증했습니다.
+Device·Buffer·Library·Function·Pipeline·Queue·CommandBuffer·Encoder를 구현했고,
+MSL 타입 AST 또는 실제 LLVM으로 디코딩한 AIR SSA를 OpenCL C로 변환한 뒤 드라이버가 컴파일합니다.
+Linux Xe 원본 함수는 kext 메모리 경로에 연결되어 있으며, Mellow.kext 0.4.3에는
+명시적으로 켜는 Tahoe PCI·IOUserClient·DMA 진단 경로도 포함했습니다.
+Apple Objective-C Metal ABI, 전체 Metal 2/3, native Tahoe GPU 실행은 구현·검증이 남아 있습니다.
 RTX 3080·RTX 3090·RX 9070·8086:7D41 중 어느 장치도 Mellow Metal 가속 성공으로 표시하지 않습니다.
 
 ## 설계의 기준
@@ -20,6 +22,7 @@ RTX 3080·RTX 3090·RX 9070·8086:7D41 중 어느 장치도 Mellow Metal 가속 
 - [검토한 설계 결정 / RFC 001](docs/PLATFORM-DECISIONS.md): GL/CL 기능 한계, AIR frontend,
   NVIDIA/Mesa ABI, LinuxKPI, WindowServer 통합의 전제.
 - [실제 구현 상태](docs/IMPLEMENTATION-STATUS.md): 구현·미구현·검증 명령의 구분.
+- [MSL/AIR 객체·JIT·Tahoe 진단 통합 검증](docs/VERIFICATION-METAL-JIT-2026-09-06.md): 최신 실행 증거.
 - [드라이버 이식·실제 GPU·QEMU 검증 기록](docs/VERIFICATION-2026-09-06.md): 환경별 실행과 남은 관문.
 
 작업 중 생성된 CONCEPT, ARCHITECTURE, MGAL, SHADER-JIT 등의 문서는 설계 제안으로
@@ -50,6 +53,21 @@ display scanout은 별도 검증 단계입니다.
 
 ## 지금 실행할 수 있는 코드
 
+[Runtime/MetalObjects.md](Runtime/MetalObjects.md)는 앱이 명시적으로 선택하는 C++ API입니다.
+[Examples/compute-msl.cpp](Examples/compute-msl.cpp)는 MSL의 `x[i] * 7u + 3u`를 실제 GPU에
+제출하며 현재 Windows 실행에서 `10 17 24 31`을 반환했습니다. 기존 앱의 Metal framework를
+교체하거나 시스템 `MTLDevice`를 등록하는 API는 아닙니다.
+
+```powershell
+python Tools/run-metal-objects.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/msl-objects --compute --iterations 10000
+python Tools/run-metal-objects.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/air-objects --compute --iterations 10000 --air-bitcode tests/fixtures/air/synthetic-uint-affine.bc --entry air_affine --llvm-library C:/path/to/LLVM-C.dll
+```
+
+AIR 입력은 고정된 ABI의 uint 단일 버퍼 compute 부분집합입니다. 위 양성 fixture는 직접 작성한
+**synthetic 입력**이며, 실제 LLVM 검증·GPU 실행을 통과해도 일반 Apple 산출물 호환성을 뜻하지 않습니다.
+지원 범위는 [셰이더 계약](docs/SHADER-JIT-IMPLEMENTATION.md), 비트코드·컨테이너 입력은
+[AIR decoder](docs/AIR-DECODER.md)를 따릅니다. LLVM 라이브러리는 별도로 준비해야 합니다.
+
 [Runtime/PlatformRuntime.hpp](Runtime/PlatformRuntime.hpp)는 C++17의 독립 정책 계약입니다.
 
 - provider의 advertised/verified 기능과 reset epoch를 확인하여 compute/render/blit 경로를 선택합니다.
@@ -61,8 +79,8 @@ display scanout은 별도 검증 단계입니다.
 
 이 정책 코드 자체는 GPU 관측을 수집하거나 셰이더를 컴파일하지 않습니다.
 [OpenCLProvider](Runtime/OpenCLProvider.md)가 실제 context·queue·event·buffer를 소유하고
-관측을 수집합니다. 명시적인 `OpenClC` 입력만 직접 실행할 수 있으며, 기본 Metal 입력은
-번역 기능이 없으므로 거절합니다.
+관측을 수집합니다. provider가 직접 받는 입력은 `OpenClC`입니다. Mellow 객체 계층은 검증한
+MSL/AIR 부분집합만 번역하여 이 경로에 전달하며, 범용 Metal capability를 선언하지 않습니다.
 
 ```sh
 python3 Tools/run-platform-tests.py --cxx g++ --out build/platform-tests
@@ -132,13 +150,16 @@ python3 Tools/mellow-port.py generate \
 ## 기존 연구 자산과 검증 범위
 
 `Mellow/`의 Lilu/Xe 연구 경로에는 새 PortedXe PTE/PDE 인코더를 연결했습니다.
-기존 46비트 DMA·4 KiB system-memory·read-only 계약을 유지하고, kext 0.4.2의
-31개 대상 소스를 실제 Darwin linker로 빌드했습니다. 사용자 공간 MellowRT는 별도입니다.
+기존 46비트 DMA·4 KiB system-memory·read-only 계약을 유지하고, kext 0.4.3의
+33개 대상 소스를 실제 Darwin linker로 빌드했습니다. 새 진단 서비스의 IOUserClient는
+관리자에게 query·bounded DMA 준비·해제만 제공하며 GuC/GPU 제출은 제공하지 않습니다.
+426개 import의 정적 Tahoe export 대응을 확인했습니다. 사용자 공간 MellowRT는 별도입니다.
 구조 검증은 실제 Tahoe 적재·GuC·GPU 실행을 입증하지 않으며, 이 변경을 USB EFI에
 자동 활성화하지 않았습니다.
 
 - [기존 native backend 감사](docs/NATIVE-XE-BACKEND-AUDIT.md)
 - [실제 kext 빌드 기록](docs/BUILD-VALIDATION.md)
+- [Tahoe 진단 드라이버 계약과 실기 명령](docs/TAHOE-DRIVER-IMPLEMENTATION.md)
 - [실기 compute/render/stress 수용 기준](docs/ACCEPTANCE-0.4.1.ko.md)
 - [기존 ABI 조사](docs/TAHOE-ABI.md), [Intel OpenCL 컴파일 산출물](compiler-evidence/)
 

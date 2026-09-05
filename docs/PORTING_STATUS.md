@@ -3,8 +3,8 @@
 > **Scope and precedence:** [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md),
 > [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md), and
 > [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md) govern conflicting draft assumptions.
-> Current evidence includes policy/intake, native Windows OpenCL provider execution and portable Xe tests.
-> Standalone probe results remain separate; no Metal, WindowServer or display acceptance has passed.
+> Current evidence includes portable MSL/AIR compute objects, Windows OpenCL execution and portable Xe tests.
+> Standalone probe results remain separate; Apple Metal ABI, WindowServer and display acceptance have not passed.
 > Native macOS GPU execution remains unverified; see IMPLEMENTATION-STATUS for the recorded scope.
 
 ## 한글 요약
@@ -13,8 +13,8 @@
 "평면별·backend별 포팅 상태"로 재조정했다. 증거 사다리 `S/B/L/F/R`와 7개 분류는 그대로다.
 IORegistry에 iGPU가 보이거나, framebuffer가 로드되거나, 데스크톱에 도달하는 것은 그 자체로
 하드웨어 가속을 증명하지 않는다.
-**native macOS Xe/Metal 경로의 `L`·`F`·`R` 증거는 없다.** Windows에서는 MellowRT native
-OpenCL provider의 제한된 compute 실행을 확인했다. 기존 standalone 기판 시험, 이식 알고리즘의
+**native macOS Xe/Metal 경로의 `L`·`F`·`R` 증거는 없다.** Windows에서는 자체 C++ 객체·MSL 및
+synthetic raw AIR의 제한된 compute를 각각 10,000회 검증했다. 기존 standalone 기판 시험, 이식 알고리즘의
 QEMU 시험, kext 빌드는 각각 별도의 범위이며 아래처럼 기록한다.
 
 ---
@@ -64,11 +64,11 @@ diagnostics or workarounds. They must never be promoted merely because the syste
 
 | Layer | Current source state | Classification | Evidence | Hardware result |
 | --- | --- | --- | --- | --- |
-| Metal object model | No Mellow-owned `MTLDevice` exists. `Info.plist` names unverified Apple TGL bundles not found in the inspected Recovery inputs. | Not implemented | none | **UNVERIFIED** |
+| Metal object model | Portable MellowMTL C++ Device/Buffer/Library/Function/Pipeline/Queue/CommandBuffer/Encoder exist; Apple Objective-C `MTLDevice` conformance and system registration do not. | Feature-limited implementation | Current object tests and GPU records | Windows uint compute subset passed; native macOS **UNVERIFIED** |
 | Attachment — interposition | Planned. The `cs_validate_page` hook exists but its body is gated to Sonoma and is dead on Tahoe. | Not implemented | none | **UNVERIFIED** |
 | Attachment — driver plug-in | Planned. The `gpu_bundle_find_trusted` discovery hook exists but is commented out at [Mellow/DYLDPatches.cpp:113](../Mellow/DYLDPatches.cpp). | Not implemented | none | **UNVERIFIED** |
-| AIR ingestion | Format survey only; see [AIR-ABI.md](AIR-ABI.md). | Not implemented | none | **UNVERIFIED** |
-| Shader lowering | No shader translation path exists; Runtime cache identity is policy only, not a compiler. | Not implemented | none | **UNVERIFIED** |
+| AIR ingestion | Actual LLVM raw/wrapped bitcode decoder, observed metallib container parser and exact AIR2.7 metadata admission exist. Positive AIR fixture is synthetic; general Apple artifact compatibility remains unimplemented. | Feature-limited implementation | Decoder/roundtrip/control tests and current object GPU record | Windows synthetic AIR compute passed; native macOS **UNVERIFIED** |
+| Shader lowering | Typed MSL AST and AIR SSA lower the checked single-buffer uint subset to OpenCL C; driver pipelines compile once and are reused. | Feature-limited implementation | 2,269 frontend checks, 72 CPU references, 9 CL syntax fixtures; current GPU records | Windows MSL/raw AIR each passed 10,000 submissions; native macOS **UNVERIFIED** |
 | Offline compiler harness | Intel `ocloc` 26.27.39122.11 / IGC 2.38.2 compiled OpenCL C for `-device 0x7d41`; 6,944-byte ZEBIN with verified EU disassembly. **This is OpenCL C, not Metal.** | Feature-limited tooling | `B` | **UNVERIFIED** |
 | Acceptance harnesses | [Tools/metal-probe.swift](../Tools/metal-probe.swift) and [Userspace/metal_session.py](../Userspace/metal_session.py) are careful clients with strong attribution checks. Never compiled or executed — no macOS or Metal in the build environment. | Feature-limited implementation | `S` | **UNVERIFIED** |
 
@@ -86,10 +86,10 @@ diagnostics or workarounds. They must never be promoted merely because the syste
 
 | Layer | Current source state | Classification | Evidence | Hardware result |
 | --- | --- | --- | --- | --- |
-| Logic/platform separation | **Already achieved.** Every `Xe*` module is freestanding C++17 with a POD ops struct; host tests compile production sources with `-Werror`. | Feature-limited implementation | `S`, `B` | **UNVERIFIED** |
-| Named MGAL interfaces | Not extracted. Device identity is duplicated: `7D41` appears 39 times across 26 files, admission logic in ≥4 binding files. | Not implemented | none | **UNVERIFIED** |
-| Composition root | **Absent — the central gap.** Nothing constructs the MMIO, page-table, firmware, transport, interrupt, fence, or context objects. `BackendOwnerIntegrated = false` at [Mellow/RuntimeReadiness.hpp:84](../Mellow/RuntimeReadiness.hpp). | Not implemented | none | **UNVERIFIED** |
-| MELLOW-UAPI | No `IOUserClient` exists. The `IOResources` personality has no backing class — the `IOService` subclass at [Mellow/kern_start.cpp:52](../Mellow/kern_start.cpp) is commented out. | Not implemented | none | **UNVERIFIED** |
+| Logic/platform separation | Portable Xe algorithms use explicit ops/callback boundaries and production sources are host-tested with `-Werror`; IOKit binding code remains a separate kernel boundary. | Feature-limited implementation | `S`, `B` | **UNVERIFIED** |
+| Named MGAL interfaces | Full named interface extraction and a single GPU backend admission owner remain incomplete. | Not implemented | none | **UNVERIFIED** |
+| Composition root | Complete GPU owner remains absent: MMIO, VM publication, firmware, transport, interrupt, fence and execution are not integrated. The separate diagnostic service only binds bounded administrative PCI/DMA operations. | Not implemented for GPU execution | Diagnostic source/build records, see IMPLEMENTATION-STATUS | **UNVERIFIED** |
+| MELLOW-UAPI | Full GPU UAPI remains unimplemented. TahoeDiagnostic supplies a separate admin IOUserClient for query and bounded DMA preparation/release, without GPU submission. | Feature-limited diagnostic implementation | 6,328 host protocol checks and actual kext cross-link | Native service/DMA execution **UNVERIFIED** |
 | Readiness ladder | 20-bit fail-closed gate with ordered stages; monotonic; `mayAdvertiseMetal` requires all bits. | Feature-limited implementation | `S` | Source-predicted stage `physical-provider`, first missing `bar0-mapped`; no physical capture |
 
 ### Plane 1 — Backends and MellowKPI
@@ -115,8 +115,8 @@ diagnostics or workarounds. They must never be promoted merely because the syste
 | --- | --- | --- | --- | --- |
 | Source intake/report and bounded generation | `Tools/mellow-port.py inspect/plan/generate` exist. Reviewed PortedXe integration is a separate manual source port; the intake tool does not perform semantic driver translation or XNU binding. | Feature-limited analysis tooling | Tests, see IMPLEMENTATION-STATUS | — |
 | Firmware fetch and verify | [tests/xe_submission_fetch_firmware.py](../tests/xe_submission_fetch_firmware.py) checks size and SHA-256, opens exclusive-create, refuses to write on mismatch. Intel GuC only. | Feature-limited implementation | `B` | — |
-| Cross-build | [Tools/cross-build.py](../Tools/cross-build.py) built 0.4.2 from 31 target units as Darwin `MH_KEXT_BUNDLE`; PortedXe inputs are hashed before/after and compiled via one binding unit. | Feature-limited implementation | `B` | No kernel load or GPU execution |
-| ABI validation | [Tools/tahoe-abi.py](../Tools/tahoe-abi.py) resolves imports against real KPI export sets; 378/378 resolved; 15 parser test methods with 28 negative subcases. | Feature-limited implementation | `B` | — |
+| Cross-build | [Tools/cross-build.py](../Tools/cross-build.py) built 0.4.3 from 33 target units as Darwin `MH_KEXT_BUNDLE`; portable encoders and diagnostic service included, inputs hashed before/after. | Feature-limited implementation | `B` | No kernel load or GPU execution |
+| ABI validation | [Tools/tahoe-abi.py](../Tools/tahoe-abi.py) resolves imports against inspected KPI/Lilu export sets; current diagnostic build resolves 426/426 imports. Parser regressions remain separate from native linker/load acceptance. | Feature-limited implementation | `B` | — |
 
 ## Current ceiling
 
@@ -187,13 +187,20 @@ MellowRT on Windows. It checks planning, queue/event ownership, readback, profil
 and rejects unsupported Metal input. This result must not be described as the older standalone
 probe, which has `mellow_runtime_used=false`.
 
+The portable C++ [MetalObjects](../Runtime/MetalObjects.md) now translate the supported MSL/AIR
+subset before calling that provider. MSL and synthetic raw AIR each passed 10,000 GPU submissions
+and independent readbacks through one compiled pipeline, plus ordered encoder checks. The
+[current verification](VERIFICATION-METAL-JIT-2026-09-06.md) records this additional scope. It does
+not provide Apple Metal ABI conformance, rendering, native Tahoe GPU ownership or system registration.
+
 [Drivers/PortedXe](../Drivers/PortedXe) contains six retained Linux source functions and separately
 adapted GGTT bind/unmap loops. The [QEMU runner](../Tools/run-ported-xe-emulator.py) executed the
 actual portable source in a diskless Linux guest: 18,721 checks passed. Five guest negative controls
 and 19 parser controls verified failure handling. The simulated MMIO/DMA/TLB boundary does not
 authenticate firmware, access a real Xe GPU or load the Darwin kext.
 
-Version 0.4.2 links 31 target translation units as `MH_KEXT_BUNDLE`; XeMemory uses the ported
-encoder through one binding unit. Exact records and limits are maintained in
+Version 0.4.3 links 33 target translation units as `MH_KEXT_BUNDLE`; XeMemory uses the ported
+encoder through one binding unit, and the new PCI/IOUserClient service supports bounded DMA
+diagnostics only. Exact records and limits are maintained in
 [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md). No sustained-load or reset/reboot acceptance
 is inferred from these bounded runs.

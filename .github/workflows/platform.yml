@@ -22,20 +22,34 @@ jobs:
       - name: Backport source intake and negative tests
         run: python3 -m unittest discover -s tests -p test_mellow_port.py -v
       - name: Execute ported Linux Xe algorithms and verify provenance
-        run: python3 Tools/run-ported-xe-tests.py --cxx g++ --out build/ported-xe-tests
+        run: python3 Tools/run-ported-xe-tests.py --cxx g++ --out "${{ runner.temp }}/mellow-ported-xe"
       - name: Compile native OpenCL provider without requiring a runner GPU
         run: python3 Tools/run-opencl-runtime.py --cxx g++ --out build/opencl-runtime-build
       - name: Check OpenCL lifecycle and injected cleanup failures
         run: python3 Tools/run-opencl-runtime-regressions.py --cxx g++ --out build/opencl-regressions --sanitize
       - name: Check stress timeout and malformed worker reports
         run: python3 tests/opencl_runtime_stress_report_tests.py
+      - name: Check typed MSL and AIR lowering with sanitizers
+        run: python3 Tools/run-shader-jit-tests.py --cxx g++ --clang clang --require-opencl-syntax --sanitize --out "${{ runner.temp }}/mellow-shader-jit"
+      - name: Check AIR containers and supervised translator failure paths
+        run: |
+          python3 tests/air_decoder_tests.py
+          python3 tests/shader_cli_controls.py
+          python3 tests/metal_objects_report_tests.py
+      - name: Compile Mellow object API without claiming a runner GPU
+        run: python3 Tools/run-metal-objects.py --cxx g++ --out build/metal-objects-compile
+      - name: Check diagnostic driver protocol with sanitizers
+        run: python3 Tools/run-tahoe-diagnostic-tests.py --cxx g++ --sanitize --out "${{ runner.temp }}/mellow-tahoe-diagnostic"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: mellow-platform-host-evidence
           path: |
             build/platform-tests/
-            build/ported-xe-tests/
+            ${{ runner.temp }}/mellow-ported-xe/
             build/opencl-runtime-build/
             build/opencl-regressions/
+            build/metal-objects-compile/
+            ${{ runner.temp }}/mellow-shader-jit/
+            ${{ runner.temp }}/mellow-tahoe-diagnostic/
           if-no-files-found: error

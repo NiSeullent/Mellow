@@ -1,6 +1,25 @@
 Mellow Attribution Notice
 =========================
 
+Platform 0.3.0 / kext 0.4.3 development additions, 2026-09-06
+----------------------------------------------------------
+Adds explicit portable C++ compute objects, original MSL/AIR subset translation,
+LLVM C API interoperability and an opt-in Tahoe IOKit diagnostic service.
+Existing repository and per-file licenses remain controlling. Original files
+that explicitly carry SPDX-License-Identifier: MIT use the standard MIT terms
+reproduced in LICENSES/Mellow-original-MIT.txt; this does not relicense existing
+Mellow, kernel, SDK, driver or combined-artifact code.
+
+The two SDL metallib test fixtures are retained upstream compiler artifacts,
+not locally compiled Apple output. Their source pin, hashes and zlib license
+are in tests/fixtures/air/provenance.json and LICENSE.SDL.txt. They are used
+for container decoding and unsupported-render rejection, not render support.
+The synthetic AIR fixture has separate synthetic-provenance.json. LLVM is
+an explicitly supplied external dependency, not bundled with this release.
+
+Retained attribution and development history
+-------------------------------------------
+
 Mellow is a modified derivative work based on:
 
 1. ChefKiss NootedGreen

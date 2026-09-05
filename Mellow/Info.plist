@@ -15,13 +15,28 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.4.2</string>
+	<string>0.4.3</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>0.4.2</string>
+	<string>0.4.3</string>
 	<key>IOKitPersonalities</key>
 	<dict>
+		<key>MellowTahoeDiagnostic</key>
+		<dict>
+			<key>CFBundleIdentifier</key>
+			<string>com.NiSeullent.Mellow</string>
+			<key>IOClass</key>
+			<string>MellowTahoeDiagnostic</string>
+			<key>IOProviderClass</key>
+			<string>IOPCIDevice</string>
+			<key>IOPCIPrimaryMatch</key>
+			<string>0x7D418086</string>
+			<key>IOProbeScore</key>
+			<integer>1000</integer>
+			<key>IOUserClientClass</key>
+			<string>MellowTahoeDiagnosticClient</string>
+		</dict>
 		<key>DisplayAppleIDInjection</key>
 		<dict>
 			<key>CFBundleIdentifier</key>
@@ -102,6 +117,6 @@
 	<key>MellowDevelopmentBuild</key>
 	<true/>
 	<key>MellowValidationStatus</key>
-	<string>GuC firmware, context execution coordinator, IRQ/fence and public Metal client; physical GPU runtime and Metal driver unverified</string>
+	<string>Opt-in Tahoe PCI/MMIO/prepared-DMA diagnostic service; actual kernel loading and GPU/Metal execution unverified</string>
 </dict>
 </plist>
