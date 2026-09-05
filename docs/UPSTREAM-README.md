@@ -1,3 +1,9 @@
+> **Historical record — preserved unedited.** This document predates the MELLOW
+> re-architecture. It is retained because the record of what was known, and when, is itself
+> evidence. For the current concept and architecture see [CONCEPT.md](CONCEPT.md) and
+> [ARCHITECTURE.md](ARCHITECTURE.md); for what any of it is allowed to claim, see
+> [EVIDENCE-POLICY.md](EVIDENCE-POLICY.md).
+
 # Mellow
 
 Mellow is an experimental Lilu plug-in for Intel Core Ultra integrated graphics. It adapts Apple's Tiger Lake Gen12 graphics stack to Meteor Lake and Arrow Lake iGPUs, with the initial bring-up centered on `8086:7D41` (Arrow Lake-U, Core Ultra 7 255U).

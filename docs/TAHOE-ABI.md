@@ -1,3 +1,9 @@
+> **Historical record — preserved unedited.** This document predates the MELLOW
+> re-architecture. It is retained because the record of what was known, and when, is itself
+> evidence. For the current concept and architecture see [CONCEPT.md](CONCEPT.md) and
+> [ARCHITECTURE.md](ARCHITECTURE.md); for what any of it is allowed to claim, see
+> [EVIDENCE-POLICY.md](EVIDENCE-POLICY.md).
+
 # Actual Tahoe binary evidence and static linkage eligibility
 
 The final Mellow 0.4.0 binary has **378 imports, and all 378 have eligible

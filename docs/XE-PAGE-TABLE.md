@@ -1,3 +1,9 @@
+> **Historical record — preserved unedited.** Component documentation for the hand-written
+> Intel Xe backend, which compiles into the kext but has no call path
+> ([Mellow/RuntimeReadiness.hpp:84](../Mellow/RuntimeReadiness.hpp)). Scheduled to move to
+> `docs/backends/xe/` in P1. For how these modules map onto the vendor-neutral abstraction
+> see [MGAL.md](MGAL.md); for the current architecture see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 # 4단계 GPU 페이지 테이블 구성기
 
 `Mellow/XePageTable.cpp/.hpp`는 CPU 메모리에 4 KiB system-memory GPU 페이지

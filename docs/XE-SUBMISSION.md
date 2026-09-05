@@ -1,3 +1,9 @@
+> **Historical record — preserved unedited.** Component documentation for the hand-written
+> Intel Xe backend, which compiles into the kext but has no call path
+> ([Mellow/RuntimeReadiness.hpp:84](../Mellow/RuntimeReadiness.hpp)). Scheduled to move to
+> `docs/backends/xe/` in P1. For how these modules map onto the vendor-neutral abstraction
+> see [MGAL.md](MGAL.md); for the current architecture see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 # 7D41 GuC firmware·submission·fence 구현
 
 이번 구현은 실제 실행 가능한 C++ 소프트웨어 계층이다. **7D41 하드웨어에

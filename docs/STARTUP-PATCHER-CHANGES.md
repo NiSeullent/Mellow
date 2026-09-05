@@ -1,3 +1,9 @@
+> **Historical record — preserved unedited.** This document predates the MELLOW
+> re-architecture. It is retained because the record of what was known, and when, is itself
+> evidence. For the current concept and architecture see [CONCEPT.md](CONCEPT.md) and
+> [ARCHITECTURE.md](ARCHITECTURE.md); for what any of it is allowed to claim, see
+> [EVIDENCE-POLICY.md](EVIDENCE-POLICY.md).
+
 # Local startup, pattern routing and display probe changes
 
 This is a development derivative of Mellow f895d89653ea5cad3a534cce46a62d0f59384d71, version 0.1.1. A driver entry, kext build or matched device does not establish Metal support.

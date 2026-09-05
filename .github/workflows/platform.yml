@@ -1,0 +1,29 @@
+name: Mellow platform foundation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build and execute portable policy tests
+        run: python3 Tools/run-platform-tests.py --cxx g++ --out build/platform-tests
+      - name: Backport source intake and negative tests
+        run: python3 -m unittest discover -s tests -p test_mellow_port.py -v
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mellow-platform-host-evidence
+          path: build/platform-tests/
+          if-no-files-found: error
