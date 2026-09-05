@@ -35,6 +35,8 @@ specs=[('xe_memory_tests',['XeMemory.cpp']),
        ('xe_zebin_tests',['XeMemory.cpp','XeZebin.cpp']),
        ('xe_bridge_tests',['XeMemory.cpp','XeFirmware.cpp','XeSubmission.cpp'])]
 for name,sources in specs:
+    if 'XeMemory.cpp' in sources:
+        sources = [*sources, 'PortedXeBindings.cpp']
     exe=args.out/(name+('.exe' if sys.platform=='win32' else ''))
     if execute(name+' compile',[args.cxx,'-std=c++17','-O2','-Wall','-Wextra','-Werror','-pedantic',
         '-I'+str(root/'Mellow'),*(['-I'+str(root/'tests/iokit_types')] if name=='xe_page_table_iokit_tests' else []),

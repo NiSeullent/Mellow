@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C42F5B82067D421096F10001 /* PortedXeBindings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C42F5B82067D421096F10002 /* PortedXeBindings.cpp */; };
 		2E1301D52CD9026F00CFD021 /* libkmod.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E1301D42CD9026F00CFD021 /* libkmod.a */; };
 		2E1CC3E22BA5DBD9004EC8F6 /* DisplayMergeNub.h in Headers */ = {isa = PBXBuildFile; fileRef = 2E1CC3E02BA5DBD9004EC8F6 /* DisplayMergeNub.h */; };
 		2E1CC3E32BA5DBD9004EC8F6 /* DisplayMergeNub.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 2E1CC3E12BA5DBD9004EC8F6 /* DisplayMergeNub.cpp */; };
@@ -61,6 +62,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		C42F5B82067D421096F10002 /* PortedXeBindings.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PortedXeBindings.cpp; sourceTree = "<group>"; };
 		1C748C271C21952C0024EED2 /* Mellow.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Mellow.kext; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C748C2E1C21952C0024EED2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2E1301D42CD9026F00CFD021 /* libkmod.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libkmod.a; path = MacKernelSDK/Library/x86_64/libkmod.a; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 		1C748C291C21952C0024EED2 /* Mellow */ = {
 			isa = PBXGroup;
 			children = (
+				C42F5B82067D421096F10002 /* PortedXeBindings.cpp */,
 				1C748C2E1C21952C0024EED2 /* Info.plist */,
 				8C08783D431EFF2D805D7E02 /* XeGuCFirmware.cpp */,
 				AA9EBAD50983BE81A8D4C209 /* XeGuCFirmware.hpp */,
@@ -393,6 +396,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C42F5B82067D421096F10001 /* PortedXeBindings.cpp in Sources */,
 				F0EDFC58B1C04818A187BD4D /* XeGuCFirmware.cpp in Sources */,
 				F15AC567811442834E48303E /* XeGuCFirmwareIOKit.cpp in Sources */,
 				07105C39D3A806F8F8C3B7ED /* XeContext.cpp in Sources */,
@@ -582,7 +586,7 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.1;
+				MODULE_VERSION = 0.4.2;
 				OTHER_CFLAGS = (
 					"-mmmx",
 					"-msse",
@@ -637,7 +641,7 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.1;
+				MODULE_VERSION = 0.4.2;
 				OTHER_CFLAGS = (
 					"-mmmx",
 					"-msse",
@@ -751,7 +755,7 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.1;
+				MODULE_VERSION = 0.4.2;
 				OTHER_CFLAGS = (
 					"-mmmx",
 					"-msse",

@@ -1,58 +1,81 @@
 # Platform implementation status
 
-This file distinguishes the platform foundation from the target architecture and the legacy kext.
+The runnable platform now includes an actual host OpenCL provider and a source-derived part of the
+Xe memory subsystem. [VERIFICATION-2026-09-06](VERIFICATION-2026-09-06.md) records the evidence
+boundaries. Neither the architecture nor a passing algorithm test grants complete GPU/Metal support.
 
-## Implemented in the platform foundation
+## Implemented and exercised
 
-- `Runtime/PlatformRuntime.hpp` and `.cpp`: freestanding C++17 provider/route policy,
-  resource transition admission, reset-generation completion checks and JIT cache identity.
-  These are host-testable policy components; they do not call OpenGL, OpenCL or a GPU.
-- `Tools/mellow-port.py` and `Tools/mellow_port/`: explicit Linux source intake, hashes,
-  licensing facts, conservative inventory, gap reports and limited generated source/build inputs.
-  Successful artifact generation does not assert a compiled or functional driver.
-- `Tools/run-platform-tests.py`, `tests/platform_runtime_test.cpp` and
-  `tests/test_mellow_port.py`: software tests with synthetic providers and source fixtures.
-- `Tools/probe-opencl-substrate.py`: bounded discovery and opt-in OpenCL GPU compute through an
-  installed host driver. This standalone probe bypasses MellowRT/JIT/Metal, records readback and
-  event profiling, and does not infer physical PCI identity from a friendly device name.
+- `Runtime/PlatformRuntime.hpp/.cpp`: bounded provider/route policy, resource transition admission,
+  reset-generation completion checks and cache identity. 108 synthetic policy checks pass with
+  ASan/UBSan. Direct OpenCL C is explicit and cannot satisfy the default Metal translation route.
+- `Runtime/OpenCLProvider.*`: actual OpenCL context/queue/compiler/buffer/event ownership.
+  It validates a bootstrap workload before advertising Compute/OrderedQueue, then uses MellowRT
+  planning and completion correlation for real dispatches. The bounded input is OpenCL C 1.2,
+  one in-place uint buffer and an independent acceptance reference; MSL/AIR is not accepted.
+  Windows Intel driver 32.0.101.6737 reports 8086:7D41 through its advertised Intel query extension.
+  Its final Windows stress run verified 10,000 consecutive submissions (2,560,000 uint results),
+  matching independent expected/readback stream hashes, on one queue/device/session epoch.
+  Forty-five injected lifecycle checks pass under ASan/UBSan; six report-failure tests also pass.
+- `Drivers/PortedXe/`: Linux Xe page-entry algorithms (six unchanged function bodies) and adapted
+  scatter/gather GGTT mapping/clear loops with pin, write, invalidation and release contracts.
+  Addresses/PAT/permissions are validated. Host and actual QEMU Linux guest tests each pass
+  18,721 checks; their MMIO/DMA/invalidations are simulated boundaries.
+- `Mellow/XeMemory.cpp` and `PortedXeBindings.cpp`: call the ported PTE/PDE encoding inside the
+  existing kext source target while preserving its 46-bit, 4K, system-memory and read-only contract.
+  Actual cross compilation/linking produces Mellow.kext 0.4.2, a 31-unit x86_64 MH_KEXT_BUNDLE.
+  Its 378 unresolved kernel/Lilu imports introduce no new names relative to the previous kext;
+  their resolution on an installed Tahoe kernel remains untested.
+- `Tools/mellow-port.py` and `Tools/mellow_port/`: source intake, hashes, licensing facts,
+  lexical inventory, gap reports and limited integer extraction. Eleven tests pass. The separate
+  PortedXe subsystem is a reviewed manual port, not output demonstrating automatic driver conversion.
 
-## Recorded verification
+## What has not been implemented or validated
 
-[platform-foundation.json](../validation/platform-foundation.json) records C++ policy checks
-with ASan/UBSan and Python source-intake tests. Two separately fetched, pinned upstream inputs
-identified 17 Xe register constants and 3 amdgpu constants. Generation emitted the 17 Xe constants;
-the amdgpu file's missing SPDX expression caused source-derived generation to be withheld.
-The remaining semantic contracts stay unimplemented and both plans explicitly report `driver_ready=false`.
+Mellow-owned Objective-C Metal objects, MSL/AIR/metallib lowering, Metal JIT, a GL rendering provider,
+cross-API resource sharing, complete LinuxKPI/DRM and vendor driver ports, NVIDIA/AMD driver binding,
+system Metal registration and WindowServer integration remain work.
 
-[opencl-windows-substrate.json](../validation/opencl-windows-substrate.json) records an actual
-Windows execution using Intel OpenCL Graphics / NEO, driver 32.0.101.6737. Three nonce-varied
-256-element `x * 7 + 3` submissions passed readback and nonzero ordered GPU event timestamps.
-The result is `PASS_OPENCL_GPU_SUBSTRATE_ONLY`: Mellow, Metal, macOS and physical PCI attribution
-are not validated by that result. The probe tool hash is recorded in the report.
+The new memory algorithms do not create a real Darwin DMA/IOMMU mapping, perform physical GGTT
+writes, authenticate GuC firmware or prove actual GPU interrupts/fences. Their test callbacks are
+explicitly simulated. The Windows OpenCL provider uses the installed Intel Windows driver; it
+does not execute the ported kernel backend. It cannot establish macOS support for 7D41.
 
-## Not implemented by this change
+No physical Tahoe host was available for this verification. Actual kext loading, installation,
+Recovery GUI, Metal compute/render/stress, WindowServer and sleep/wake have not passed.
+The separate QEMU Recovery experiment reached boot.efi/kernel collection loading, not a verified
+XNU boot or Recovery desktop. QEMU algorithm tests do not close that boot blocker.
 
-`libMellowMTL`, a Mellow-owned Objective-C `MTLDevice`, AIR/metallib lowering, MSL JIT,
-actual GL/CL providers, MellowGL/MellowCL, XNU LinuxKPI, Mesa winsys adaptation,
-NVIDIA/AMD driver binding, system Metal registration and WindowServer integration remain work.
-No placeholder backend is registered to make those features appear present.
+## Reproduce the implemented paths
 
-The native Xe modules under `Mellow/` retain their previous experimental scope. The new portable
-runtime is not wired into that kext or the Galaxy Book EFI. Existing native test reports refer to
-their recorded snapshots, not to the new platform or a physical acceleration result.
+Python 3.9 or newer and a C++17 compiler are required for the portable source/tool tests.
 
-## Verification commands
+```sh
+python3 Tools/run-platform-tests.py --cxx g++ --out build/platform-tests --sanitize
+python3 -m unittest discover -s tests -p test_mellow_port.py -v
+python3 Tools/run-ported-xe-tests.py --cxx g++ --out build/ported-xe-tests
+python3 Tools/run-opencl-runtime-regressions.py --cxx g++ --out build/opencl-regressions --sanitize
+```
 
-Run `python3 Tools/run-platform-tests.py --out build/platform-tests` with a C++17 compiler,
-and `python3 -m unittest discover -s tests -p test_mellow_port.py` for the source intake tool.
-The source-intake host needs Python 3.9 or newer; portable policy tests also need a working C++17
-compiler. A macOS SDK is not required for these
-portable tests. The native kext continues to use its separate Xcode workflow.
+On Windows with an installed Intel OpenCL driver and MinGW compiler:
 
-Run `python Tools/probe-opencl-substrate.py --report build/opencl-discovery.json` to discover an
-installed OpenCL GPU runtime. Add `--compute` to run the small fixed kernel under a 30-second worker
-deadline. This command does not install or modify a driver and does not fall back to a CPU device.
+```powershell
+python Tools/run-opencl-runtime.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/opencl-runtime --compute
+python Tools/run-opencl-runtime.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/opencl-stress --compute --iterations 10000 --timeout 180
+```
 
-Read [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md) for the implementation contracts and
-[PLATFORM-DECISIONS](PLATFORM-DECISIONS.md) for reviewed assumptions and primary sources.
-No Metal family, GPU, or operating-system support claim is granted by host tests.
+Omit `--compute` for compile-only validation. Actual driver calls are supervised in a separate
+process with a deadline. Driver failure, unexpected device identity, event ownership mismatch,
+readback mismatch or cleanup failure cannot produce successful runtime completion.
+
+Use [run-ported-xe-emulator.py](../Tools/run-ported-xe-emulator.py) from Linux/WSL with QEMU and
+an explicitly supplied Linux kernel. It boots an initramfs and runs the compiled tests as a child
+of guest PID1. Success requires the exact guest protocol, nonzero checks, expected scope flags,
+process/VM exits and stable input/source hashes. It is not a Xe GPU device model.
+
+## Historical evidence
+
+[platform-foundation.json](../validation/platform-foundation.json) describes the earlier 102-check
+policy/intake snapshot. [opencl-windows-substrate.json](../validation/opencl-windows-substrate.json)
+is the earlier independent probe, which bypassed MellowRT. Their recorded source hashes and scope
+remain historical; use the current verification record for the integrated provider and port.

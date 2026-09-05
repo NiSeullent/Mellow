@@ -3,33 +3,39 @@
 > **Scope and precedence:** [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md),
 > [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md), and
 > [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md) govern conflicting draft assumptions.
-> Runtime policy and source-intake tools are runnable; the Metal facade, shader JIT, live GL/CL
-> providers and integrated XNU GPU backend are not implemented. No Mellow GPU/Metal PASS exists.
+> Current evidence includes policy/intake, native Windows OpenCL provider execution and portable Xe tests.
+> Standalone probe results remain separate; no Metal, WindowServer or display acceptance has passed.
+> Native macOS GPU execution remains unverified; see IMPLEMENTATION-STATUS for the recorded scope.
 
 ## 한글 요약
 
 목표 디렉터리 구조와 현재→목표 이관 대응표다. **이 문서는 서술이며, P0에서는 실행하지 않는다.**
-기존 source의 이관은 아직 실행하지 않았다. 새 Runtime/와 Tools/mellow_port/는 현재
-존재하며, 아래 목표 kernel/userspace/tools 구조와 구별해야 한다.
+기존 source의 디렉터리 이관은 아직 실행하지 않았다. Runtime/의 native OpenCL provider,
+Drivers/PortedXe/의 검토한 Linux 함수 이식과 Tools/mellow_port/는 현재 존재한다.
+XeMemory의 encoder 연결은 실제 kext에 포함됐으며, 아래 목표 kernel/userspace/tools 구조와 구별한다.
 핵심 원칙은 **평면별 분리** — `kernel/`(Plane 1–2), `userspace/`(Plane 3–4), `tools/`(Plane 0) —
 와 **backend별 격리**다. 기존 증거 자료(`validation/`, `abi-evidence/`, `compiler-evidence/`,
 `tests/*.json`)는 **전량 그대로 보존**한다.
 
 ---
 
-**Status: current tree plus a proposed migration. New Runtime/policy and Tools/intake files exist.
-Legacy source migration is not performed; target directories and future bundles below are proposals.**
+**Status: current tree plus a proposed migration. Runtime policy/native OpenCL, reviewed PortedXe
+source integration and Tools/intake files exist. Directory migration is not performed; target
+directories and future bundles below are proposals.**
 
 ## Current layout
 
 ```
 Mellow/
-├─ Mellow/                 retained legacy plug-in and Xe research modules
-├─ Runtime/                PlatformRuntime.hpp/.cpp policy/cache contracts; no live provider
+├─ Mellow/                 retained plug-in/Xe modules; PortedXeBindings.cpp links encoders once
+├─ Drivers/PortedXe/       six retained Linux functions, GGTT bind/unmap, notices and provenance
+├─ Runtime/                PlatformRuntime policy/cache plus native OpenCLProvider and ABI loader
 ├─ Tools/                  build, ABI, Metal, test orchestration
 │  ├─ mellow-port.py        current inspect/plan/generate entry point
 │  ├─ mellow_port/          source analysis/report and bounded generation
-│  └─ run-platform-tests.py policy contract host-test runner
+│  ├─ run-platform-tests.py policy contract host-test runner
+│  ├─ run-opencl-runtime.py native OpenCL provider build/acceptance
+│  └─ run-ported-xe-*.py   portable host tests and real QEMU Linux guest execution
 ├─ Userspace/              metal_session.py, mellow_acceptance.py
 ├─ tests/                  host tests and result JSON
 ├─ validation/             evidence JSON
@@ -37,12 +43,20 @@ Mellow/
 ├─ compiler-evidence/      Intel ocloc output
 ├─ docs/                   flat document set
 ├─ Lilu.kext/  MacKernelSDK/
-└─ Mellow.xcodeproj/       existing native kext project; Runtime is not integrated into the kext
+└─ Mellow.xcodeproj/       31-unit 0.4.2 kext target includes PortedXe; Runtime remains userspace
 ```
 
-The flat `Mellow/` directory is the main problem: it mixes ~12k LOC of Apple-impersonation patching
-with ~2.5k LOC of vendor-neutral-shaped Xe backend and the display code, with no boundary between
-them.
+`Mellow/` still contains Apple compatibility patching, experimental Xe modules and display code.
+The portable source now has its own `Drivers/PortedXe` boundary. Its six retained function bodies
+and adapted GGTT loops preserve their source notices; this separation does not relicense the rest
+of the tree. XeMemory calls PTE/PDE wrappers through one binding translation unit, retaining its
+46-bit DMA and read-only contracts. The 0.4.2 `MH_KEXT_BUNDLE` build is structural evidence;
+native GPU execution and the complete device owner remain unverified or unimplemented.
+
+Windows OpenCL execution uses `Runtime/OpenCLProvider`, independently of that kext. Portable Xe
+tests executed 18,721 checks in a Linux QEMU guest, with simulated MMIO/DMA/TLB boundaries and no
+Xe GPU model. Current source-bound evidence is indexed by
+[IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md).
 
 ## Proposed target layout — not the current filesystem
 
@@ -118,7 +132,8 @@ still require changes; one directory does not guarantee isolation of semantics o
 | `Mellow/Info.plist` | `kernel/MellowKMD/Info.plist` | Personalities revised; profiles generalized per backend |
 | `Userspace/*.py` | `userspace/tools/` | Unchanged content |
 | `Tools/*` | `tools/` | Future migration only; update imports/entry points and tests first |
-| `Runtime/PlatformRuntime.*` | `userspace/MellowRT/` policy layer | Existing code; destination proposed, live execution unimplemented |
+| `Runtime/PlatformRuntime.*`, `OpenCLProvider.*`, `OpenCLAbi.hpp` | `userspace/MellowRT/` | Existing policy and bounded native OpenCL execution; destination proposed; Metal/JIT remain unimplemented |
+| `Drivers/PortedXe/*`, `Mellow/PortedXeBindings.cpp` | Reviewed portable subsystem under the future Xe backend | Existing integration; preserve notices/provenance and exactly one compiled implementation |
 | `docs/XE-*.md` | `docs/backends/xe/` | Bodies unedited |
 | `docs/IOACCEL-METAL.md`, `METAL-IMPLEMENTATION-PLAN.md`, `METAL-USERSPACE.md`, `METAL-PATH-CHANGES.md`, `USERLAND-METAL-EVIDENCE-AUDIT-*.md`, `NATIVE-XE-BACKEND-AUDIT.md`, `DRIVER-CORE-CHANGES.md`, `STARTUP-PATCHER-CHANGES.md`, `ACCEPTANCE-0.4.1.ko.md`, `BUILD-VALIDATION.md`, `EXPERIMENTS.md`, `UPSTREAM-README.md` | `docs/history/` | **Bodies unedited.** Banners added in P0 |
 | `validation/`, `abi-evidence/`, `compiler-evidence/`, `tests/*.json` | unchanged | **Preserved in full** |

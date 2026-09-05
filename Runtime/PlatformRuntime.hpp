@@ -12,6 +12,7 @@ enum class Api : uint8_t { OpenGL, OpenCL, Native, CpuReference };
 enum class ProviderKind : uint8_t { Host, Mellow, Reference };
 enum class Execution : uint8_t { Hardware, Software };
 enum class Workload : uint8_t { Compute, Render, Blit };
+enum class WorkloadInput : uint8_t { MetalSemantics, OpenClC };
 enum class Feature : uint64_t {
     Compute = 1ULL << 0, Render = 1ULL << 1, Blit = 1ULL << 2,
     ComputeTranslation = 1ULL << 3, RenderTranslation = 1ULL << 4,
@@ -53,6 +54,7 @@ struct Step {
     Workload workload {Workload::Compute};
     Features required {}; // Every semantic/format requirement of this workload.
     uint64_t requiredProvider {}; // Zero lets the planner select a provider.
+    WorkloadInput input {WorkloadInput::MetalSemantics};
 };
 struct Dependency {
     size_t producer {};

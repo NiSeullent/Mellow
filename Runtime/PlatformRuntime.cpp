@@ -33,7 +33,9 @@ bool supports(const ProviderDescriptor &p, const Step &s, bool reference) {
     if (reference) {
         if (p.api != Api::CpuReference) return false;
     } else if (p.execution != Execution::Hardware || p.api == Api::CpuReference) return false;
-    const Features needed = baseline(s.workload) | s.required | bit(Feature::OrderedQueue);
+    if (s.input == WorkloadInput::OpenClC && (p.api != Api::OpenCL || s.workload != Workload::Compute)) return false;
+    const Features operations = s.input == WorkloadInput::OpenClC ? bit(Feature::Compute) : baseline(s.workload);
+    const Features needed = operations | s.required | bit(Feature::OrderedQueue);
     if ((p.verified & needed) != needed) return false;
     if (p.api == Api::OpenGL) {
         // Core compute shaders arrived in GL 4.3. GL 4.1 availability is not
@@ -131,7 +133,8 @@ RoutePlan planWorkload(const ProviderDescriptor *providers, size_t providerCount
         for (size_t j = 0; j < i; ++j) if (providers[j].id == providers[i].id) return plan;
     }
     for (size_t i = 0; i < stepCount; ++i)
-        if (!baseline(steps[i].workload) || (steps[i].required & ~KnownFeatures)) return plan;
+        if (!baseline(steps[i].workload) || (steps[i].required & ~KnownFeatures) ||
+            (steps[i].input != WorkloadInput::MetalSemantics && steps[i].input != WorkloadInput::OpenClC)) return plan;
     for (size_t i = 0; i < dependencyCount; ++i) {
         const auto &d = dependencies[i];
         if (!d.resource || d.producer >= d.consumer || d.consumer >= stepCount ||

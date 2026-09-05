@@ -1,5 +1,6 @@
 // Local 7D41 research implementation, 2026. See LICENSE and NOTICE.
 #include "XeMemory.hpp"
+#include "../Drivers/PortedXe/XePageTable.hpp"
 
 namespace XeMemory {
 static bool powerOfTwo(uint64_t value) { return value && !(value & (value - 1)); }
@@ -14,23 +15,18 @@ static bool alignUp(uint64_t value, uint64_t alignment, uint64_t &out) {
     out = (value + alignment - 1) & ~(alignment - 1);
     return true;
 }
-static uint64_t patBits(uint8_t pat) {
-    // Intel xe_gtt_defs.h: PAT0=3, PAT1=4, leaf PAT2=7, Xe-LPG PAT3=62.
-    return ((pat & 1U) ? (1ULL << 3) : 0) |
-           ((pat & 2U) ? (1ULL << 4) : 0) |
-           ((pat & 4U) ? (1ULL << 7) : 0) |
-           ((pat & 8U) ? (1ULL << 62) : 0);
-}
 Status encodeSystemPte4K(uint64_t address, uint8_t pat, bool writable, uint64_t &entry) {
     if (!dmaPage(address) || pat > 15) return Status::Invalid;
-    entry = address | 1ULL | (writable ? 2ULL : 0) | patBits(pat);
-    return Status::Ok;
+    // Preserve this backend's 46-bit system-memory/4K contract. Upstream Xe
+    // encoding does not establish PAT programming or a hardware DMA mapping.
+    const auto result = Mellow::PortedXe::encodePpgtt(address, pat, 0, false, 46, entry, writable);
+    return result == Mellow::PortedXe::Status::Ok ? Status::Ok : Status::Invalid;
 }
 Status encodeSystemPde(uint64_t address, uint8_t pat, uint64_t &entry) {
     // Non-leaf tables expose only PAT0/PAT1 in Intel's xelp_pde_encode_bo.
     if (!dmaPage(address) || pat > 3) return Status::Invalid;
-    entry = address | 3ULL | patBits(pat);
-    return Status::Ok;
+    const auto result = Mellow::PortedXe::encodePde(address, pat, 46, entry);
+    return result == Mellow::PortedXe::Status::Ok ? Status::Ok : Status::Invalid;
 }
 Status pageTableIndices(uint64_t address, uint16_t (&indices)[4]) {
     if (address >= VaLimit) return Status::Invalid;

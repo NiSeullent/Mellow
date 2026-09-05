@@ -7,10 +7,12 @@ Mellow는 Metal 요청을 자체 객체·셰이더 변환·명령 실행 계층�
 Metal 2/3의 기능을 단계적으로 구현하고, Linux 드라이버 소스를 활용해 macOS에 드라이버가
 없는 GPU까지 확장하는 것이 목표입니다.
 
-현재는 **플랫폼 정책 코드와 소스 포팅 분석 도구를 실행·시험할 수 있는 개발 단계**입니다.
-Mellow-owned Metal 장치, 셰이더 JIT, 실제 GL/CL provider와 Linux→XNU GPU driver는 아직
-구현되지 않았습니다. RTX 3080·RTX 3090·RX 9070·8086:7D41은 연구 대상이며,
-어느 장치도 Mellow Metal 가속 성공으로 표시하지 않습니다.
+현재는 **실제 OpenCL 제공자와 Linux Xe 페이지 테이블 부분 이식을 실행·시험하는 개발 단계**입니다.
+Windows의 Intel GPU에서 MellowRT를 통한 OpenCL C 제출·readback·완료 추적을 실행했습니다.
+Linux Xe 원본 함수는 기존 kext 메모리 경로에 연결하여 Mellow.kext 0.4.2로 빌드했고,
+QEMU Linux 게스트에서도 이식 알고리즘을 실행했습니다.
+Mellow-owned Metal 장치, MSL/AIR JIT, 전체 Linux→XNU GPU driver는 아직 구현되지 않았습니다.
+RTX 3080·RTX 3090·RX 9070·8086:7D41 중 어느 장치도 Mellow Metal 가속 성공으로 표시하지 않습니다.
 
 ## 설계의 기준
 
@@ -18,6 +20,7 @@ Mellow-owned Metal 장치, 셰이더 JIT, 실제 GL/CL provider와 Linux→XNU G
 - [검토한 설계 결정 / RFC 001](docs/PLATFORM-DECISIONS.md): GL/CL 기능 한계, AIR frontend,
   NVIDIA/Mesa ABI, LinuxKPI, WindowServer 통합의 전제.
 - [실제 구현 상태](docs/IMPLEMENTATION-STATUS.md): 구현·미구현·검증 명령의 구분.
+- [드라이버 이식·실제 GPU·QEMU 검증 기록](docs/VERIFICATION-2026-09-06.md): 환경별 실행과 남은 관문.
 
 작업 중 생성된 CONCEPT, ARCHITECTURE, MGAL, SHADER-JIT 등의 문서는 설계 제안으로
 보존합니다. 내용이 충돌하면 위 세 문서와 실제 실행 기록을 우선합니다.
@@ -56,8 +59,10 @@ display scanout은 별도 검증 단계입니다.
 - JIT 캐시 식별에는 소스·entry point·frontend·lowering·backend·driver·target·옵션·
   specialization·resource ABI의 digest가 모두 들어갑니다.
 
-이 코드는 신뢰하는 adapter가 전달한 정보를 검증하는 정책입니다.
-실제 GPU 관측을 수집하거나 Metal 셰이더를 컴파일하지 않습니다.
+이 정책 코드 자체는 GPU 관측을 수집하거나 셰이더를 컴파일하지 않습니다.
+[OpenCLProvider](Runtime/OpenCLProvider.md)가 실제 context·queue·event·buffer를 소유하고
+관측을 수집합니다. 명시적인 `OpenClC` 입력만 직접 실행할 수 있으며, 기본 Metal 입력은
+번역 기능이 없으므로 거절합니다.
 
 ```sh
 python3 Tools/run-platform-tests.py --cxx g++ --out build/platform-tests
@@ -73,6 +78,22 @@ event timestamp를 확인했습니다. 이 시험은 MellowRT/JIT/Metal을 사�
 ```sh
 python Tools/probe-opencl-substrate.py --compute --report build/opencl-substrate.json
 ```
+
+위 독립 probe에서 발전한 실제 C++ runtime 경로는 다음과 같습니다. Windows 예시이며
+GPU가 없는 CI에서는 `--compute`를 생략해 컴파일만 수행합니다.
+
+```powershell
+python Tools/run-opencl-runtime.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/opencl-runtime --compute
+```
+
+실제 Windows 시험에서는 `--iterations 10000 --timeout 180`으로 연속 10,000회,
+총 2,560,000개 결과를 검증했습니다. 모든 제출의 event·readback·완료·자원 해제를 확인하고
+전체 스트림 hash를 Python의 독립 계산과 대조했습니다. 이 결과는 OpenCL C 실행이며
+Metal 또는 이식한 Darwin backend의 실기 실행 결과는 아닙니다.
+
+드라이버가 보고한 `cl_intel_device_attribute_query` 확장을 확인한 뒤 장치 ID를 조회합니다.
+현재 시험에서는 `8086:7D41`을 반환했습니다. 물리 PCI 소유권이나 Tahoe 드라이버 검증으로
+승격하지 않으며, 관측할 수 없는 reset/page-fault 수치를 0으로 만들지 않습니다.
 
 ## Linux 소스 포팅 도구
 
@@ -102,10 +123,19 @@ python3 Tools/mellow-port.py generate \
 [NVIDIA 공개 모듈](https://github.com/NVIDIA/open-gpu-kernel-modules)은 대응 GSP와 userspace가
 필요하며, NVIDIA RM과 Nouveau/Mesa winsys의 ABI는 별도입니다.
 
+[Drivers/PortedXe](Drivers/PortedXe/PORTING-NOTES.md)는 분석 도구와 별개인 실제 수동 부분 이식입니다.
+고정 Linux commit의 원본 함수 6개, SG 기반 GGTT bind/unmap과 명시적인 pin·invalidation 계약을
+컴파일·실행합니다. 기존 XeMemory의 PPGTT/PDE 함수도 이 코드를 호출합니다.
+호스트와 QEMU에서 각각 18,721개 검사를 통과했지만 MMIO/DMA 경계는 시험 모델입니다.
+이 부분 이식은 임의 Linux driver를 완성된 kext로 자동 변환한다는 뜻이 아닙니다.
+
 ## 기존 연구 자산과 검증 범위
 
-`Mellow/`의 Lilu/Xe 코드는 이전 연구 경로로 유지됩니다. 새 Runtime은 현재 kext에
-연결되지 않으며 이 개편이 Galaxy Book EFI에 GPU 드라이버를 활성화하지 않습니다.
+`Mellow/`의 Lilu/Xe 연구 경로에는 새 PortedXe PTE/PDE 인코더를 연결했습니다.
+기존 46비트 DMA·4 KiB system-memory·read-only 계약을 유지하고, kext 0.4.2의
+31개 대상 소스를 실제 Darwin linker로 빌드했습니다. 사용자 공간 MellowRT는 별도입니다.
+구조 검증은 실제 Tahoe 적재·GuC·GPU 실행을 입증하지 않으며, 이 변경을 USB EFI에
+자동 활성화하지 않았습니다.
 
 - [기존 native backend 감사](docs/NATIVE-XE-BACKEND-AUDIT.md)
 - [실제 kext 빌드 기록](docs/BUILD-VALIDATION.md)
