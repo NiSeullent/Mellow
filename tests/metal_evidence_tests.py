@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 import plistlib
 import struct
 import tempfile
@@ -122,7 +123,9 @@ class EvidenceGateTests(unittest.TestCase):
 class MachOInventoryTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.data = (ROOT / "build/Release/Mellow.kext/Contents/MacOS/Mellow").read_bytes()
+        binary = Path(os.environ.get("MELLOW_KEXT_BINARY",
+                      str(ROOT / "build/Release/Mellow.kext/Contents/MacOS/Mellow")))
+        cls.data = binary.read_bytes()
 
     def test_real_crossbuilt_kext_inventory_not_abi_pass(self):
         result = abi.macho_inventory(self.data)

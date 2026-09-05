@@ -29,9 +29,9 @@ def digest(path):
 
 def source_hashes():
     paths = []
-    for directory in ('Mellow', 'tests', 'Userspace'):
+    for directory in ('Mellow', 'Drivers/PortedXe', 'tests', 'Userspace'):
         paths.extend(path for path in (ROOT / directory).rglob('*')
-                     if path.is_file() and path.suffix in ('.cpp', '.hpp', '.h', '.inl', '.py'))
+                     if path.is_file() and path.suffix in ('.cpp', '.hpp', '.h', '.inc', '.inl', '.py'))
     paths.extend((ROOT / 'Tools').glob('*.py'))
     paths.append(ROOT / 'compiler-evidence/mellow_evidence_mtl.bin')
     return {path.relative_to(ROOT).as_posix(): digest(path) for path in sorted(set(paths))}
@@ -100,6 +100,8 @@ def main():
 
     execute('compiler_version', [args.cxx, '--version'])
     for name, sources in SPECS:
+        if 'XeMemory.cpp' in sources:
+            sources = [*sources, 'PortedXeBindings.cpp']
         binary = args.out / (name + ('.exe' if os.name == 'nt' else ''))
         command = [args.cxx, '-std=c++17', '-O2', '-Wall', '-Wextra', '-Werror',
                    '-I' + str(ROOT / 'Mellow'), ROOT / 'tests' / (name + '.cpp'),
@@ -136,7 +138,9 @@ def main():
         scope='Real production source with explicit host MMIO, DMA, OS and GPU-peer simulations; no physical GPU, IRQ, firmware upload or Metal execution',
         baseline_included=args.baseline, firmware_sha256=digest(args.firmware),
         source_sha256=before, source_changed_during_run=changed,
-        production_sources={name: ['Mellow/' + source for source in sources] for name, sources in SPECS},
+        production_sources={name: ['Mellow/' + source for source in
+            (sources + ['PortedXeBindings.cpp'] if 'XeMemory.cpp' in sources else sources)]
+            for name, sources in SPECS},
         results=results)
     target = args.out / 'runtime-tests.json'
     target.write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')

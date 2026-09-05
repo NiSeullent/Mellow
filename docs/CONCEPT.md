@@ -3,7 +3,9 @@
 > **Design draft; implementation status is separate.**
 > [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md) and [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md)
 > take precedence over conflicting assumptions below. [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md)
-> records the runnable policy/intake code. No GPU, Metal, WindowServer or display acceptance has passed.
+> records policy/intake, the native Windows OpenCL provider, portable Xe tests and kext build evidence.
+> Standalone OpenCL probes and MellowRT provider execution have separate records; no Metal, WindowServer
+> or display acceptance has passed. Native macOS GPU execution remains unverified.
 
 ## 한글 요약
 

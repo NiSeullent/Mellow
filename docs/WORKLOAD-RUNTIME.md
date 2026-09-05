@@ -3,23 +3,47 @@
 > **Design draft; implementation status is separate.**
 > [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md) and [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md)
 > take precedence over conflicting assumptions below. [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md)
-> records the runnable policy/intake code. No GPU, Metal, WindowServer or display acceptance has passed.
+> records policy/intake, the native Windows OpenCL provider, portable Xe tests and kext build evidence.
+> Standalone OpenCL probes and MellowRT provider execution have separate records; no Metal, WindowServer
+> or display acceptance has passed. Native macOS GPU execution remains unverified.
 
 ## 한글 요약
 
 MellowRT는 자원 모델을 소유하고, command buffer 단위로 어느 기판이 작업을 실행할지 고른다.
-제공자는 두 종류다 — **Host provider**는 Apple의 `OpenGL.framework`(4.1)/`OpenCL.framework`를 쓰며
-이미 가속되는 GPU용이고, **Mellow provider**는 Mesa 파생 `libMellowGL`/`libMellowCL`을 MGAL 위에서
-돌려 macOS에 드라이버가 없는 GPU에 기판 자체를 공급한다.
+목표 설계의 제공자는 두 종류다. **Host provider**는 이미 설치된 GPU 드라이버의 API를 쓰며,
+현재 native OpenCL adapter는 Windows에서 실행됐다. macOS의 Apple GL/CL 연결은 별도 검증이
+필요하다. **Mellow provider**는 Mesa 파생 `libMellowGL`/`libMellowCL`을 MGAL 위에서 실행하는
+미구현 목표다.
 라우팅 경로는 `cl`/`gl`/`native`/`cpu`이며, **`cpu`는 시험용 참조값 전용으로 명시적 opt-in 없이는
 도달할 수 없고 그 경로로 완료된 작업은 반드시 관측 가능하게 표시된다.**
 IOSurface import/export는 format·소유권·동기화 계약을 별도로 검증한다.
-**실제 provider는 미구현이며, 정책 코드는 IMPLEMENTATION-STATUS를 따른다.**
+**현재 OpenCL C compute provider는 구현·실행됐고, Metal facade/JIT/GL/IOSurface는 미구현이다.**
+정확한 실행 범위와 기록은 IMPLEMENTATION-STATUS를 따른다.
 
 ---
 
-**Status: provider execution is planned. PlatformRuntime policy/cache contracts now exist; see
-[IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md). They do not collect GPU evidence or execute shaders.**
+**Current: PlatformRuntime policy contracts and a native OpenCL C provider execute bounded GPU
+compute on Windows. Metal command-buffer routing, JIT, OpenGL and compositor integration below
+remain design contracts. See [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md).**
+
+## Implemented native host boundary
+
+[Runtime/OpenCLProvider](../Runtime/OpenCLProvider.md) dynamically loads the installed host OpenCL
+driver. The acceptance executable links this adapter with PlatformRuntime. After a bounded
+bootstrap witness, explicit `OpenClC` steps pass through `planWorkload()` and actual event
+observations pass through `CompletionTracker`; enqueue, queue/context ownership, result bytes,
+ordered profiling and cleanup are checked before accepting completion.
+
+The current API admits bounded OpenCL C source, one kernel entry and one in-place uint buffer.
+It requests GPU devices and does not switch to a CPU device after failure. Windows execution
+used the driver-reported `8086:7D41`; this query is not independent physical PCI attribution.
+Linux/macOS loader code exists but has no host execution acceptance from the Windows result.
+This provider requires Intel device-attribute identity in its first version; it is not generic
+AMD/NVIDIA support. Default Metal input remains unsupported because no MSL/AIR compiler exists.
+
+The earlier standalone substrate probe bypassed MellowRT. Its record remains distinct from this
+native adapter's runtime planning and completion evidence. Both use the installed host driver;
+neither loads Mellow's Darwin kext, provides scanout or establishes reset/reboot stability.
 
 ## What this plane owns
 
@@ -32,8 +56,8 @@ Three responsibilities:
 
 ## Provider kinds
 
-The two provider kinds are a direct consequence of the two halves of the thesis in
-[CONCEPT.md](CONCEPT.md).
+The following table describes the target macOS architecture from [CONCEPT.md](CONCEPT.md).
+It is not the implementation inventory; the Windows host adapter above is the current execution path.
 
 | | Host provider | Mellow provider |
 | --- | --- | --- |
@@ -72,7 +96,7 @@ flowchart TB
 | --- | --- | --- |
 | `cl` | Compute encoders | An OpenCL provider of either kind |
 | `gl` | Render and blit encoders | An OpenGL provider of either kind |
-| `native` | Everything, at best performance | A complete backend module and MELLOW-UAPI |
+| `native` | Features with reviewed direct-submission implementations; performance measured separately | A complete backend module and MELLOW-UAPI |
 | `cpu` | **Test reference values only** | Explicit opt-in; never selected automatically |
 
 Route selection stays within an admitted physical device/provider domain. Cross-domain sharing
@@ -158,8 +182,9 @@ rather than emitting work whose ordering it cannot guarantee.
 
 ## Relationship to MGAL
 
-The Mellow provider is a client of [MGAL](MGAL.md) through [MELLOW-UAPI](MELLOW-UAPI.md). The host
-provider bypasses both entirely — it talks to Apple's frameworks, which talk to Apple's driver.
+The proposed Mellow provider is a client of [MGAL](MGAL.md) through [MELLOW-UAPI](MELLOW-UAPI.md).
+Host providers bypass both: the current Windows adapter uses the installed OpenCL driver;
+the proposed macOS adapters would use Apple's frameworks and must be tested there separately.
 
 This is why the plane boundary is drawn here: everything above Plane 3 is provider-agnostic, and
 everything below Plane 3 exists only for GPUs that need Mellow to supply the substrate.

@@ -50,6 +50,13 @@ static void routes() {
     CHECK(one(cl, {Workload::Compute, bit(Feature::ArgumentBuffersTier2), 0}).status == PlanStatus::UnsupportedFeatures);
     cl.verified &= ~bit(Feature::ComputeTranslation);
     CHECK(one(cl, compute).status == PlanStatus::UnsupportedFeatures);
+    const Step direct {Workload::Compute, 0, 0, WorkloadInput::OpenClC};
+    CHECK(one(cl, direct).status == PlanStatus::Ready);
+    CHECK(one(cl, {Workload::Render, 0, 0, WorkloadInput::OpenClC}).status == PlanStatus::UnsupportedFeatures);
+    CHECK(one(cl, {Workload::Blit, 0, 0, WorkloadInput::OpenClC}).status == PlanStatus::UnsupportedFeatures);
+    CHECK(one(gl, direct).status == PlanStatus::UnsupportedFeatures);
+    CHECK(one(provider(9, Api::Native), direct).status == PlanStatus::UnsupportedFeatures);
+    CHECK(one(cl, {Workload::Compute, 0, 0, static_cast<WorkloadInput>(255)}).status == PlanStatus::InvalidInput);
     cl = provider(2, Api::OpenCL);
     cl.verified &= ~bit(Feature::OrderedQueue);
     CHECK(one(cl, compute).status == PlanStatus::UnsupportedFeatures);

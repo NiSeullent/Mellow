@@ -62,7 +62,7 @@ def sources_from_project(root):
 
 def input_hashes(root):
     paths = []
-    for folder in ("Mellow", "Lilu.kext/Contents/Resources", "MacKernelSDK"):
+    for folder in ("Mellow", "Drivers/PortedXe", "Lilu.kext/Contents/Resources", "MacKernelSDK"):
         paths.extend(p for p in (root / folder).rglob("*") if p.is_file())
     paths.append(root / "Mellow.xcodeproj/project.pbxproj")
     return {str(p.relative_to(root)).replace("\\", "/"): hashlib.sha256(p.read_bytes()).hexdigest()

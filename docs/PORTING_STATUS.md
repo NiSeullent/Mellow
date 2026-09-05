@@ -3,8 +3,9 @@
 > **Scope and precedence:** [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md),
 > [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md), and
 > [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md) govern conflicting draft assumptions.
-> Runtime policy and source-intake tools are runnable; the Metal facade, shader JIT, live GL/CL
-> providers and integrated XNU GPU backend are not implemented. No Mellow GPU/Metal PASS exists.
+> Current evidence includes policy/intake, native Windows OpenCL provider execution and portable Xe tests.
+> Standalone probe results remain separate; no Metal, WindowServer or display acceptance has passed.
+> Native macOS GPU execution remains unverified; see IMPLEMENTATION-STATUS for the recorded scope.
 
 ## 한글 요약
 
@@ -12,8 +13,9 @@
 "평면별·backend별 포팅 상태"로 재조정했다. 증거 사다리 `S/B/L/F/R`와 7개 분류는 그대로다.
 IORegistry에 iGPU가 보이거나, framebuffer가 로드되거나, 데스크톱에 도달하는 것은 그 자체로
 하드웨어 가속을 증명하지 않는다.
-**Mellow 실행 경로의 `L`·`F`·`R` 증거는 없다.** 정책/intake 테스트와 별도의 Windows
-OpenCL 기판 성공은 아래처럼 별도 범위로 기록한다.
+**native macOS Xe/Metal 경로의 `L`·`F`·`R` 증거는 없다.** Windows에서는 MellowRT native
+OpenCL provider의 제한된 compute 실행을 확인했다. 기존 standalone 기판 시험, 이식 알고리즘의
+QEMU 시험, kext 빌드는 각각 별도의 범위이며 아래처럼 기록한다.
 
 ---
 
@@ -36,8 +38,10 @@ Cumulative. A component at `F` must also satisfy `S`, `B`, and `L`.
 | `F` | A deterministic functional test produced the expected GPU result with CPU fallback excluded. |
 | `R` | Repeated functional and recovery tests passed across reboot, sleep/wake, and sustained load. |
 
-**No Mellow execution path has `L`, `F`, or `R` evidence.** The Windows vendor OpenCL
-substrate probe is a separate observation and does not promote this driver stack.
+**No native macOS Xe/Metal execution path has `L`, `F`, or `R` evidence.** Windows OpenCL
+provider execution through MellowRT is recorded separately from both the standalone substrate
+probe and this Darwin driver stack. Its `8086:7D41` identity is driver-reported; independent
+physical PCI ownership is not established by the OpenCL query.
 
 ## Classifications
 
@@ -72,9 +76,10 @@ diagnostics or workarounds. They must never be promoted merely because the syste
 
 | Layer | Current source state | Classification | Evidence | Hardware result |
 | --- | --- | --- | --- | --- |
-| Workload router | Runtime/PlatformRuntime policy contracts and host tests exist; no live provider adapter. | Feature-limited policy implementation | Host tests, see IMPLEMENTATION-STATUS | **UNVERIFIED** |
-| Resource model and storage modes | Route/resource contract validation exists; live allocation/storage adapters remain planned. | Feature-limited policy prototype | Host tests, see IMPLEMENTATION-STATUS | **UNVERIFIED** |
-| Host provider (Apple GL/CL) | Planned. | Not implemented | none | **UNVERIFIED** |
+| Workload router | PlatformRuntime admits explicit OpenCL C steps and tracks actual host-provider completion; default Metal steps are rejected. | Feature-limited implementation | Host tests and Windows runtime record, see IMPLEMENTATION-STATUS | Bounded Windows OpenCL execution passed; macOS unverified |
+| Resource model and storage modes | Route/resource policy and one in-place uint buffer adapter exist; general Metal storage modes, textures and interop remain planned. | Feature-limited implementation | Host and bounded provider tests, see IMPLEMENTATION-STATUS | Windows uint-buffer compute only |
+| Host OpenCL provider | Native adapter compiles and submits OpenCL C through the installed host driver; Windows executed. Other loader paths require host tests. | Feature-limited implementation | See IMPLEMENTATION-STATUS and Runtime/OpenCLProvider.md | Driver-reported `8086:7D41`; physical PCI ownership not independently verified |
+| Host OpenGL provider | Planned. | Not implemented | none | **UNVERIFIED** |
 | Mellow provider (Mesa-derived) | Planned. | Not implemented | none | **UNVERIFIED** |
 
 ### Plane 2 — MGAL and MELLOW-UAPI
@@ -93,12 +98,12 @@ diagnostics or workarounds. They must never be promoted merely because the syste
 | --- | --- | --- | --- | --- |
 | MellowKPI | No `linux/*` or `drm/*` headers exist. | Not implemented | none | **UNVERIFIED** |
 | `xe` — MMIO / forcewake | Real BAR0 mapping helpers, bounds and ordering, GMD_ID read, GT/render forcewake with ACK and timeout. | Prototype implementation | `S`, `B` | **UNVERIFIED** |
-| `xe` — memory and page tables | 48-bit VA, owner/generation, 46-bit DMA, PTE/PDE encoding, pin/bind/retire; 4-level table build with rollback and seal. | Prototype implementation | `S`, `B` | **UNVERIFIED** |
+| `xe` — memory and page tables | 48-bit VA, owner/generation, 46-bit DMA; XeMemory calls retained Linux PTE/PDE algorithms. Portable GGTT bind/unmap has simulated ownership/TLB tests; native table build retains rollback and seal. | Prototype implementation | `S`, `B`; 18,721 checks in a real QEMU Linux guest | **UNVERIFIED** on the GPU; guest CPU/RAM execution only |
 | `xe` — firmware and GuC transport | CSS parse, WOPCM, DMA upload and authentication polling; CTB/HXG packets with credits and epochs. | Prototype implementation | `S`, `B` | **UNVERIFIED** — no device ever authenticated the blob |
 | `xe` — submission and execution | **Two rival stacks.** `SubmissionQueue` and `EvidenceExecution` are unconnected; `XeMemorySubmission.hpp` and `XeInterruptDispatch.hpp` are referenced only from `tests/` and are outside the kext include closure. | Prototype implementation | `S` | **UNVERIFIED** |
 | `xe` — interrupt and fence | Tile/master/identity handling, `IOFilterInterruptEventSource` and workloop, coherent GGTT qword fence reads. | Prototype implementation | `S`, `B` | **UNVERIFIED** |
 | `xe` — ZEBIN loader | ELF64/IntelGT parse, staging, relocation. Hardcoded to one kernel named `.text.mellow_evidence` with exactly eight arguments. | Feature-limited implementation | `S`, `B` | **UNVERIFIED** |
-| **`xe` — reachability** | **No call sites. `#include "Xe` appears nowhere outside `Mellow/Xe*`.** Compiling into the kext is structural evidence only. | Not implemented | — | **UNVERIFIED** |
+| **`xe` — reachability** | XeMemory calls the portable encoder implementation; PortedXeBindings is linked once. Complete GPU device-owner construction and hardware admission remain absent. | Partial integration | `B`; kext linkage is structural evidence only | **UNVERIFIED** |
 | `applecompat` — ICL | Solve/route lists against `AppleIntelICLLPGraphicsFramebuffer`, which was found in the inspected Tahoe Recovery inputs. | Prototype / workaround | `S` | **UNVERIFIED** |
 | `applecompat` — TGL | **`DEPRECATED`.** TGL kext absent from inspected Recovery inputs; full installed-system inventory and provenance unverified. See [LEGACY-DISPOSITION.md](LEGACY-DISPOSITION.md). | Workaround | `S` | **UNVERIFIED** |
 | `amdgpu`, selected NVIDIA adapter | Source-intake targets exist; executable GPU backends do not. | Not implemented | none | **UNVERIFIED** |
@@ -108,9 +113,9 @@ diagnostics or workarounds. They must never be promoted merely because the syste
 
 | Layer | Current source state | Classification | Evidence | Hardware result |
 | --- | --- | --- | --- | --- |
-| Source intake/report and bounded generation | `Tools/mellow-port.py inspect/plan/generate` exist. No semantic driver translation, XNU binding or backend build. | Feature-limited analysis tooling | Tests, see IMPLEMENTATION-STATUS | — |
+| Source intake/report and bounded generation | `Tools/mellow-port.py inspect/plan/generate` exist. Reviewed PortedXe integration is a separate manual source port; the intake tool does not perform semantic driver translation or XNU binding. | Feature-limited analysis tooling | Tests, see IMPLEMENTATION-STATUS | — |
 | Firmware fetch and verify | [tests/xe_submission_fetch_firmware.py](../tests/xe_submission_fetch_firmware.py) checks size and SHA-256, opens exclusive-create, refuses to write on mismatch. Intel GuC only. | Feature-limited implementation | `B` | — |
-| Cross-build | [Tools/cross-build.py](../Tools/cross-build.py) parses the pbxproj source phase, synthesizes `module_info.c`, verifies `MH_KEXT_BUNDLE`, hashes inputs before and after. | Feature-limited implementation | `B` | — |
+| Cross-build | [Tools/cross-build.py](../Tools/cross-build.py) built 0.4.2 from 31 target units as Darwin `MH_KEXT_BUNDLE`; PortedXe inputs are hashed before/after and compiled via one binding unit. | Feature-limited implementation | `B` | No kernel load or GPU execution |
 | ABI validation | [Tools/tahoe-abi.py](../Tools/tahoe-abi.py) resolves imports against real KPI export sets; 378/378 resolved; 15 parser test methods with 28 negative subcases. | Feature-limited implementation | `B` | — |
 
 ## Current ceiling
@@ -118,8 +123,9 @@ diagnostics or workarounds. They must never be promoted merely because the syste
 **Prototype / workaround.** Nothing in this repository is a stabilization candidate or a
 production-level implementation.
 
-The most consequential single fact: the Intel backend is well-structured, host-tested, and
-**completely unreachable**. Structural quality is not execution evidence.
+The portable encoder integration is now callable inside the kext, while the complete native GPU
+device owner remains unimplemented. Windows host OpenCL execution does not supply that missing
+Darwin ownership or Metal path.
 
 ## Phase gates
 
@@ -173,3 +179,21 @@ not count as evidence.
 `macos_driver_tested=false`, `mellow_gpu_acceleration_pass=false`.
 The OpenCL-reported GPU identity was not correlated to physical PCI (`physical_pci_identity_verified=false`).
 This demonstrates a Windows substrate only; it does not promote a Mellow/backend/family capability.
+
+## Current native provider, portable port and build evidence
+
+The newer [OpenCLProvider](../Runtime/OpenCLProvider.md) runs bounded OpenCL C compute through
+MellowRT on Windows. It checks planning, queue/event ownership, readback, profiling and completion,
+and rejects unsupported Metal input. This result must not be described as the older standalone
+probe, which has `mellow_runtime_used=false`.
+
+[Drivers/PortedXe](../Drivers/PortedXe) contains six retained Linux source functions and separately
+adapted GGTT bind/unmap loops. The [QEMU runner](../Tools/run-ported-xe-emulator.py) executed the
+actual portable source in a diskless Linux guest: 18,721 checks passed. Five guest negative controls
+and 19 parser controls verified failure handling. The simulated MMIO/DMA/TLB boundary does not
+authenticate firmware, access a real Xe GPU or load the Darwin kext.
+
+Version 0.4.2 links 31 target translation units as `MH_KEXT_BUNDLE`; XeMemory uses the ported
+encoder through one binding unit. Exact records and limits are maintained in
+[IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md). No sustained-load or reset/reboot acceptance
+is inferred from these bounded runs.

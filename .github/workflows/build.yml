@@ -24,12 +24,15 @@ jobs:
         run: |
           python3 Tools/run-host-tests.py --cxx clang++ --out build/host-tests
           python3 tests/metal_session_tests.py
-          python3 tests/metal_evidence_tests.py
           python3 tests/acceptance_cli_tests.py
           sh -n Tools/collect-boot-evidence.sh
       - name: Build actual kext with Xcode
         run: |
           bash Tools/cross-build-native.sh Release
+      - name: Test evidence parser against the newly built kext
+        run: |
+          bundle=$(python3 -c 'import json,pathlib; a=json.load(open("build/native-Release/build-settings.json")); s=next(x["buildSettings"] for x in a if x.get("target")=="Mellow"); print(pathlib.Path(s["TARGET_BUILD_DIR"])/s["FULL_PRODUCT_NAME"])')
+          MELLOW_KEXT_BINARY="$bundle/Contents/MacOS/Mellow" python3 tests/metal_evidence_tests.py
       - name: Compile Intel Metal probe
         run: |
           xcrun swiftc -swift-version 5 -O -target x86_64-apple-macos13.0 Tools/metal-probe.swift -o build/metal-probe -framework Metal -framework IOKit -framework CryptoKit

@@ -3,12 +3,16 @@
 > **Design draft; implementation status is separate.**
 > [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md) and [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md)
 > take precedence over conflicting assumptions below. [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md)
-> records the runnable policy/intake code. No GPU, Metal, WindowServer or display acceptance has passed.
+> records policy/intake, the native Windows OpenCL provider, portable Xe tests and kext build evidence.
+> Standalone OpenCL probes and MellowRT provider execution have separate records; no Metal, WindowServer
+> or display acceptance has passed. Native macOS GPU execution remains unverified.
 
 ## 한글 요약
 
-**현재 어떤 GPU도 Mellow를 통해 가속되지 않는다.** 모든 행이 증거 등급 `S` 또는 그 이하이며,
-`L`·`F`·`R` 기록은 0건이다. Intel Xe 계열만 소스 경로가 존재하고, 그마저 호출되지 않는다.
+**Windows에서는 MellowRT의 native OpenCL provider를 통한 제한된 GPU compute가 실행됐다.**
+드라이버가 보고한 대상은 `8086:7D41`이며, 독립적인 physical PCI 소유권 확인은 아니다.
+macOS native Xe/Metal 경로에는 `L`·`F`·`R` 기록이 없다. XeMemory는 이식한 PTE/PDE 함수를
+호출하며 실제 kext에 링크되지만, 하드웨어 GPU owner와 실행 경로는 아직 검증되지 않았다.
 AMD·NVIDIA GPU 실행 backend는 미구현이다. source-intake target은 driver 지원이 아니다.
 이 표는 계획이 아니라 **실적**을 기록한다. 계획은 [ROADMAP.md](ROADMAP.md)에 있다.
 
@@ -22,12 +26,23 @@ This document records **what has been achieved**, not what is intended. Intent l
 
 | | |
 | --- | --- |
-| GPUs accelerated through Mellow | **0** |
-| Backends with a composition root | **0** |
-| Rows at evidence level `L`, `F`, or `R` | **0** |
+| Native macOS/Metal GPU acceleration results | **0** |
+| Windows host OpenCL providers executed through MellowRT | **1 bounded Intel GPU provider path**; driver-reported `8086:7D41` |
+| Native XNU GPU backends with an integrated device owner | **0** |
+| Native macOS rows at evidence level `L`, `F`, or `R` | **0** |
 | Executable non-Intel GPU backends | **none** |
 
 ## Per-GPU status
+
+### Windows host OpenCL provider — separate execution domain
+
+[Runtime/OpenCLProvider](../Runtime/OpenCLProvider.md) implements the native adapter used by
+MellowRT for bounded OpenCL C compute. Windows execution used the installed Intel OpenCL driver,
+with GPU-only selection, queue/event ownership, readback, profiling and completion checks.
+The driver-reported identity is `8086:7D41`; independent physical PCI ownership is not established.
+This is distinct from the older standalone substrate probe, which bypassed MellowRT.
+The current records and exact acceptance scope are in [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md).
+Neither path validates MSL/AIR translation, Metal, the Darwin Xe driver or display output.
 
 ### Intel — Xe-LPG / Xe2
 
@@ -40,13 +55,15 @@ The only family with any source path. Device table at
 | `8086:7D45` | Intel Graphics (Meteor Lake) | `xe` | `S` | `SOURCE PATH` |
 | `8086:7D55` | Intel Arc Graphics (Meteor Lake) | `xe` | `S` | `SOURCE PATH` |
 | `8086:7DD5` | Intel Graphics (Meteor Lake) | `xe` | `S` | `SOURCE PATH` |
-| `8086:7D41` | Intel Graphics 4-Core (Arrow Lake-U) | `xe` | `S` | `SOURCE PATH` — the only device with backend code written for it |
+| `8086:7D41` | Intel Graphics 4-Core (Arrow Lake-U) | `xe` | `S`, `B` | Portable Xe encoding integrated into the built kext; native GPU execution unverified |
 | `8086:7D51` | Intel Graphics (Arrow Lake-H) | `xe` | `S` | `SOURCE PATH` |
 | `8086:7D67` | Intel Graphics (Arrow Lake-S) | `xe` | `S` | `SOURCE PATH` |
 
-Even for `7D41`, the backend is unreachable: the `Xe*` modules have no call sites and no IOKit
-owner, recorded at [Mellow/RuntimeReadiness.hpp:84](../Mellow/RuntimeReadiness.hpp) and analysed in
-[NATIVE-XE-BACKEND-AUDIT.md](NATIVE-XE-BACKEND-AUDIT.md). Source readiness evaluation predicts
+For `7D41`, `XeMemory` now calls the portable PTE/PDE encoders through the single
+`PortedXeBindings.cpp` translation unit. The complete native GPU backend still has no integrated
+IOKit device owner, as gated by [Mellow/RuntimeReadiness.hpp](../Mellow/RuntimeReadiness.hpp).
+[NATIVE-XE-BACKEND-AUDIT.md](NATIVE-XE-BACKEND-AUDIT.md) records the earlier source snapshot.
+Source readiness evaluation predicts
 stage `physical-provider`, first missing bit `bar0-mapped`; no physical capture establishes this state.
 
 Recognition in a device table does not imply support of any kind.
@@ -55,8 +72,8 @@ Recognition in a device table does not imply support of any kind.
 
 | Family | Backend | Evidence | Status |
 | --- | --- | --- | --- |
-| Ice Lake (ICL) | `applecompat` | `S` | `SOURCE PATH` — `AppleIntelICLLPGraphicsFramebuffer` exists on Tahoe |
-| Tiger Lake (TGL) | `applecompat` | — | **`DEPRECATED`** — no Apple TGL kext exists on Tahoe; see [LEGACY-DISPOSITION.md](LEGACY-DISPOSITION.md) |
+| Ice Lake (ICL) | `applecompat` | `S` | `SOURCE PATH` — `AppleIntelICLLPGraphicsFramebuffer` found in inspected Tahoe Recovery inputs |
+| Tiger Lake (TGL) | `applecompat` | — | **`DEPRECATED`** — no Apple TGL kext found in inspected Recovery inputs; installed-system inventory remains separate; see [LEGACY-DISPOSITION.md](LEGACY-DISPOSITION.md) |
 
 ### AMD
 
@@ -65,10 +82,8 @@ Recognition in a device table does not imply support of any kind.
 | RX 9070 | Navi 48 (RDNA 4, gfx12) | `amdgpu` | — | `NOT IMPLEMENTED` |
 | RDNA 2 / 3 generally | — | `amdgpu` | — | `NOT IMPLEMENTED` |
 
-**No AMD code exists in this tree.** `0x1002` appears twice in the source and neither occurrence is
-a PCI vendor ID — one is commented-out dead code in
-[Mellow/HDMI.cpp](../Mellow/HDMI.cpp), the other is a GuC HXG action number in
-[Mellow/XeGuCTransport.cpp](../Mellow/XeGuCTransport.cpp).
+**No executable AMD GPU backend exists in this tree.** Source-intake targets, constants and
+historical tables do not implement an amdgpu runtime adapter.
 
 Upstream source is available; per-file notices and the full DRM/Linux dependency closure require
 review before integration. See [LICENSING.md](LICENSING.md).
@@ -94,14 +109,15 @@ contract first. The project currently fetches firmware rather than redistributin
 | --- | --- | --- |
 | 4 | MellowMTL — Metal object model | `NOT IMPLEMENTED` |
 | 4 | MellowJIT — AIR ingestion | `NOT IMPLEMENTED` |
-| 3 | MellowRT — router and resource model | PlatformRuntime policy contracts exist; live provider/resource execution is not implemented |
-| 3 | Host provider (Apple GL/CL) | `NOT IMPLEMENTED` |
+| 3 | MellowRT — router and resource model | Policy contracts plus live bounded OpenCL C compute through the native host adapter; general Metal resources remain unimplemented |
+| 3 | Host OpenCL provider | Implemented and executed on Windows; macOS/Linux loader paths are not execution evidence |
+| 3 | Host OpenGL provider | `NOT IMPLEMENTED` |
 | 3 | Mellow provider (`libMellowGL` / `libMellowCL`) | `NOT IMPLEMENTED` |
 | 2 | MGAL interfaces | `NOT IMPLEMENTED` — the underlying separation exists in `Xe*` at `S` |
 | 2 | MELLOW-UAPI | `NOT IMPLEMENTED` |
 | 2 | Composition root | `NOT IMPLEMENTED` — this is the central gap |
 | 1 | MellowKPI | `NOT IMPLEMENTED` |
-| 1 | `xe` backend | `SOURCE PATH` at `S`, unreachable |
+| 1 | `xe` backend | Six retained Linux functions plus source-derived GGTT bind/unmap; XeMemory encoder calls linked in kext; no native hardware execution |
 | 1 | `applecompat` backend | `SOURCE PATH` at `S`; TGL half deprecated |
 | 1 | `amdgpu`, selected NVIDIA adapter | `NOT IMPLEMENTED` |
 | 0 | `mellow-port` | Intake/report generation exists; complete semantic driver port remains unimplemented |
@@ -116,13 +132,16 @@ To be precise about where the project genuinely stands, these things did run:
 | [validation/xe-tests.json](../validation/xe-tests.json) | Production `Xe*` sources compiled and executed on a host against emulated MMIO and ownership callbacks | Nothing about hardware. The OS and GPU boundaries are explicit test backends |
 | [abi-evidence/](../abi-evidence) | Real Apple binaries from macOS 26.6.2 build 25G83 parsed; 378/378 kext imports resolved against KPI export sets | Symbol names and addresses only — no selector numbers, vtable slots, or struct layouts |
 | [tests/xe_guc_firmware_results.json](../tests/xe_guc_firmware_results.json) | The pinned 320,320-byte Intel GuC blob parsed by production code; hash, length, and version verified | No device ever authenticated it |
+| [Runtime/OpenCLProvider](../Runtime/OpenCLProvider.md), [current records](IMPLEMENTATION-STATUS.md) | Native Windows OpenCL C compute through MellowRT, using the installed Intel driver | No Metal/JIT, Darwin backend or independently verified physical PCI ownership |
+| [Drivers/PortedXe](../Drivers/PortedXe), [QEMU runner](../Tools/run-ported-xe-emulator.py) | Six retained source functions and GGTT lifetime loops tested in a real Linux QEMU guest: 18,721 checks; five guest negative controls and 19 parser controls | Emulated CPU/RAM and simulated MMIO/DMA/TLB boundaries; QEMU has no Xe GPU model here |
+| [kext build](IMPLEMENTATION-STATUS.md) | Version 0.4.2, 31 target translation units linked as Darwin `MH_KEXT_BUNDLE`, including the portable encoders | Structural build evidence; no kext load or GPU execution |
 
-Every one of these carries explicit negative-claim fields, and none of them raises any row above
-`S` or `B`.
+These records preserve separate scopes. Windows host execution does not promote a native macOS
+row, and portable/QEMU/build results do not raise native hardware evidence above `S` or `B`.
 
 ## How a row moves
 
-A row advances only through the readiness ladder in
+A native macOS backend row advances through the readiness ladder in
 [Mellow/RuntimeReadiness.hpp](../Mellow/RuntimeReadiness.hpp), stage by stage, each requiring the
 previous:
 

@@ -7,9 +7,11 @@ Mellow — **Metal Emulation Layer Logic for OpenGL/OpenCL Workloads**.
 GPU backend에 제출한다. GL/CL 제공자가 없는 장치는 Linux 드라이버를 이식한 별도
 하위 스택이 먼저 필요하다. 기존 Intel Xe 코드는 이 하위 스택의 연구 자산이다.
 
-`Runtime/`과 `Tools/mellow_port/`의 초기 정책·분석 코드는 이 계약의 일부를 구현한다.
-아래 GPU 호출, Objective-C Metal 구현, JIT, XNU binding은 명시적으로 구현 상태가
-갱신되기 전까지 설계다. 실제 상태는 [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md)를 따른다.
+`Runtime/`의 정책과 실제 OpenCL C provider, `Tools/mellow_port/`의 분석 도구,
+`Drivers/PortedXe/`의 부분 이식은 이 계약의 일부를 구현한다. 실제 Windows OpenCL 제출과
+QEMU의 알고리즘 실행, 이식 함수를 포함한 Darwin kext 빌드를 구분해 기록한다.
+아래 Objective-C Metal 구현, JIT와 전체 XNU hardware binding은 설계 단계다.
+실제 상태는 [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md)를 따른다.
 기존 작성 중인 CONCEPT/MGAL/AIR 문서는 제안 자료이며 전제 검토는
 [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md)를 우선한다.
 
@@ -67,7 +69,8 @@ WindowServer/CoreAnimation 경로는 별도의 통합 단계다. 앱이 offscree
   dependency-gap analysis, reviewed transformation recipes and reproducible build inputs.
 
 The existing `Mellow/` Lilu/Xe implementation retains its historical ABI and device scope.
-Portable platform policy does not automatically attach these components to a PCI device.
+Its PTE/PDE helpers now call the source-derived PortedXe encoding through one linked integration
+unit. Portable policy and algorithm compilation do not attach a hardware backend to a PCI device.
 
 ## 3. Capability and execution contract
 
@@ -183,8 +186,9 @@ support establishes a source/reference path, not macOS driver readiness.
    and intake/gap-report generation. These policy observations are explicitly host/synthetic.
 2. **One accelerated host provider:** enumerate real GL/CL capabilities, execute compute and draw,
    bind results to the actual GPU, test explicit failure and timeouts. No new kernel driver needed.
-   The separate Windows OpenCL compute probe is an initial substrate observation, not a MellowRT
-   provider adapter or completion of this milestone; draw and physical PCI attribution remain open.
+   A native C++ OpenCL provider now executes direct OpenCL C through MellowRT on Windows.
+   It does not implement Metal translation; draw, GL interop and physical PCI ownership attribution
+   remain open. The earlier standalone probe is retained as separate historical substrate evidence.
 3. **One shader subset and opt-in Metal facade:** parse supported compiler output, lower it,
    create real Metal-style pipeline/command objects and compare GPU results against CPU references.
 4. **First ported backend:** bind 7D41 hardware, firmware authentication, VM residency,

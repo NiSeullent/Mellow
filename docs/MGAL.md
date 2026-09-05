@@ -3,8 +3,9 @@
 > **Scope and precedence:** [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md),
 > [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md), and
 > [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md) govern conflicting draft assumptions.
-> Runtime policy and source-intake tools are runnable; the Metal facade, shader JIT, live GL/CL
-> providers and integrated XNU GPU backend are not implemented. No Mellow GPU/Metal PASS exists.
+> Current evidence includes policy/intake, native Windows OpenCL provider execution and portable Xe tests.
+> Standalone probe results remain separate; no Metal, WindowServer or display acceptance has passed.
+> Native macOS GPU execution remains unverified; see IMPLEMENTATION-STATUS for the recorded scope.
 
 ## 한글 요약
 

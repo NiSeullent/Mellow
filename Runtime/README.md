@@ -33,6 +33,12 @@ argument-buffer, SIMD-group, mesh-shader or ray-tracing requirements are errors.
 The version checks delimit the initial provider policy, not every extension
 combination allowed by the underlying API specification.
 
+`Step::input` defaults to `MetalSemantics`, preserving these translation gates.
+An explicitly selected `OpenClC` input can take only an OpenCL compute route and
+requires Compute and OrderedQueue, without implying Metal translation. It cannot
+select GL/native/reference providers, render or blit. The native OpenCL adapter
+uses this distinction for actual host OpenCL C execution while Metal remains gated.
+
 The caller must enumerate **every resource hazard** as a `Dependency`; this
 library does not discover resource aliasing. Same-provider dependencies use that
 provider's verified ordered-queue contract. Cross-provider dependencies require

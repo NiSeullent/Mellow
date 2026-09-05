@@ -21,9 +21,21 @@ jobs:
         run: python3 Tools/run-platform-tests.py --cxx g++ --out build/platform-tests
       - name: Backport source intake and negative tests
         run: python3 -m unittest discover -s tests -p test_mellow_port.py -v
+      - name: Execute ported Linux Xe algorithms and verify provenance
+        run: python3 Tools/run-ported-xe-tests.py --cxx g++ --out build/ported-xe-tests
+      - name: Compile native OpenCL provider without requiring a runner GPU
+        run: python3 Tools/run-opencl-runtime.py --cxx g++ --out build/opencl-runtime-build
+      - name: Check OpenCL lifecycle and injected cleanup failures
+        run: python3 Tools/run-opencl-runtime-regressions.py --cxx g++ --out build/opencl-regressions --sanitize
+      - name: Check stress timeout and malformed worker reports
+        run: python3 tests/opencl_runtime_stress_report_tests.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: mellow-platform-host-evidence
-          path: build/platform-tests/
+          path: |
+            build/platform-tests/
+            build/ported-xe-tests/
+            build/opencl-runtime-build/
+            build/opencl-regressions/
           if-no-files-found: error
