@@ -51,3 +51,15 @@ negative API cases. Optional --air-text or --air-bitcode --llvm-library selects
 AIR input. Reports pin source, binary, fixture, and decoder library hashes.
 The harness deliberately expects the test kernel x = x * 7 + 3; the runtime
 itself accepts other supported frontend expressions without this oracle.
+
+The Windows LLVM decoder pins its selected DLL for the process lifetime.
+Unload-after-use caused an observed process-exit access violation with the
+tested LLVM-C DLL; the ordinary LoadLibrary reference is still balanced.
+Use the supervised worker for this explicit dependency and native GPU execution.
+
+Both final Windows tests executed 10,000 submissions with one native pipeline
+compilation, independent readback checks and two ordered encoder dispatches:
+[MSL GPU evidence](../validation/msl-object-gpu.json) and
+[synthetic raw AIR GPU evidence](../validation/air-object-gpu.json).
+The latter fixture is synthetic; neither result establishes Apple-produced AIR
+compatibility, macOS execution or the system Metal/WindowServer driver ABI.

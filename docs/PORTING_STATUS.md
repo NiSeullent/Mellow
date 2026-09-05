@@ -3,7 +3,8 @@
 > **Scope and precedence:** [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md),
 > [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md), and
 > [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md) govern conflicting draft assumptions.
-> Current evidence includes portable MSL/AIR compute objects, Windows OpenCL execution and portable Xe tests.
+> Current evidence includes portable MSL/AIR compute, MSL render objects, Windows OpenCL/OpenGL
+> execution and portable Xe tests.
 > Standalone probe results remain separate; Apple Metal ABI, WindowServer and display acceptance have not passed.
 > Native macOS GPU execution remains unverified; see IMPLEMENTATION-STATUS for the recorded scope.
 
@@ -16,6 +17,9 @@ IORegistry에 iGPU가 보이거나, framebuffer가 로드되거나, 데스크톱
 **native macOS Xe/Metal 경로의 `L`·`F`·`R` 증거는 없다.** Windows에서는 자체 C++ 객체·MSL 및
 synthetic raw AIR의 제한된 compute를 각각 10,000회 검증했다. 기존 standalone 기판 시험, 이식 알고리즘의
 QEMU 시험, kext 빌드는 각각 별도의 범위이며 아래처럼 기록한다.
+별도의 MSL vertex/fragment 객체 경로는 1,000회 offscreen·120회 visible 렌더링에서 전체
+픽셀을 대조했다. Windows swap API 결과는 물리 scanout·Apple Metal ABI·WindowServer 결과가 아니다.
+[렌더링 증거 묶음](../validation/render/integration.json)은 실제 픽셀·완료·source hash 검증 범위를 기록한다.
 
 ---
 
@@ -64,11 +68,12 @@ diagnostics or workarounds. They must never be promoted merely because the syste
 
 | Layer | Current source state | Classification | Evidence | Hardware result |
 | --- | --- | --- | --- | --- |
-| Metal object model | Portable MellowMTL C++ Device/Buffer/Library/Function/Pipeline/Queue/CommandBuffer/Encoder exist; Apple Objective-C `MTLDevice` conformance and system registration do not. | Feature-limited implementation | Current object tests and GPU records | Windows uint compute subset passed; native macOS **UNVERIFIED** |
+| Metal object model | Separate portable MellowMTL compute and render devices, libraries/functions, pipelines, buffers/RGBA8 texture snapshots, queues and encoders exist; Apple Objective-C `MTLDevice` conformance and registration do not. | Feature-limited implementation | Current object tests and GPU records; RENDER-IMPLEMENTATION | Windows bounded compute/render subsets passed; native macOS **UNVERIFIED** |
 | Attachment — interposition | Planned. The `cs_validate_page` hook exists but its body is gated to Sonoma and is dead on Tahoe. | Not implemented | none | **UNVERIFIED** |
 | Attachment — driver plug-in | Planned. The `gpu_bundle_find_trusted` discovery hook exists but is commented out at [Mellow/DYLDPatches.cpp:113](../Mellow/DYLDPatches.cpp). | Not implemented | none | **UNVERIFIED** |
 | AIR ingestion | Actual LLVM raw/wrapped bitcode decoder, observed metallib container parser and exact AIR2.7 metadata admission exist. Positive AIR fixture is synthetic; general Apple artifact compatibility remains unimplemented. | Feature-limited implementation | Decoder/roundtrip/control tests and current object GPU record | Windows synthetic AIR compute passed; native macOS **UNVERIFIED** |
 | Shader lowering | Typed MSL AST and AIR SSA lower the checked single-buffer uint subset to OpenCL C; driver pipelines compile once and are reused. | Feature-limited implementation | 2,269 frontend checks, 72 CPU references, 9 CL syntax fixtures; current GPU records | Windows MSL/raw AIR each passed 10,000 submissions; native macOS **UNVERIFIED** |
+| MSL render lowering | Checked vertex/fragment float/vector source lowers to GLSL330; exact triangle, shared parameters, clip-depth and fragment-coordinate conversion. Render AIR and sampled textures are absent. | Feature-limited implementation | 969 frontend checks, including Linux ASan/UBSan; independent full-pixel GPU records | Windows 1,000 offscreen / 120 visible frames passed; native macOS **UNVERIFIED** |
 | Offline compiler harness | Intel `ocloc` 26.27.39122.11 / IGC 2.38.2 compiled OpenCL C for `-device 0x7d41`; 6,944-byte ZEBIN with verified EU disassembly. **This is OpenCL C, not Metal.** | Feature-limited tooling | `B` | **UNVERIFIED** |
 | Acceptance harnesses | [Tools/metal-probe.swift](../Tools/metal-probe.swift) and [Userspace/metal_session.py](../Userspace/metal_session.py) are careful clients with strong attribution checks. Never compiled or executed — no macOS or Metal in the build environment. | Feature-limited implementation | `S` | **UNVERIFIED** |
 
@@ -77,9 +82,9 @@ diagnostics or workarounds. They must never be promoted merely because the syste
 | Layer | Current source state | Classification | Evidence | Hardware result |
 | --- | --- | --- | --- | --- |
 | Workload router | PlatformRuntime admits explicit OpenCL C steps and tracks actual host-provider completion; default Metal steps are rejected. | Feature-limited implementation | Host tests and Windows runtime record, see IMPLEMENTATION-STATUS | Bounded Windows OpenCL execution passed; macOS unverified |
-| Resource model and storage modes | Route/resource policy and one in-place uint buffer adapter exist; general Metal storage modes, textures and interop remain planned. | Feature-limited implementation | Host and bounded provider tests, see IMPLEMENTATION-STATUS | Windows uint-buffer compute only |
+| Resource model and storage modes | Route/resource policy, uint-buffer compute and separate copied RGBA8 render snapshots exist. General Metal storage modes, sampled textures and interop remain planned. | Feature-limited implementation | Host and bounded provider/object tests, see IMPLEMENTATION-STATUS | Windows uint compute and single-target RGBA8 rendering passed |
 | Host OpenCL provider | Native adapter compiles and submits OpenCL C through the installed host driver; Windows executed. Other loader paths require host tests. | Feature-limited implementation | See IMPLEMENTATION-STATUS and Runtime/OpenCLProvider.md | Driver-reported `8086:7D41`; physical PCI ownership not independently verified |
-| Host OpenGL provider | Planned. | Not implemented | none | **UNVERIFIED** |
+| Host OpenGL provider | Isolated Windows WGL/core3.3 worker/context, actual GLSL programs, RGBA8 FBO rendering, fences, readback and optional swap. RenderDevice selects it explicitly; GL/CL sharing is absent. | Feature-limited implementation | Provider and MSL-object GPU records; Runtime/OpenGLProvider.md | Intel Windows execution passed; physical PCI identity, scanout and native macOS **UNVERIFIED** |
 | Mellow provider (Mesa-derived) | Planned. | Not implemented | none | **UNVERIFIED** |
 
 ### Plane 2 — MGAL and MELLOW-UAPI

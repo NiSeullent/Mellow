@@ -7,13 +7,16 @@ Mellow는 Metal 요청을 자체 객체·셰이더 변환·명령 실행 계층�
 Metal 2/3의 기능을 단계적으로 구현하고, Linux 드라이버 소스를 활용해 macOS에 드라이버가
 없는 GPU까지 확장하는 것이 목표입니다.
 
-현재는 **자체 C++ 객체와 제한된 MSL/AIR compute JIT를 실제 GPU에서 실행하는 개발 단계**입니다.
+현재는 **자체 C++ 객체와 제한된 compute·render 셰이더 변환을 실제 GPU에서 실행하는 개발 단계**입니다.
 Windows Intel GPU에서 MSL과 raw AIR 각각 10,000회 제출·readback을 검증했습니다.
 Device·Buffer·Library·Function·Pipeline·Queue·CommandBuffer·Encoder를 구현했고,
 MSL 타입 AST 또는 실제 LLVM으로 디코딩한 AIR SSA를 OpenCL C로 변환한 뒤 드라이버가 컴파일합니다.
+렌더링은 별도 RenderDevice에서 MSL vertex/fragment를 GLSL로 변환하고 실제 WGL/OpenGL
+program을 재사용합니다. 1,000회 offscreen 렌더링의 3,072,000픽셀과 visible window
+120회의 368,640픽셀을 독립적으로 검증했습니다. 창 swap API 성공은 물리 scanout 검증과 구분합니다.
 Linux Xe 원본 함수는 kext 메모리 경로에 연결되어 있으며, Mellow.kext 0.4.3에는
 명시적으로 켜는 Tahoe PCI·IOUserClient·DMA 진단 경로도 포함했습니다.
-Apple Objective-C Metal ABI, 전체 Metal 2/3, native Tahoe GPU 실행은 구현·검증이 남아 있습니다.
+Apple Objective-C Metal ABI, 전체 Metal 2/3, native Tahoe GPU 실행·WindowServer 가속은 구현·검증이 남아 있습니다.
 RTX 3080·RTX 3090·RX 9070·8086:7D41 중 어느 장치도 Mellow Metal 가속 성공으로 표시하지 않습니다.
 
 ## 설계의 기준
@@ -23,6 +26,10 @@ RTX 3080·RTX 3090·RX 9070·8086:7D41 중 어느 장치도 Mellow Metal 가속 
   NVIDIA/Mesa ABI, LinuxKPI, WindowServer 통합의 전제.
 - [실제 구현 상태](docs/IMPLEMENTATION-STATUS.md): 구현·미구현·검증 명령의 구분.
 - [MSL/AIR 객체·JIT·Tahoe 진단 통합 검증](docs/VERIFICATION-METAL-JIT-2026-09-06.md): 최신 실행 증거.
+- [MSL 렌더링 구현 계약](docs/RENDER-IMPLEMENTATION.md): 실제 렌더 객체·셰이더·픽셀 검증 범위.
+- [렌더링 실기 증거와 source hash 감사](validation/render/integration.json):
+  [offscreen 1,000회](validation/render/objects-offscreen.json),
+  [visible 120회](validation/render/objects-visible.json), [실제 GPU readback](validation/render/offscreen-gpu-readback.png).
 - [드라이버 이식·실제 GPU·QEMU 검증 기록](docs/VERIFICATION-2026-09-06.md): 환경별 실행과 남은 관문.
 
 작업 중 생성된 CONCEPT, ARCHITECTURE, MGAL, SHADER-JIT 등의 문서는 설계 제안으로
@@ -57,6 +64,23 @@ display scanout은 별도 검증 단계입니다.
 [Examples/compute-msl.cpp](Examples/compute-msl.cpp)는 MSL의 `x[i] * 7u + 3u`를 실제 GPU에
 제출하며 현재 Windows 실행에서 `10 17 24 31`을 반환했습니다. 기존 앱의 Metal framework를
 교체하거나 시스템 `MTLDevice`를 등록하는 API는 아닙니다.
+
+[Examples/render-msl.cpp](Examples/render-msl.cpp)는 별도의 RenderDevice·RenderTexture·
+RenderLibrary·RenderPipeline·RenderEncoder를 사용하는 그래픽 클라이언트입니다.
+현재는 RGBA8 attachment에 단일 삼각형을 그리는 MSL vertex/fragment 부분집합을 지원합니다.
+fragment position과 top-left readback, 공유 float4 파라미터, 실제 fence와 완료 상태를 검사하며
+라이브러리/함수/파이프라인의 소유권을 유지합니다. GL/CL 자원 공유와 sampled texture는 지원하지 않습니다.
+
+```powershell
+python Tools/run-render-objects.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/msl-render --render --frames 1000
+python Tools/run-render-objects.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/msl-render-visible --render --visible --frames 120
+```
+
+이 runner는 실제 GPU의 전체 RGBA 스트림과 마지막 frame PNG를 저장합니다. Python이 별도로
+삼각형 coverage와 gradient를 계산하며, 경계 픽셀도 제한된 subpixel 범위에서 clear 또는
+올바른 fragment 색상만 허용합니다. 일반 런타임에는 픽셀 정답을 전달하지 않습니다.
+실제 GPU가 없는 환경에서는 `--render`를 생략해 컴파일만 검사합니다. Linux의 native GL
+실행은 명시적으로 unsupported이며, CI의 frontend·빌드·보고서 검사는 GPU 실행 증거가 아닙니다.
 
 ```powershell
 python Tools/run-metal-objects.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/msl-objects --compute --iterations 10000
