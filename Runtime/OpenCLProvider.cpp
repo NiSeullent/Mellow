@@ -91,7 +91,7 @@ constexpr char Witness[] =
 }
 
 struct OpenCLProvider::Impl {
-    std::unique_ptr<Library> library;
+    std::shared_ptr<Library> library;
     Functions api {};
 #if defined(MELLOW_OPENCL_TESTING)
     Functions syntheticApi {};
@@ -102,7 +102,7 @@ struct OpenCLProvider::Impl {
     OpenCLDeviceInfo info {};
     OpenCLExecution bootstrap {};
     CompletionTracker completion {};
-    uint64_t epoch {1}, sequence {}, record {};
+    uint64_t epoch {1}, sequence {}, record {}, compilations {};
     bool ready {};
 
     ~Impl() { close(); }
@@ -141,7 +141,7 @@ struct OpenCLProvider::Impl {
         } else
 #endif
         {
-            library = std::make_unique<Library>();
+            library = std::make_shared<Library>();
 #define MELLOW_LOAD(name, result, ...) library->load(api.name, "cl" #name);
             MELLOW_CL_FUNCTIONS(MELLOW_LOAD)
 #undef MELLOW_LOAD
@@ -291,6 +291,12 @@ struct OpenCLProvider::Impl {
         checked(buildStatus, "clBuildProgram");
         Handle kernel = api.CreateKernel(program, entry.c_str(), &status);
         resources.own(kernel, status, api.ReleaseKernel, "clCreateKernel");
+        executeKernel(resources, kernel, input, &expected, result, useRuntime);
+    }
+    void executeKernel(CommandResources &resources, Handle kernel,
+                       const std::vector<uint32_t> &input, const std::vector<uint32_t> *expected,
+                       OpenCLExecution &result, bool useRuntime) {
+        Int status {};
         auto initial = input;
         Handle buffer = api.CreateBuffer(context, ReadWriteCopy, initial.size() * sizeof(uint32_t), initial.data(), &status);
         resources.own(buffer, status, api.ReleaseMemObject, "clCreateBuffer");
@@ -307,7 +313,7 @@ struct OpenCLProvider::Impl {
         resources.own(event, Success, api.ReleaseEvent, "kernel event");
         result.epoch = epoch;
         result.sequence = sequence;
-        if (useRuntime) {
+        if (useRuntime && expected) {
             result.armStatus = completion.armAfterSubmission(provider, token);
             require(result.armStatus == CompletionStatus::Accepted, "Runtime rejected actual submission token");
         }
@@ -321,15 +327,15 @@ struct OpenCLProvider::Impl {
         result.output.resize(input.size());
         checked(api.EnqueueReadBuffer(queue, buffer, 1, 0, result.output.size() * sizeof(uint32_t),
                                       result.output.data(), 0, nullptr, nullptr), "clEnqueueReadBuffer");
-        result.resultsVerified = result.output == expected;
+        result.resultsVerified = expected && result.output == *expected;
         result.gpuStart = scalarInfo<uint64_t>(api.GetEventProfilingInfo, event, ProfileStart);
         result.gpuEnd = scalarInfo<uint64_t>(api.GetEventProfilingInfo, event, ProfileEnd);
         result.profilingVerified = result.gpuStart && result.gpuEnd > result.gpuStart;
-        require(result.resultsVerified, "GPU readback does not match supplied reference");
+        if (expected) require(result.resultsVerified, "GPU readback does not match supplied reference");
         require(result.profilingVerified, "GPU profiling interval is missing or invalid");
         resources.finalize();
         result.resourcesReleased = true;
-        if (useRuntime) {
+        if (useRuntime && expected) {
             result.validationRecord = ++record;
             const CompletionObservation observed {token, ObservationKind::GpuCompletion,
                                                    result.gpuStart, result.gpuEnd,
@@ -340,12 +346,30 @@ struct OpenCLProvider::Impl {
                     "Runtime rejected observed GPU completion");
             result.runtimeCompletionAccepted = true;
         }
+        result.executionCompleted = true;
     }
 };
 
-OpenCLProvider::OpenCLProvider() : impl_(std::make_unique<Impl>()) {}
+struct OpenCLPipeline::Impl {
+    std::shared_ptr<OpenCLProvider::Impl> owner;
+    std::shared_ptr<Library> library;
+    Functions api {};
+    Handle program {}, kernel {}, context {};
+    uint64_t epoch {}, serial {};
+    std::string log;
+    ~Impl() {
+        if (kernel) api.ReleaseKernel(kernel);
+        if (program) api.ReleaseProgram(program);
+    }
+};
+OpenCLPipeline::OpenCLPipeline() : impl_(std::make_unique<Impl>()) {}
+OpenCLPipeline::~OpenCLPipeline() = default;
+uint64_t OpenCLPipeline::compilationSerial() const { return impl_->serial; }
+const std::string &OpenCLPipeline::buildLog() const { return impl_->log; }
+
+OpenCLProvider::OpenCLProvider() : impl_(std::make_shared<Impl>()) {}
 #if defined(MELLOW_OPENCL_TESTING)
-OpenCLProvider::OpenCLProvider(const OpenCLAbi::Functions &functions) : impl_(std::make_unique<Impl>()) {
+OpenCLProvider::OpenCLProvider(const OpenCLAbi::Functions &functions) : impl_(std::make_shared<Impl>()) {
     impl_->synthetic = true;
     impl_->syntheticApi = functions;
 }
@@ -371,6 +395,70 @@ bool OpenCLProvider::executeOpenClC(const std::string &source, const std::string
         return false;
     }
 }
+std::shared_ptr<OpenCLPipeline> OpenCLProvider::compileOpenClC(const std::string &source,
+                                                           const std::string &entry, std::string &error) {
+    error.clear();
+    try {
+        require(impl_->ready && impl_->context && impl_->queue, "Provider has no current validated substrate");
+        require(!source.empty() && source.size() <= MaxSourceBytes && source.find('\0') == std::string::npos,
+                "OpenCL C source invalid");
+        require(!entry.empty() && entry.size() <= 128 && entry.find('\0') == std::string::npos, "Kernel entry invalid");
+        auto pipeline = std::shared_ptr<OpenCLPipeline>(new OpenCLPipeline());
+        auto &compiled = *pipeline->impl_;
+        compiled.owner = impl_;
+        compiled.library = impl_->library;
+        compiled.api = impl_->api;
+        compiled.context = impl_->context;
+        compiled.epoch = impl_->epoch;
+        const char *text = source.c_str();
+        const size_t length = source.size();
+        Int status {};
+        compiled.program = compiled.api.CreateProgramWithSource(compiled.context, 1, &text, &length, &status);
+        checked(status, "clCreateProgramWithSource");
+        require(compiled.program, "Program creation returned null");
+        const auto build = compiled.api.BuildProgram(compiled.program, 1, &impl_->device, "-cl-std=CL1.2", nullptr, nullptr);
+        size_t size {};
+        checked(compiled.api.GetProgramBuildInfo(compiled.program, impl_->device, ProgramBuildLog, 0, nullptr, &size), "build log size");
+        require(size <= 1024 * 1024, "Build log too large");
+        std::vector<char> log(size ? size : 1, 0);
+        checked(compiled.api.GetProgramBuildInfo(compiled.program, impl_->device, ProgramBuildLog, log.size(), log.data(), nullptr), "build log");
+        require(log.back() == 0, "Build log not terminated");
+        compiled.log = log.data();
+        require(build == Success, "OpenCL pipeline compilation failed: " + compiled.log);
+        compiled.kernel = compiled.api.CreateKernel(compiled.program, entry.c_str(), &status);
+        checked(status, "clCreateKernel");
+        require(compiled.kernel, "Kernel creation returned null");
+        require(impl_->compilations != std::numeric_limits<uint64_t>::max(), "Pipeline build serial exhausted");
+        compiled.serial = ++impl_->compilations;
+        return pipeline;
+    } catch (const std::exception &failure) { error = failure.what(); return {}; }
+}
+bool OpenCLProvider::executePipeline(const std::shared_ptr<OpenCLPipeline> &pipeline,
+                                    const std::vector<uint32_t> &input, OpenCLExecution &result) {
+    result = {};
+    try {
+        require(impl_->ready && pipeline && pipeline->impl_, "Provider/pipeline unavailable");
+        const auto &compiled = *pipeline->impl_;
+        require(compiled.owner.get() == impl_.get() && compiled.context == impl_->context &&
+                compiled.epoch == impl_->epoch && compiled.library == impl_->library,
+                "Pipeline belongs to another provider or invalidated epoch");
+        require(!input.empty() && input.size() <= MaxElements, "Input size invalid");
+        const Step step {Workload::Compute, 0, impl_->provider.id, WorkloadInput::OpenClC};
+        const auto plan = planWorkload(&impl_->provider, 1, &step, 1, nullptr, 0, nullptr, 0);
+        result.planStatus = plan.status;
+        require(plan.status == PlanStatus::Ready && plan.providers[0] == impl_->provider.id && !plan.referenceOnly,
+                "MellowRuntime denied compiled OpenCL route");
+        result.runtimePlanned = true;
+        Impl::CommandResources resources {*impl_, {}};
+        impl_->executeKernel(resources, compiled.kernel, input, nullptr, result, true);
+        return result.executionCompleted;
+    } catch (const std::exception &failure) {
+        result.error = failure.what();
+        if (result.submissionAttempted) impl_->invalidate();
+        return false;
+    }
+}
+uint64_t OpenCLProvider::pipelineBuildCount() const { return impl_->compilations; }
 const ProviderDescriptor &OpenCLProvider::descriptor() const { return impl_->provider; }
 const OpenCLDeviceInfo &OpenCLProvider::device() const { return impl_->info; }
 const OpenCLExecution &OpenCLProvider::bootstrapEvidence() const { return impl_->bootstrap; }

@@ -25,6 +25,10 @@ PluginConfiguration ADDPR(config) {
 	KernelVersion::Ventura,
 	KernelVersion::Tahoe,
 	[]() {
+		if (checkKernelArgument("-mellowdiag")) {
+			SYSLOG("mellow", "diagnostic IOService selected; legacy Apple graphics patch callbacks are not registered");
+			return;
+		}
 		const bool tahoeTrial = checkKernelArgument("-mellowtahoe");
 		const bool vesa = checkKernelArgument("-igfxvesa");
 		const bool nativeBackendRequested = checkKernelArgument("-mellownativexe");

@@ -1,5 +1,8 @@
 # Verification record — 2026-09-06
 
+Historical `platform-v0.2.0-dev` record. The later objects/JIT and diagnostic-driver snapshot is
+[VERIFICATION-METAL-JIT-2026-09-06](VERIFICATION-METAL-JIT-2026-09-06.md).
+
 This record separates executable driver-source porting, a real Windows GPU runtime path, and
 QEMU guest execution. The combined result is **implemented stages verified; complete Tahoe/Metal
 validation not achieved**. The user confirmed that only the current Windows PC was available.

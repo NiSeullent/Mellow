@@ -1,5 +1,11 @@
 # Portable runtime policy implementation
 
+This page describes the policy core. The executable object and compiler paths are
+documented in [MetalObjects.md](MetalObjects.md), [OpenCLProvider.md](OpenCLProvider.md),
+and [SHADER-JIT-IMPLEMENTATION](../docs/SHADER-JIT-IMPLEMENTATION.md). Their MSL and
+raw AIR compute subsets have separate actual Windows GPU evidence; the core's
+generic Metal capability gate is not promoted by those subset results.
+
 `PlatformRuntime.hpp/.cpp` implements user-space **policy**, not a GL/CL provider,
 Metal ABI bridge, shader compiler, Linux kernel compatibility layer, or device
 driver. It has no platform calls, dynamic allocation, exceptions, or RTTI. The

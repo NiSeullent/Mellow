@@ -3,13 +3,14 @@
 > **Design draft; implementation status is separate.**
 > [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md) and [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md)
 > take precedence over conflicting assumptions below. [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md)
-> records policy/intake, the native Windows OpenCL provider, portable Xe tests and kext build evidence.
-> Standalone OpenCL probes and MellowRT provider execution have separate records; no Metal, WindowServer
-> or display acceptance has passed. Native macOS GPU execution remains unverified.
+> records portable MSL/AIR compute objects, the Windows OpenCL provider, portable Xe tests and kext evidence.
+> Standalone probes, translated compute and native driver records remain separate. Apple Metal ABI,
+> WindowServer and display acceptance have not passed. Native macOS GPU execution remains unverified.
 
 ## 한글 요약
 
-**Windows에서는 MellowRT의 native OpenCL provider를 통한 제한된 GPU compute가 실행됐다.**
+**Windows에서는 자체 C++ 객체와 제한된 MSL/AIR 변환을 거친 GPU compute가 실행됐다.**
+MSL과 synthetic raw AIR 각각 10,000회 제출·독립 readback을 확인했다. Apple Metal ABI 구현은 아니다.
 드라이버가 보고한 대상은 `8086:7D41`이며, 독립적인 physical PCI 소유권 확인은 아니다.
 macOS native Xe/Metal 경로에는 `L`·`F`·`R` 기록이 없다. XeMemory는 이식한 PTE/PDE 함수를
 호출하며 실제 kext에 링크되지만, 하드웨어 GPU owner와 실행 경로는 아직 검증되지 않았다.
@@ -28,6 +29,7 @@ This document records **what has been achieved**, not what is intended. Intent l
 | --- | --- |
 | Native macOS/Metal GPU acceleration results | **0** |
 | Windows host OpenCL providers executed through MellowRT | **1 bounded Intel GPU provider path**; driver-reported `8086:7D41` |
+| Portable C++ objects and translated MSL/AIR compute | **Windows subset executed**; 10,000 submissions each, synthetic AIR positive input |
 | Native XNU GPU backends with an integrated device owner | **0** |
 | Native macOS rows at evidence level `L`, `F`, or `R` | **0** |
 | Executable non-Intel GPU backends | **none** |
@@ -42,7 +44,16 @@ with GPU-only selection, queue/event ownership, readback, profiling and completi
 The driver-reported identity is `8086:7D41`; independent physical PCI ownership is not established.
 This is distinct from the older standalone substrate probe, which bypassed MellowRT.
 The current records and exact acceptance scope are in [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md).
-Neither path validates MSL/AIR translation, Metal, the Darwin Xe driver or display output.
+Those direct OpenCL records do not themselves validate translation, the Darwin Xe driver or display output.
+
+### Portable C++ objects and MSL/AIR compute — Windows subset
+
+`Runtime/MetalObjects.*`, `ShaderJit.*` and `AirDecoder.*` implement an explicit C++ object API,
+typed MSL lowering, actual LLVM bitcode decoding and checked AIR2.7 SSA lowering. MSL and raw AIR
+each passed 10,000 submissions and independent readbacks through one reusable OpenCL pipeline.
+The positive AIR fixture is synthetic. The API binds one uint buffer with exact 1D dispatch; it
+does not implement Apple's Objective-C Metal protocols, arbitrary AIR/metallib, rendering or a
+native macOS provider. See [current verification](VERIFICATION-METAL-JIT-2026-09-06.md).
 
 ### Intel — Xe-LPG / Xe2
 
@@ -60,8 +71,9 @@ The only family with any source path. Device table at
 | `8086:7D67` | Intel Graphics (Arrow Lake-S) | `xe` | `S` | `SOURCE PATH` |
 
 For `7D41`, `XeMemory` now calls the portable PTE/PDE encoders through the single
-`PortedXeBindings.cpp` translation unit. The complete native GPU backend still has no integrated
-IOKit device owner, as gated by [Mellow/RuntimeReadiness.hpp](../Mellow/RuntimeReadiness.hpp).
+`PortedXeBindings.cpp` translation unit. Version 0.4.3 also adds an opt-in PCI/IOUserClient DMA
+diagnostic service; it is not the complete native GPU owner, as gated by
+[Mellow/RuntimeReadiness.hpp](../Mellow/RuntimeReadiness.hpp).
 [NATIVE-XE-BACKEND-AUDIT.md](NATIVE-XE-BACKEND-AUDIT.md) records the earlier source snapshot.
 Source readiness evaluation predicts
 stage `physical-provider`, first missing bit `bar0-mapped`; no physical capture establishes this state.
@@ -107,14 +119,14 @@ contract first. The project currently fetches firmware rather than redistributin
 
 | Plane | Component | Status |
 | --- | --- | --- |
-| 4 | MellowMTL — Metal object model | `NOT IMPLEMENTED` |
-| 4 | MellowJIT — AIR ingestion | `NOT IMPLEMENTED` |
+| 4 | MellowMTL — Metal object model | Portable C++ compute objects executed on Windows; Apple Objective-C Metal ABI remains unimplemented |
+| 4 | MellowJIT — AIR ingestion | Typed MSL and narrow AIR2.7 decoding/lowering executed; positive AIR fixture is synthetic, general compatibility unimplemented |
 | 3 | MellowRT — router and resource model | Policy contracts plus live bounded OpenCL C compute through the native host adapter; general Metal resources remain unimplemented |
 | 3 | Host OpenCL provider | Implemented and executed on Windows; macOS/Linux loader paths are not execution evidence |
 | 3 | Host OpenGL provider | `NOT IMPLEMENTED` |
 | 3 | Mellow provider (`libMellowGL` / `libMellowCL`) | `NOT IMPLEMENTED` |
 | 2 | MGAL interfaces | `NOT IMPLEMENTED` — the underlying separation exists in `Xe*` at `S` |
-| 2 | MELLOW-UAPI | `NOT IMPLEMENTED` |
+| 2 | MELLOW-UAPI | Full GPU UAPI unimplemented; separate opt-in administrative query/bounded DMA diagnostic IOUserClient exists |
 | 2 | Composition root | `NOT IMPLEMENTED` — this is the central gap |
 | 1 | MellowKPI | `NOT IMPLEMENTED` |
 | 1 | `xe` backend | Six retained Linux functions plus source-derived GGTT bind/unmap; XeMemory encoder calls linked in kext; no native hardware execution |
@@ -133,8 +145,9 @@ To be precise about where the project genuinely stands, these things did run:
 | [abi-evidence/](../abi-evidence) | Real Apple binaries from macOS 26.6.2 build 25G83 parsed; 378/378 kext imports resolved against KPI export sets | Symbol names and addresses only — no selector numbers, vtable slots, or struct layouts |
 | [tests/xe_guc_firmware_results.json](../tests/xe_guc_firmware_results.json) | The pinned 320,320-byte Intel GuC blob parsed by production code; hash, length, and version verified | No device ever authenticated it |
 | [Runtime/OpenCLProvider](../Runtime/OpenCLProvider.md), [current records](IMPLEMENTATION-STATUS.md) | Native Windows OpenCL C compute through MellowRT, using the installed Intel driver | No Metal/JIT, Darwin backend or independently verified physical PCI ownership |
+| [Runtime/MetalObjects](../Runtime/MetalObjects.md), [current verification](VERIFICATION-METAL-JIT-2026-09-06.md) | MSL and synthetic raw AIR each translated, driver-compiled once, and executed for 10,000 verified GPU submissions | Portable compute subset; no Apple Metal ABI, rendering, arbitrary AIR compatibility or native Tahoe execution |
 | [Drivers/PortedXe](../Drivers/PortedXe), [QEMU runner](../Tools/run-ported-xe-emulator.py) | Six retained source functions and GGTT lifetime loops tested in a real Linux QEMU guest: 18,721 checks; five guest negative controls and 19 parser controls | Emulated CPU/RAM and simulated MMIO/DMA/TLB boundaries; QEMU has no Xe GPU model here |
-| [kext build](IMPLEMENTATION-STATUS.md) | Version 0.4.2, 31 target translation units linked as Darwin `MH_KEXT_BUNDLE`, including the portable encoders | Structural build evidence; no kext load or GPU execution |
+| [kext build](IMPLEMENTATION-STATUS.md) | Version 0.4.3, 33 target translation units linked as Darwin `MH_KEXT_BUNDLE`, including portable encoders and the opt-in diagnostic service; 426 imports statically resolved | Structural build evidence; no kext load or GPU execution |
 
 These records preserve separate scopes. Windows host execution does not promote a native macOS
 row, and portable/QEMU/build results do not raise native hardware evidence above `S` or `B`.

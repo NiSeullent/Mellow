@@ -14,7 +14,7 @@ static unsigned checks {};
 #define CHECK(x) do { ++checks; if (!(x)) { std::fprintf(stderr, "FAIL %d: %s\n", __LINE__, #x); std::exit(1); } } while (false)
 enum class Mode { Intel, MissingIdentity, IdentityQueryFails, NoPlatforms, ContextFails, WrongBootstrap };
 static Mode mode = Mode::Intel;
-static bool failFinish {}, failEventRelease {};
+static bool failFinish {}, failEventRelease {}, failBuild {}, failKernel {};
 static unsigned enqueues {}, releases {}, eventReleases {}, identityQueries {};
 static int platformTag, deviceTag, contextTag, queueTag, programTag, kernelTag, memoryTag, eventTag;
 static std::vector<uint32_t> memory;
@@ -72,9 +72,11 @@ static Int MELLOW_CL_CALL queueInfo(Handle, UInt parameter, size_t size, void *o
     return put<Handle>(parameter == QueueContext ? &contextTag : &deviceTag, size, output, actual);
 }
 static Handle MELLOW_CL_CALL createProgram(Handle, UInt, const char **, const size_t *, Int *status) { *status = Success; return &programTag; }
-static Int MELLOW_CL_CALL build(Handle, UInt, const Handle *, const char *, BuildCallback, void *) { return Success; }
+static Int MELLOW_CL_CALL build(Handle, UInt, const Handle *, const char *, BuildCallback, void *) { return failBuild ? -11 : Success; }
 static Int MELLOW_CL_CALL buildInfo(Handle, Handle, UInt, size_t size, void *output, size_t *actual) { return putText("", size, output, actual); }
-static Handle MELLOW_CL_CALL createKernel(Handle, const char *, Int *status) { *status = Success; return &kernelTag; }
+static Handle MELLOW_CL_CALL createKernel(Handle, const char *, Int *status) {
+    *status = failKernel ? -46 : Success; return failKernel ? nullptr : &kernelTag;
+}
 static Handle MELLOW_CL_CALL createBuffer(Handle, Bits, size_t size, void *input, Int *status) {
     auto words = static_cast<uint32_t *>(input);
     memory.assign(words, words + size / sizeof(uint32_t));
@@ -190,5 +192,54 @@ int main() {
     CHECK(provider.initialize(0, error));
     CHECK(provider.executeOpenClC(OpenCLProvider::witnessSource(), "mellow_witness", input, expected, result));
     CHECK(result.runtimeCompletionAccepted && result.resourcesReleased);
+    failBuild = true;
+    auto rejectedBuild = provider.compileOpenClC(OpenCLProvider::witnessSource(), "mellow_witness", error);
+    CHECK(!rejectedBuild && !error.empty());
+    CHECK(provider.pipelineBuildCount() == 0 && provider.descriptor().verified != 0);
+    failBuild = false;
+    failKernel = true;
+    auto rejectedKernel = provider.compileOpenClC(OpenCLProvider::witnessSource(), "mellow_witness", error);
+    CHECK(!rejectedKernel && !error.empty());
+    CHECK(provider.pipelineBuildCount() == 0 && provider.descriptor().verified != 0);
+    failKernel = false;
+    auto pipeline = provider.compileOpenClC(OpenCLProvider::witnessSource(), "mellow_witness", error);
+    CHECK(bool(pipeline) && pipeline->compilationSerial() == 1);
+    CHECK(provider.executePipeline(pipeline, input, result));
+    CHECK(result.executionCompleted && result.output == expected && result.resourcesReleased);
+    CHECK(!result.resultsVerified && !result.runtimeCompletionAccepted); // No caller oracle supplied.
+    CHECK(provider.executePipeline(pipeline, input, result));
+    CHECK(provider.pipelineBuildCount() == 1); // Compiled program/kernel reused.
+    provider.invalidateSession();
+    CHECK(!provider.executePipeline(pipeline, input, result) && !result.submitted);
+    CHECK(provider.initialize(0, error));
+    CHECK(!provider.executePipeline(pipeline, input, result) && !result.submitted); // Old epoch cannot revive.
+    auto current = provider.compileOpenClC(OpenCLProvider::witnessSource(), "mellow_witness", error);
+    CHECK(bool(current) && current->compilationSerial() == 2);
+    CHECK(provider.executePipeline(current, input, result) && result.executionCompleted);
+    {
+        OpenCLProvider other(fixture());
+        CHECK(other.initialize(0, error));
+        CHECK(!other.executePipeline(current, input, result) && !result.submitted);
+    }
+    failEventRelease = true;
+    CHECK(!provider.executePipeline(current, input, result));
+    CHECK(!result.executionCompleted && !result.runtimeCompletionAccepted);
+    CHECK(provider.descriptor().verified == 0);
+    failEventRelease = false;
+    std::shared_ptr<OpenCLPipeline> survivor;
+    unsigned afterProviderDestroy {};
+    {
+        auto temporary = std::make_unique<OpenCLProvider>(fixture());
+        CHECK(temporary->initialize(0, error));
+        survivor = temporary->compileOpenClC(OpenCLProvider::witnessSource(), "mellow_witness", error);
+        CHECK(bool(survivor));
+        const auto beforeProviderDestroy = releases;
+        temporary.reset();
+        CHECK(releases == beforeProviderDestroy); // Pipeline retains context/queue + API owner.
+        CHECK(survivor->compilationSerial() == 1 && survivor->buildLog().empty());
+        afterProviderDestroy = releases;
+    }
+    survivor.reset();
+    CHECK(releases == afterProviderDestroy + 4); // kernel/program then queue/context.
     std::printf("PASS: %u synthetic ICD state/cleanup regressions; no hardware GPU execution\n", checks);
 }

@@ -8,11 +8,19 @@ their availability and successful execution must be checked on those hosts.
 
 ## Implemented boundary
 
-The public API accepts bounded OpenCL C source, a kernel entry name and one
+The acceptance API accepts bounded OpenCL C source, a kernel entry name and one
 in-place `uint` buffer, with a caller-supplied expected result for acceptance.
 It compiles with the installed driver's OpenCL C 1.2 compiler, allocates the
 buffer, submits the kernel, waits for its event and reads the result back.
 This is a useful substrate adapter, not MSL/AIR translation or a Metal driver.
+
+The reusable runtime API compiles once with compileOpenClC, returning an owned
+OpenCLPipeline; executePipeline then accepts input without an expected answer.
+It sets executionCompleted only after real event correlation, profiling,
+readback and checked per-dispatch cleanup. It leaves resultsVerified and
+runtimeCompletionAccepted false because normal application execution has no
+independent result oracle. The separately implemented MellowMTL object layer
+translates supported shaders before passing OpenCL C into this adapter.
 
 The adapter requests only GPU devices and requires the runtime's type bits to
 exclude CPU devices. It never chooses another device after a failure. This first
@@ -53,9 +61,14 @@ and the context/queue are drained and released. Subsequent calls cannot execute
 until a fresh context and bootstrap validation are created. `invalidateSession()`
 is this software lifetime operation; it does not perform a physical GPU reset.
 
-The class is single-owner and not thread safe. Kernel/program/memory/event objects
-are explicitly finalized after the queue drains, and drain/release errors are
-checked before publishing an accepted completion. Destructors perform only
+The class is not thread safe. Acceptance dispatch objects and normal dispatch
+memory/events are explicitly finalized after the queue drains; drain/release
+errors are checked before reporting executionCompleted or accepted evidence.
+Reusable pipelines retain compiled program/kernel objects across submissions;
+resourcesReleased describes per-dispatch resources, not destruction of the
+persistent pipeline. A pipeline captures its original function table and loader,
+retains its provider/context owner and rejects execution after a reset epoch.
+Its destructor releases the persistent objects; dispatch destructors perform
 fallback cleanup for already-failing paths. A new initialization attempt clears
 all prior discovery and bootstrap data, even if the new device cannot expose an
 identity; monotonic epoch/sequence counters remain. Synchronous driver calls can hang,

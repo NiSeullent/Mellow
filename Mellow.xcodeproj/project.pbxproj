@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		D1A625064D41470000000002 /* TahoeDiagnosticProtocol.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D1A625064D414700000000A2 /* TahoeDiagnosticProtocol.cpp */; };
+		D1A625064D41470000000001 /* TahoeDiagnostic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D1A625064D414700000000A1 /* TahoeDiagnostic.cpp */; };
 		C42F5B82067D421096F10001 /* PortedXeBindings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C42F5B82067D421096F10002 /* PortedXeBindings.cpp */; };
 		2E1301D52CD9026F00CFD021 /* libkmod.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2E1301D42CD9026F00CFD021 /* libkmod.a */; };
 		2E1CC3E22BA5DBD9004EC8F6 /* DisplayMergeNub.h in Headers */ = {isa = PBXBuildFile; fileRef = 2E1CC3E02BA5DBD9004EC8F6 /* DisplayMergeNub.h */; };
@@ -62,6 +64,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		D1A625064D414700000000A2 /* TahoeDiagnosticProtocol.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TahoeDiagnosticProtocol.cpp; sourceTree = "<group>"; };
+		D1A625064D414700000000A1 /* TahoeDiagnostic.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TahoeDiagnostic.cpp; sourceTree = "<group>"; };
 		C42F5B82067D421096F10002 /* PortedXeBindings.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PortedXeBindings.cpp; sourceTree = "<group>"; };
 		1C748C271C21952C0024EED2 /* Mellow.kext */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Mellow.kext; sourceTree = BUILT_PRODUCTS_DIR; };
 		1C748C2E1C21952C0024EED2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -172,6 +176,8 @@
 		1C748C291C21952C0024EED2 /* Mellow */ = {
 			isa = PBXGroup;
 			children = (
+				D1A625064D414700000000A1 /* TahoeDiagnostic.cpp */,
+				D1A625064D414700000000A2 /* TahoeDiagnosticProtocol.cpp */,
 				C42F5B82067D421096F10002 /* PortedXeBindings.cpp */,
 				1C748C2E1C21952C0024EED2 /* Info.plist */,
 				8C08783D431EFF2D805D7E02 /* XeGuCFirmware.cpp */,
@@ -396,6 +402,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D1A625064D41470000000001 /* TahoeDiagnostic.cpp in Sources */,
+				D1A625064D41470000000002 /* TahoeDiagnosticProtocol.cpp in Sources */,
 				C42F5B82067D421096F10001 /* PortedXeBindings.cpp in Sources */,
 				F0EDFC58B1C04818A187BD4D /* XeGuCFirmware.cpp in Sources */,
 				F15AC567811442834E48303E /* XeGuCFirmwareIOKit.cpp in Sources */,
@@ -586,7 +594,7 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.2;
+				MODULE_VERSION = 0.4.3;
 				OTHER_CFLAGS = (
 					"-mmmx",
 					"-msse",
@@ -641,7 +649,7 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.2;
+				MODULE_VERSION = 0.4.3;
 				OTHER_CFLAGS = (
 					"-mmmx",
 					"-msse",
@@ -755,7 +763,7 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.2;
+				MODULE_VERSION = 0.4.3;
 				OTHER_CFLAGS = (
 					"-mmmx",
 					"-msse",
