@@ -1,13 +1,42 @@
 # Platform implementation status
 
 The runnable platform now includes portable Mellow objects, a typed MSL/AIR compute frontend,
-actual LLVM bitcode decoding, reusable host OpenCL pipelines, and source-derived Xe memory code.
+actual LLVM bitcode decoding, reusable host OpenCL pipelines, bounded MSL render objects and
+a native Windows OpenGL provider, plus source-derived Xe memory code.
 The kext also contains an opt-in Tahoe diagnostic service. The current record is
 [VERIFICATION-METAL-JIT-2026-09-06](VERIFICATION-METAL-JIT-2026-09-06.md).
-Full Apple Metal ABI compatibility and native Tahoe GPU execution remain incomplete.
+The graphics contract is [RENDER-IMPLEMENTATION](RENDER-IMPLEMENTATION.md).
+The source-bound [render integration record](../validation/render/integration.json) indexes the
+actual frontend, provider, object, client and report-control evidence.
+Full Apple Metal ABI compatibility, native Tahoe GPU execution and WindowServer remain incomplete.
 
 ## Implemented and exercised
 
+- `Runtime/RenderShaderJit.*`: checked MSL vertex/fragment source lowers to GLSL330.
+  Float/vector types, three-vertex arrays, a shared float4 parameter and fragment position are
+  bounded and validated. Clip-depth, fragment-coordinate and readback-row transformations are
+  explicit. Current [Windows](../validation/render/frontend-windows.json) and
+  [Linux sanitizer](../validation/render/frontend-linux-sanitized.json) tests pass 969 frontend checks.
+  Render AIR, sampled textures and user varyings are not implemented.
+- `Runtime/RenderObjects.*`: explicit C++ render device, RGBA8 texture, library/functions,
+  retained pipeline, command queue/buffer and encoder. Windows offscreen tests passed 1,000
+  MSL frames, 16,050 native assertions and 27 negative API cases with one driver program build.
+  The [offscreen pixel oracle](../validation/render/objects-offscreen.json) checked all
+  3,072,000 pixels from 12,288,000 actual RGBA bytes.
+  Each frame had at least 572 foreground pixels. Across the run, 1,016 subpixel-boundary pixels were checked
+  against a restricted clear-or-valid-fragment rule, not skipped. A separate
+  [120-frame visible run](../validation/render/objects-visible.json)
+  checked all 368,640 pixels and swap API acceptance. Neither run passed an oracle to the
+  runtime. Actual readback PNGs and complete raw streams accompany the runner reports.
+- `Runtime/OpenGLProvider.*`: a private worker owns an isolated WGL context/window, verifies
+  a non-generic accelerated pixel format and core3.3 profile, compiles GLSL programs and checks
+  FBO rendering, real fences, context identity, readback and per-frame cleanup. Native GLSL
+  provider tests separately passed 1,000 offscreen and 120 visible frames. Driver identity is
+  Intel(R) Graphics / 32.0.101.6737; renderer strings do not establish a PCI device ID.
+  Invalidated/failed contexts clear discovery claims, and retained pipelines cannot revive in
+  a new epoch. Six provider-report and seven object-report control tests pass without a GPU.
+  [Linux compilation](../validation/render/objects-linux-build.json) succeeds; native GL execution
+  is explicitly Windows-only. [Report controls](../validation/render/report-controls.json) remain software-only.
 - `Runtime/MetalObjects.*`: explicit portable C++ Device/Buffer/Library/Function/Pipeline/Queue/
   CommandBuffer/ComputeEncoder. One immutable-size uint buffer, exact 1D dispatch, retained
   pipeline compilation and synchronous completion. Ordinary workloads do not need an expected
@@ -56,15 +85,19 @@ Full Apple Metal ABI compatibility and native Tahoe GPU execution remain incompl
 ## What has not been implemented or validated
 
 Apple Objective-C Metal protocol conformance, general MSL/AIR/metallib compatibility,
-texture/render/blit providers, cross-API resource sharing, complete LinuxKPI/DRM and vendor
+render AIR, general texture sampling/storage, a blit encoder, cross-API resource sharing, complete LinuxKPI/DRM and vendor
 driver ports, NVIDIA/AMD binding, system Metal registration and WindowServer integration
-remain work. The new C++ objects and compute JIT implement a narrow opt-in subset.
+remain work. The C++ compute and render objects implement separate narrow opt-in subsets.
+RenderDevice chooses the GL provider explicitly; the shared route policy does not automatically
+combine GL rendering and OpenCL compute or establish interop between their resources.
+Windows SwapBuffers acceptance does not prove physical scanout, cursor-plane operation or macOS
+compositor acceleration.
 
 The diagnostic service can call the real IOKit DMA preparation APIs when a device mapper is
 admitted, but no actual Darwin mapping has been observed on hardware. Physical GGTT publication,
 GuC authentication, context submission, GPU interrupts/fences and reset recovery are not connected
 into a working native GPU owner. Host protocol callbacks are explicitly simulated. The Windows
-OpenCL provider uses the installed Intel Windows driver and does not run the Darwin kernel code.
+OpenCL and OpenGL providers use the installed Intel Windows driver and do not run the Darwin kernel code.
 
 No physical Tahoe host was available for this verification. Actual kext loading, installation,
 Recovery GUI, Metal compute/render/stress, WindowServer and sleep/wake have not passed.
@@ -83,6 +116,11 @@ python3 Tools/run-opencl-runtime-regressions.py --cxx g++ --out build/opencl-reg
 python3 Tools/run-shader-jit-tests.py --cxx g++ --sanitize --out ../shader-jit-test
 python3 tests/air_decoder_tests.py
 python3 tests/shader_cli_controls.py
+python3 Tools/run-render-shader-tests.py --cxx g++ --sanitize --out ../new-render-shader-tests
+python3 Tools/run-opengl-provider.py --cxx g++ --out build/opengl-provider-compile
+python3 Tools/run-render-objects.py --cxx g++ --out build/render-objects-compile
+python3 tests/opengl_provider_report_tests.py
+python3 tests/render_objects_report_tests.py
 ```
 
 On Windows with an installed Intel OpenCL driver and MinGW compiler:
@@ -91,11 +129,18 @@ On Windows with an installed Intel OpenCL driver and MinGW compiler:
 python Tools/run-opencl-runtime.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/opencl-runtime --compute
 python Tools/run-opencl-runtime.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/opencl-stress --compute --iterations 10000 --timeout 180
 python Tools/run-metal-objects.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/msl-objects --compute --iterations 10000
+python Tools/run-render-objects.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/msl-render --render --frames 1000
+python Tools/run-render-objects.py --cxx C:/msys64/mingw64/bin/g++.exe --out build/msl-render-visible --render --visible --frames 120
 ```
 
-Omit `--compute` for compile-only validation. Actual driver calls are supervised in a separate
+Omit `--compute` or `--render` for compile-only validation. Actual driver calls are supervised in a separate
 process with a deadline. Driver failure, unexpected device identity, event ownership mismatch,
 readback mismatch or cleanup failure cannot produce successful runtime completion.
+
+The platform workflow includes render frontend sanitizers, compile-only provider/object builds
+and Python report controls. It never requests GPU rendering on hosted CI. Local results above
+are not a hosted Actions pass: the account billing restriction currently prevents a confirming
+CI run, so hosted CI success is not claimed.
 
 Use [run-ported-xe-emulator.py](../Tools/run-ported-xe-emulator.py) from Linux/WSL with QEMU and
 an explicitly supplied Linux kernel. It boots an initramfs and runs the compiled tests as a child
