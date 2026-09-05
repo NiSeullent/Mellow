@@ -20,14 +20,31 @@
 			A1B2C3D4E5F601020304A002 /* IntelDPLinkTraining.hpp in Headers */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F601020304B002 /* IntelDPLinkTraining.hpp */; };		CE405ED91E4A080700AA0B3D /* plugin_start.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CE405ED81E4A080700AA0B3D /* plugin_start.cpp */; };
 		F009B7A129E4EE3C00786AFF /* kern_start.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F009B7A029E4EE3C00786AFF /* kern_start.cpp */; };
 		F009B7A329E4EEBA00786AFF /* kern_mellow.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F009B7A229E4EEBA00786AFF /* kern_mellow.cpp */; };
-		F067C22629D84710004BB52E /* (null) in Sources */ = {isa = PBXBuildFile; };
 		F0A4BE592A1996E40031D569 /* kern_model.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F0A4BE572A1996E40031D569 /* kern_model.hpp */; };
 		F0AF08BB2A0F373F00B63C2B /* kern_gen11.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F0AF08B92A0F373F00B63C2B /* kern_gen11.cpp */; };
 		F0AF08BC2A0F373F00B63C2B /* kern_gen11.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F0AF08BA2A0F373F00B63C2B /* kern_gen11.hpp */; };
-		F0B49E9529D93A600067BE5B /* (null) in Headers */ = {isa = PBXBuildFile; };
-		F0B49E9629D93A600067BE5B /* (null) in Sources */ = {isa = PBXBuildFile; };
 		F0BB9E552A57A0340081F5FA /* kern_patcherplus.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F0BB9E532A57A0340081F5FA /* kern_patcherplus.cpp */; };
 		F0BB9E562A57A0340081F5FA /* kern_patcherplus.hpp in Headers */ = {isa = PBXBuildFile; fileRef = F0BB9E542A57A0340081F5FA /* kern_patcherplus.hpp */; };
+		D7E3FC856D41563B7C195633 /* XeMemory.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CC2ACB31EAD2B281A5670870 /* XeMemory.cpp */; };
+		741D27048E48401FE89C645B /* XeMemoryIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = B519F7CEFC54673C9F5E06AD /* XeMemoryIOKit.cpp */; };
+		6BAA099D720FB9649F70EDBB /* XeFirmware.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 31F37188FB01B3122DA9BCA6 /* XeFirmware.cpp */; };
+		69B708220100C5C36B6D6A6B /* XeSubmission.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AE8EA7A9249B9F9861A34B88 /* XeSubmission.cpp */; };
+		0E050B36E88990EA64578883 /* XePageTable.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 7D85C60D70F269A329A38496 /* XePageTable.cpp */; };
+		531B7D344341807DA7814736 /* XeMmioAccess.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 32A78B1D1FE9FC78DD5A04B3 /* XeMmioAccess.cpp */; };
+		99833C7F725E9ED1B13361B9 /* XeMmioIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C53207933471BE57D832C559 /* XeMmioIOKit.cpp */; };
+		D34C13604F628450230474E9 /* XePageTableIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1BE2EE8B7036F0808F8803EE /* XePageTableIOKit.cpp */; };
+		504CBFCF814831DE2F1C5CCD /* XeGuCTransport.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E334D0A1D72FD9824AA349CF /* XeGuCTransport.cpp */; };
+		1612B9BD160818EF65265682 /* XeGuCTransportIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A5EC69B7701AB508DBC0A7F2 /* XeGuCTransportIOKit.cpp */; };
+		958942B747C41BD313B134F0 /* XeZebin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FEA06EFB6A1FA4C706E7AEED /* XeZebin.cpp */; };
+		F0EDFC58B1C04818A187BD4D /* XeGuCFirmware.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8C08783D431EFF2D805D7E02 /* XeGuCFirmware.cpp */; };
+		F15AC567811442834E48303E /* XeGuCFirmwareIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 08C80C1179A55FA889D654C2 /* XeGuCFirmwareIOKit.cpp */; };
+		07105C39D3A806F8F8C3B7ED /* XeContext.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3663BEC9A333E8DC291412A5 /* XeContext.cpp */; };
+		4482DE84BBE2324C2704B8E2 /* XeDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CFF5ECDCFAF198ED4CA8FFE2 /* XeDispatch.cpp */; };
+		A290787A326504737791D351 /* XeContextExecution.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 80166389A3ED9AE910BEA57A /* XeContextExecution.cpp */; };
+		EE676FAA3C9C021313BC9EEA /* XeInterrupt.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5C803E328629BC3EC39AB6BF /* XeInterrupt.cpp */; };
+		B02CB2CE5CDC4EA7B014B3E1 /* XeInterruptIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E36C97DAE2064EEA93829A32 /* XeInterruptIOKit.cpp */; };
+		6917E8E070924738955C0AA5 /* XeFence.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FFBEC22E0300F59B84AFD28A /* XeFence.cpp */; };
+		FC34DA409FA2A57D7A7669A9 /* XeFenceIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 13548A8BEAE916DD0BE6B027 /* XeFenceIOKit.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -77,6 +94,46 @@
 		F0AF08BA2A0F373F00B63C2B /* kern_gen11.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = kern_gen11.hpp; sourceTree = "<group>"; };
 		F0BB9E532A57A0340081F5FA /* kern_patcherplus.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = kern_patcherplus.cpp; sourceTree = "<group>"; };
 		F0BB9E542A57A0340081F5FA /* kern_patcherplus.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = kern_patcherplus.hpp; sourceTree = "<group>"; };
+		CC2ACB31EAD2B281A5670870 /* XeMemory.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeMemory.cpp; sourceTree = "<group>"; };
+		BD5B09B0268702FD1A852B9F /* XeMemory.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeMemory.hpp; sourceTree = "<group>"; };
+		B519F7CEFC54673C9F5E06AD /* XeMemoryIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeMemoryIOKit.cpp; sourceTree = "<group>"; };
+		AE17C5555949878388957E01 /* XeMemoryIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeMemoryIOKit.hpp; sourceTree = "<group>"; };
+		31F37188FB01B3122DA9BCA6 /* XeFirmware.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeFirmware.cpp; sourceTree = "<group>"; };
+		417064C21A74C817C85897B5 /* XeFirmware.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeFirmware.hpp; sourceTree = "<group>"; };
+		AE8EA7A9249B9F9861A34B88 /* XeSubmission.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeSubmission.cpp; sourceTree = "<group>"; };
+		82263A0770B42EE376FC2D73 /* XeSubmission.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeSubmission.hpp; sourceTree = "<group>"; };
+		7D85C60D70F269A329A38496 /* XePageTable.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XePageTable.cpp; sourceTree = "<group>"; };
+		4FD20F0F74A918BCB04704B3 /* XePageTable.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XePageTable.hpp; sourceTree = "<group>"; };
+		32A78B1D1FE9FC78DD5A04B3 /* XeMmioAccess.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeMmioAccess.cpp; sourceTree = "<group>"; };
+		E58F6EE65D1F50F0D6183F6F /* XeMmioAccess.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeMmioAccess.hpp; sourceTree = "<group>"; };
+		C53207933471BE57D832C559 /* XeMmioIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeMmioIOKit.cpp; sourceTree = "<group>"; };
+		37A746DB5A1D4DA6C86F542D /* XeMmioIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeMmioIOKit.hpp; sourceTree = "<group>"; };
+		1BE2EE8B7036F0808F8803EE /* XePageTableIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XePageTableIOKit.cpp; sourceTree = "<group>"; };
+		83C651A4C1446172AA81E568 /* XePageTableIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XePageTableIOKit.hpp; sourceTree = "<group>"; };
+		E334D0A1D72FD9824AA349CF /* XeGuCTransport.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGuCTransport.cpp; sourceTree = "<group>"; };
+		80A9F2F40A5CE3F674137C4B /* XeGuCTransport.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeGuCTransport.hpp; sourceTree = "<group>"; };
+		A5EC69B7701AB508DBC0A7F2 /* XeGuCTransportIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGuCTransportIOKit.cpp; sourceTree = "<group>"; };
+		78ABFDBF78EA3BD272ACA36B /* XeGuCTransportIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeGuCTransportIOKit.hpp; sourceTree = "<group>"; };
+		FEA06EFB6A1FA4C706E7AEED /* XeZebin.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeZebin.cpp; sourceTree = "<group>"; };
+		E6D80DFA1E4BA5DE2289DD93 /* XeZebin.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeZebin.hpp; sourceTree = "<group>"; };
+		8C08783D431EFF2D805D7E02 /* XeGuCFirmware.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGuCFirmware.cpp; sourceTree = "<group>"; };
+		AA9EBAD50983BE81A8D4C209 /* XeGuCFirmware.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeGuCFirmware.hpp; sourceTree = "<group>"; };
+		08C80C1179A55FA889D654C2 /* XeGuCFirmwareIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGuCFirmwareIOKit.cpp; sourceTree = "<group>"; };
+		39F8A57FECCF0553393B6EE3 /* XeGuCFirmwareIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeGuCFirmwareIOKit.hpp; sourceTree = "<group>"; };
+		3663BEC9A333E8DC291412A5 /* XeContext.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeContext.cpp; sourceTree = "<group>"; };
+		D846C44E33EA672DBCA714FC /* XeContext.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeContext.hpp; sourceTree = "<group>"; };
+		CFF5ECDCFAF198ED4CA8FFE2 /* XeDispatch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeDispatch.cpp; sourceTree = "<group>"; };
+		673F8735B34435F96099A191 /* XeDispatch.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeDispatch.hpp; sourceTree = "<group>"; };
+		80166389A3ED9AE910BEA57A /* XeContextExecution.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeContextExecution.cpp; sourceTree = "<group>"; };
+		BC3A14FC5C73EE1EB27BCEE0 /* XeContextExecution.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeContextExecution.hpp; sourceTree = "<group>"; };
+		5C803E328629BC3EC39AB6BF /* XeInterrupt.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeInterrupt.cpp; sourceTree = "<group>"; };
+		4EF7BBFF478065B295662BC3 /* XeInterrupt.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeInterrupt.hpp; sourceTree = "<group>"; };
+		E36C97DAE2064EEA93829A32 /* XeInterruptIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeInterruptIOKit.cpp; sourceTree = "<group>"; };
+		C6E6CB1BFB9A809B1FE2F9A2 /* XeInterruptIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeInterruptIOKit.hpp; sourceTree = "<group>"; };
+		FFBEC22E0300F59B84AFD28A /* XeFence.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeFence.cpp; sourceTree = "<group>"; };
+		C1BA198E9B5CE423BCC07280 /* XeFence.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeFence.hpp; sourceTree = "<group>"; };
+		13548A8BEAE916DD0BE6B027 /* XeFenceIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeFenceIOKit.cpp; sourceTree = "<group>"; };
+		4CECBDE676DAB2A8E9BACAE3 /* XeFenceIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeFenceIOKit.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -114,6 +171,46 @@
 			isa = PBXGroup;
 			children = (
 				1C748C2E1C21952C0024EED2 /* Info.plist */,
+				8C08783D431EFF2D805D7E02 /* XeGuCFirmware.cpp */,
+				AA9EBAD50983BE81A8D4C209 /* XeGuCFirmware.hpp */,
+				08C80C1179A55FA889D654C2 /* XeGuCFirmwareIOKit.cpp */,
+				39F8A57FECCF0553393B6EE3 /* XeGuCFirmwareIOKit.hpp */,
+				3663BEC9A333E8DC291412A5 /* XeContext.cpp */,
+				D846C44E33EA672DBCA714FC /* XeContext.hpp */,
+				CFF5ECDCFAF198ED4CA8FFE2 /* XeDispatch.cpp */,
+				673F8735B34435F96099A191 /* XeDispatch.hpp */,
+				80166389A3ED9AE910BEA57A /* XeContextExecution.cpp */,
+				BC3A14FC5C73EE1EB27BCEE0 /* XeContextExecution.hpp */,
+				5C803E328629BC3EC39AB6BF /* XeInterrupt.cpp */,
+				4EF7BBFF478065B295662BC3 /* XeInterrupt.hpp */,
+				E36C97DAE2064EEA93829A32 /* XeInterruptIOKit.cpp */,
+				C6E6CB1BFB9A809B1FE2F9A2 /* XeInterruptIOKit.hpp */,
+				FFBEC22E0300F59B84AFD28A /* XeFence.cpp */,
+				C1BA198E9B5CE423BCC07280 /* XeFence.hpp */,
+				13548A8BEAE916DD0BE6B027 /* XeFenceIOKit.cpp */,
+				4CECBDE676DAB2A8E9BACAE3 /* XeFenceIOKit.hpp */,
+				32A78B1D1FE9FC78DD5A04B3 /* XeMmioAccess.cpp */,
+				E58F6EE65D1F50F0D6183F6F /* XeMmioAccess.hpp */,
+				C53207933471BE57D832C559 /* XeMmioIOKit.cpp */,
+				37A746DB5A1D4DA6C86F542D /* XeMmioIOKit.hpp */,
+				1BE2EE8B7036F0808F8803EE /* XePageTableIOKit.cpp */,
+				83C651A4C1446172AA81E568 /* XePageTableIOKit.hpp */,
+				E334D0A1D72FD9824AA349CF /* XeGuCTransport.cpp */,
+				80A9F2F40A5CE3F674137C4B /* XeGuCTransport.hpp */,
+				A5EC69B7701AB508DBC0A7F2 /* XeGuCTransportIOKit.cpp */,
+				78ABFDBF78EA3BD272ACA36B /* XeGuCTransportIOKit.hpp */,
+				FEA06EFB6A1FA4C706E7AEED /* XeZebin.cpp */,
+				E6D80DFA1E4BA5DE2289DD93 /* XeZebin.hpp */,
+				CC2ACB31EAD2B281A5670870 /* XeMemory.cpp */,
+				BD5B09B0268702FD1A852B9F /* XeMemory.hpp */,
+				B519F7CEFC54673C9F5E06AD /* XeMemoryIOKit.cpp */,
+				AE17C5555949878388957E01 /* XeMemoryIOKit.hpp */,
+				31F37188FB01B3122DA9BCA6 /* XeFirmware.cpp */,
+				417064C21A74C817C85897B5 /* XeFirmware.hpp */,
+				AE8EA7A9249B9F9861A34B88 /* XeSubmission.cpp */,
+				82263A0770B42EE376FC2D73 /* XeSubmission.hpp */,
+				7D85C60D70F269A329A38496 /* XePageTable.cpp */,
+				4FD20F0F74A918BCB04704B3 /* XePageTable.hpp */,
 					A1B2C3D4E5F601020304B001 /* IntelDPLinkTraining.cpp */,
 					A1B2C3D4E5F601020304B002 /* IntelDPLinkTraining.hpp */,
 				2E5BF5812BCC212F0095BDCF /* HDMI.cpp */,
@@ -195,7 +292,6 @@
 				2E5BF5842BCC212F0095BDCF /* HDMI.hpp in Headers */,
 				F0A4BE592A1996E40031D569 /* kern_model.hpp in Headers */,
 				2EA343FF2C93C07700160F43 /* kern_genx.hpp in Headers */,
-				F0B49E9529D93A600067BE5B /* (null) in Headers */,
 				F0BB9E562A57A0340081F5FA /* kern_patcherplus.hpp in Headers */,
 					A1B2C3D4E5F601020304A002 /* IntelDPLinkTraining.hpp in Headers */,			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -297,12 +393,30 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F0EDFC58B1C04818A187BD4D /* XeGuCFirmware.cpp in Sources */,
+				F15AC567811442834E48303E /* XeGuCFirmwareIOKit.cpp in Sources */,
+				07105C39D3A806F8F8C3B7ED /* XeContext.cpp in Sources */,
+				4482DE84BBE2324C2704B8E2 /* XeDispatch.cpp in Sources */,
+				A290787A326504737791D351 /* XeContextExecution.cpp in Sources */,
+				EE676FAA3C9C021313BC9EEA /* XeInterrupt.cpp in Sources */,
+				B02CB2CE5CDC4EA7B014B3E1 /* XeInterruptIOKit.cpp in Sources */,
+				6917E8E070924738955C0AA5 /* XeFence.cpp in Sources */,
+				FC34DA409FA2A57D7A7669A9 /* XeFenceIOKit.cpp in Sources */,
+				531B7D344341807DA7814736 /* XeMmioAccess.cpp in Sources */,
+				99833C7F725E9ED1B13361B9 /* XeMmioIOKit.cpp in Sources */,
+				D34C13604F628450230474E9 /* XePageTableIOKit.cpp in Sources */,
+				504CBFCF814831DE2F1C5CCD /* XeGuCTransport.cpp in Sources */,
+				1612B9BD160818EF65265682 /* XeGuCTransportIOKit.cpp in Sources */,
+				958942B747C41BD313B134F0 /* XeZebin.cpp in Sources */,
+				D7E3FC856D41563B7C195633 /* XeMemory.cpp in Sources */,
+				741D27048E48401FE89C645B /* XeMemoryIOKit.cpp in Sources */,
+				6BAA099D720FB9649F70EDBB /* XeFirmware.cpp in Sources */,
+				69B708220100C5C36B6D6A6B /* XeSubmission.cpp in Sources */,
+				0E050B36E88990EA64578883 /* XePageTable.cpp in Sources */,
 				F009B7A129E4EE3C00786AFF /* kern_start.cpp in Sources */,
-				F067C22629D84710004BB52E /* (null) in Sources */,
 				F009B7A329E4EEBA00786AFF /* kern_mellow.cpp in Sources */,
 				F0BB9E552A57A0340081F5FA /* kern_patcherplus.cpp in Sources */,
 				2E5BF5832BCC212F0095BDCF /* HDMI.cpp in Sources */,
-				F0B49E9629D93A600067BE5B /* (null) in Sources */,
 				2EA343FE2C93C07700160F43 /* kern_genx.cpp in Sources */,
 				F0AF08BB2A0F373F00B63C2B /* kern_gen11.cpp in Sources */,
 				CE405ED91E4A080700AA0B3D /* plugin_start.cpp in Sources */,
@@ -468,7 +582,7 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.1.0;
+				MODULE_VERSION = 0.4.1;
 				OTHER_CFLAGS = (
 					"-mmmx",
 					"-msse",
@@ -523,7 +637,7 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.1.0;
+				MODULE_VERSION = 0.4.1;
 				OTHER_CFLAGS = (
 					"-mmmx",
 					"-msse",
@@ -637,7 +751,7 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.1.0;
+				MODULE_VERSION = 0.4.1;
 				OTHER_CFLAGS = (
 					"-mmmx",
 					"-msse",

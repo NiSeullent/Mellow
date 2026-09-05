@@ -26,6 +26,8 @@
 #include <IOKit/IOLib.h>
 
 #include "DisplayMergeNub.h"
+#include "kern_mellow.hpp"
+#include <Headers/kern_api.hpp>
 //#include "KextVer.h"
 OSDefineMetaClassAndStructors(DisplayMergeNub, IOService)
 
@@ -34,11 +36,7 @@ static bool haveCreatedRef = false;
 bool
 DisplayMergeNub::start(IOService *provider)
 {
-    //IOLog("%s\n", (const char *)DisplayMergeNubVersionString);
-   // IOLog("Version %f\n", DisplayMergeNubVersionNumber);
-    IOLog("Copyright © 2013-2014 AnV Software\n");
-
-    return (true);
+    return IOService::start(provider);
 }
 
 //================================================================================================
@@ -55,31 +53,28 @@ IOService *
 DisplayMergeNub::probe(IOService *provider, SInt32 *score)
 {
 #pragma unused (score)
-    OSDictionary *providerDict = (OSDictionary*)getProperty("IOProviderMergeProperties");
-    OSNumber *providerVendor = (OSNumber*)provider->getProperty("DisplayVendorID");
-    OSNumber *providerDevice = (OSNumber*)provider->getProperty("DisplayProductID");
-    OSString *providerDisplayPrefs = (OSString*)provider->getProperty("IODisplayPrefsKey");
-    OSNumber *vendorValue = (OSNumber*)getProperty("DisplayVendorID");
-    OSNumber *deviceValue = (OSNumber*)getProperty("DisplayProductID");
-    OSString *displayPrefs = (OSString*)getProperty("IODisplayPrefsKey");
-    //OSBoolean *ignoreDisplayPrefs = (OSBoolean*)getProperty("IgnoreDisplayPrefs");
-    OSString *displayOverrideClass = (OSString*)providerDict->getObject("IOClass");
+    // IOKit personalities may probe independently of the Lilu startup callback.
+    // Do not let the optional panel merge bypass physical hardware admission.
+    if (!provider || !checkKernelArgument("-mellowdisplaymerge") ||
+        !MellowCore::callback || !MellowCore::callback->isHardwareAdmitted())
+        return nullptr;
 
-    if ((providerDict) && (providerVendor->unsigned64BitValue() == vendorValue->unsigned64BitValue()) && (providerDevice->unsigned64BitValue() == deviceValue->unsigned64BitValue()))
-    {
-             provider->getPropertyTable()->merge(providerDict);		// merge will verify that this really is a dictionary
-       // if ((!strncmp(providerDisplayPrefs->getCStringNoCopy(), displayPrefs->getCStringNoCopy(), providerDisplayPrefs->getLength())) || //(ignoreDisplayPrefs->isTrue()))
-       // {
-            if (displayOverrideClass)
-            {
-                provider->setName(displayOverrideClass->getCStringNoCopy());
-            }
+    auto *providerDict = OSDynamicCast(OSDictionary, getProperty("IOProviderMergeProperties"));
+    auto *providerVendor = OSDynamicCast(OSNumber, provider->getProperty("DisplayVendorID"));
+    auto *providerDevice = OSDynamicCast(OSNumber, provider->getProperty("DisplayProductID"));
+    auto *vendorValue = OSDynamicCast(OSNumber, getProperty("DisplayVendorID"));
+    auto *deviceValue = OSDynamicCast(OSNumber, getProperty("DisplayProductID"));
+    if (!providerDict || !providerVendor || !providerDevice || !vendorValue || !deviceValue)
+        return nullptr;
+    if (providerVendor->unsigned64BitValue() != vendorValue->unsigned64BitValue() ||
+        providerDevice->unsigned64BitValue() != deviceValue->unsigned64BitValue())
+        return nullptr;
 
-            MergeDictionaryIntoProvider( provider, providerDict);
-       // }
-    }
-    
-    return (NULL);								// always fail the probe!
+    auto *displayOverrideClass = OSDynamicCast(OSString, providerDict->getObject("IOClass"));
+    if (MergeDictionaryIntoProvider(provider, providerDict) && displayOverrideClass)
+        provider->setName(displayOverrideClass->getCStringNoCopy());
+    // Property merging never claims ownership of the display or proves rendering.
+    return nullptr;
 }
 
 //================================================================================================
@@ -93,224 +88,70 @@ DisplayMergeNub::probe(IOService *provider, SInt32 *score)
 //================================================================================================
 //
 bool
-DisplayMergeNub::MergeDictionaryIntoProvider(IOService * provider, OSDictionary * dictionaryToMerge)
+DisplayMergeNub::MergeDictionaryIntoProvider(IOService *provider, OSDictionary *dictionaryToMerge)
 {
-    const OSSymbol * 		dictionaryEntry = NULL;
-    OSCollectionIterator * 	iter = NULL;
-    bool			result = false;
-
     if (!provider || !dictionaryToMerge)
-        return (false);
+        return false;
+    auto *iter = OSCollectionIterator::withCollection(dictionaryToMerge);
+    if (!iter)
+        return false;
 
-	//
-	// rdar://4041566 -- Trick the C++ run-time into keeping us loaded.
-	//
-	if (haveCreatedRef == false) 
-	{
-		haveCreatedRef = true;
-		getMetaClass()->instanceConstructed();
-	}
-	
-    // Get the dictionary whose entries we need to merge into our provider and get
-    // an iterator to it.
-    //
-    iter = OSCollectionIterator::withCollection((OSDictionary *)dictionaryToMerge);
-    if ( iter != NULL )
-    {
-        // Iterate through the dictionary until we run out of entries
-        //
-        while ( NULL != (dictionaryEntry = (const OSSymbol *)iter->getNextObject()) )
-        {
-            const char *	str = NULL;
-            OSDictionary *	sourceDictionary = NULL;
-            OSDictionary *	providerDictionary = NULL;
-            OSObject *		providerProperty = NULL;
-
-            // Get the symbol name for debugging
-            //
-            str = dictionaryEntry->getCStringNoCopy();
-
-            // Check to see if our destination already has the same entry.  If it does
-            // we assume that it is a dictionary.  Perhaps we should check that
-            //
-            providerProperty = provider->getProperty(dictionaryEntry);
-            if ( providerProperty )
-            {
-                providerDictionary = OSDynamicCast(OSDictionary, providerProperty);
-            }
-
-            // See if our source entry is also a dictionary
-            //
-            sourceDictionary = OSDynamicCast(OSDictionary, dictionaryToMerge->getObject(dictionaryEntry));
-
-            if ( providerDictionary &&  sourceDictionary )
-            {
-                // Need to merge our entry into the provider's dictionary.  However, we don't have a copy of our dictionary, just
-                // a reference to it.  So, we need to make a copy of our provider's dictionary
-                //
-                OSDictionary *		localCopyOfProvidersDictionary;
-                UInt32			providerSize;
-                UInt32			providerSizeAfterMerge;
-
-                localCopyOfProvidersDictionary = OSDictionary::withDictionary( providerDictionary, 0);
-                if ( localCopyOfProvidersDictionary == NULL )
-                {
-                    break;
-                }
-
-                // Get the size of our provider's dictionary so that we can check later whether it changed
-                //
-                providerSize = providerDictionary->getCapacity();
-
-                // Note that our providerDictionary *might* change
-                // between the time we copied it and when we write it out again.  If so, we will obviously overwrite anychanges
-                //
-                result = MergeDictionaryIntoDictionary(  sourceDictionary, localCopyOfProvidersDictionary);
-
-                if ( result )
-                {
-                    // Get the size of our provider's dictionary so to see if it's changed  (Yes, the size could remain the same but the contents
-                    // could have changed, but this gives us a first approximation.  We're not doing anything with this result, although we could
-                    // remerge
-                    //
-                    providerSizeAfterMerge = providerDictionary->getCapacity();
-
-                    result = provider->setProperty( dictionaryEntry, localCopyOfProvidersDictionary );
-                    if ( !result )
-                    {
-                        break;
-                    }
-                }
-                else
-                {
-                    // If we got an error merging dictionaries, then just bail out without doing anything
-                    //
-                    break;
-                }
-           }
-            else
-            {
-                result = provider->setProperty(dictionaryEntry, dictionaryToMerge->getObject(dictionaryEntry));
-                if ( !result )
-                {
-                    break;
-                }
-            }
-        }
-        iter->release();
+    // Preserve the original lifetime requirement for the property merge nub.
+    if (!haveCreatedRef) {
+        haveCreatedRef = true;
+        getMetaClass()->instanceConstructed();
     }
-    return (result);
+    bool result = true;
+    while (auto *entry = iter->getNextObject()) {
+        auto *key = OSDynamicCast(OSSymbol, entry);
+        if (!key) { result = false; break; }
+        auto *source = OSDynamicCast(OSDictionary, dictionaryToMerge->getObject(key));
+        auto *target = OSDynamicCast(OSDictionary, provider->getProperty(key));
+        if (source && target) {
+            auto *copy = OSDictionary::withDictionary(target, 0);
+            if (!copy) { result = false; break; }
+            result = MergeDictionaryIntoDictionary(source, copy);
+            if (result)
+                result = provider->setProperty(key, copy);
+            // setProperty retains its own reference; release ours on all paths.
+            copy->release();
+        } else {
+            result = provider->setProperty(key, dictionaryToMerge->getObject(key));
+        }
+        if (!result)
+            break;
+    }
+    iter->release();
+    return result;
 }
 
-
-//================================================================================================
-//
-//  MergeDictionaryIntoDictionary( parentSourceDictionary, parentTargetDictionary)
-//
-//  This routine will merge the contents of parentSourceDictionary into the targetDictionary, recursively.
-//  Note that we are only modifying copies of the parentTargetDictionary, so we don't expect anybody
-//  else to be accessing them at the same time.
-//
-//================================================================================================
-//
 bool
-DisplayMergeNub::MergeDictionaryIntoDictionary(OSDictionary * parentSourceDictionary,  OSDictionary * parentTargetDictionary)
+DisplayMergeNub::MergeDictionaryIntoDictionary(OSDictionary *source, OSDictionary *target)
 {
-    OSCollectionIterator*	srcIterator = NULL;
-    OSSymbol*			keyObject = NULL ;
-    bool			result = false;
-
-    if (!parentSourceDictionary || !parentTargetDictionary)
-        return (false);
-
-    // Get our source dictionary
-    //
-    srcIterator = OSCollectionIterator::withCollection(parentSourceDictionary) ;
-
-    while (NULL != (keyObject = OSDynamicCast(OSSymbol, srcIterator->getNextObject())))
-    {
-        const char *	str;
-        OSDictionary *	childSourceDictionary = NULL;
-        OSDictionary *	childTargetDictionary = NULL;
-        OSObject *	childTargetObject = NULL;
-
-        // Get the symbol name for debugging
-        //
-        str = keyObject->getCStringNoCopy();
-
-        // Check to see if our destination already has the same entry.
-        //
-        childTargetObject = parentTargetDictionary->getObject(keyObject);
-        if ( childTargetObject )
-        {
-            childTargetDictionary = OSDynamicCast(OSDictionary, childTargetObject);
+    if (!source || !target)
+        return false;
+    auto *iter = OSCollectionIterator::withCollection(source);
+    if (!iter)
+        return false;
+    bool result = true;
+    while (auto *entry = iter->getNextObject()) {
+        auto *key = OSDynamicCast(OSSymbol, entry);
+        if (!key) { result = false; break; }
+        auto *childSource = OSDynamicCast(OSDictionary, source->getObject(key));
+        auto *childTarget = OSDynamicCast(OSDictionary, target->getObject(key));
+        if (childSource && childTarget) {
+            auto *copy = OSDictionary::withDictionary(childTarget, 0);
+            if (!copy) { result = false; break; }
+            result = MergeDictionaryIntoDictionary(childSource, copy);
+            if (result)
+                result = target->setObject(key, copy);
+            copy->release();
+        } else {
+            result = target->setObject(key, source->getObject(key));
         }
-
-        // See if our source entry is also a dictionary
-        //
-        childSourceDictionary = OSDynamicCast(OSDictionary, parentSourceDictionary->getObject(keyObject));
-
-        if ( childTargetDictionary && childSourceDictionary)
-        {
-            // Our target dictionary already has the entry for this same object AND our
-            // source is also a dictionary, so we need to recursively add it.
-            //
-			// Need to merge our entry into the provider's dictionary.  However, we don't have a copy of our dictionary, just
-			// a reference to it.  So, we need to make a copy of our target's dictionary
-			//
-			OSDictionary *		localCopyOfTargetDictionary;
-			UInt32			targetSize;
-			UInt32			targetSizeAfterMerge;
-			
-			localCopyOfTargetDictionary = OSDictionary::withDictionary( childTargetDictionary, 0);
-			if ( localCopyOfTargetDictionary == NULL )
-			{
-				break;
-			}
-			
-			// Get the size of our provider's dictionary so that we can check later whether it changed
-			//
-			targetSize = childTargetDictionary->getCapacity();
-			
-			// Note that our targetDictionary *might* change
-			// between the time we copied it and when we write it out again.  If so, we will obviously overwrite anychanges
-			//
-            result = MergeDictionaryIntoDictionary(childSourceDictionary, localCopyOfTargetDictionary) ;
-			if ( result )
-			{
-				// Get the size of our provider's dictionary so to see if it's changed  (Yes, the size could remain the same but the contents
-				// could have changed, but this gives us a first approximation.  We're not doing anything with this result, although we could
-				// remerge
-				//
-				targetSizeAfterMerge = childTargetDictionary->getCapacity();
-				
-				result = parentTargetDictionary->setObject(keyObject, localCopyOfTargetDictionary);
-				if ( !result )
-				{
-					break;
-				}
-			}
-			else
-			{
-				// If we got an error merging dictionaries, then just bail out without doing anything
-				//
-				break;
-			}
-        }
-        else
-        {
-            // We have a property that we need to merge into our parent dictionary.
-            //
-            result = parentTargetDictionary->setObject(keyObject, parentSourceDictionary->getObject(keyObject)) ;
-            if ( !result )
-            {
-                break;
-            }
-        }
-
+        if (!result)
+            break;
     }
-
-    srcIterator->release();
-
-    return (result);
+    iter->release();
+    return result;
 }

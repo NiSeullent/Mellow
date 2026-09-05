@@ -2,6 +2,7 @@
 //! See LICENSE for details.
 
 #include "kern_patcherplus.hpp"
+#include "PatternMatch.hpp"
 
 bool SolveRequestPlus::solve(KernelPatcher &patcher, size_t id, mach_vm_address_t address, size_t maxSize) {
 	if(!this->address) return false;
@@ -16,15 +17,16 @@ bool SolveRequestPlus::solve(KernelPatcher &patcher, size_t id, mach_vm_address_
 		return false;
 	}
 
-	size_t offset = 0;
-	if (!KernelPatcher::findPattern(this->pattern, this->mask, this->patternSize,
-			reinterpret_cast<const void *>(address), maxSize, &offset) ||
-		!offset) {
-		DBGLOG("Patcher+", "Failed to solve %s using pattern", safeString(this->symbol));
+	if (!MellowPattern::validAddressRange(address, maxSize)) return false;
+	const auto match = MellowPattern::findUnique(reinterpret_cast<const UInt8 *>(address),
+		maxSize, this->pattern, this->mask, this->patternSize);
+	if (match.status != MellowPattern::Status::Unique) {
+		SYSLOG("Patcher+", "Refusing missing, invalid or ambiguous pattern for %s (%u)",
+			safeString(this->symbol), static_cast<unsigned>(match.status));
 		return false;
 	}
 
-	*this->address = address + offset;
+	*this->address = address + match.offset;
 	return true;
 }
 
@@ -45,15 +47,16 @@ bool RouteRequestPlus::route(KernelPatcher &patcher, size_t id, mach_vm_address_
 		return false;
 	}
 
-	size_t offset = 0;
-	if (!KernelPatcher::findPattern(this->pattern, this->mask, this->patternSize,
-			reinterpret_cast<const void *>(address), maxSize, &offset) ||
-		!offset) {
-		DBGLOG("Patcher+", "Failed to route %s using pattern", safeString(this->symbol));
+	if (!MellowPattern::validAddressRange(address, maxSize)) return false;
+	const auto match = MellowPattern::findUnique(reinterpret_cast<const UInt8 *>(address),
+		maxSize, this->pattern, this->mask, this->patternSize);
+	if (match.status != MellowPattern::Status::Unique) {
+		SYSLOG("Patcher+", "Refusing missing, invalid or ambiguous route pattern for %s (%u)",
+			safeString(this->symbol), static_cast<unsigned>(match.status));
 		return false;
 	}
 
-	auto org = patcher.routeFunction(address + offset, this->to, true);
+	auto org = patcher.routeFunction(address + match.offset, this->to, true);
 	if (!org) {
 		DBGLOG("Patcher+", "Failed to route %s using pattern: %d", safeString(this->symbol), patcher.getError());
 		return false;

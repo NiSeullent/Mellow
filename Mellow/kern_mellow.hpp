@@ -8,6 +8,7 @@
 #include <IOKit/pci/IOPCIDevice.h>
 #include <IOKit/graphics/IOFramebuffer.h>
 #include <IOKit/acpi/IOACPIPlatformExpert.h>
+#include "HardwareAccess.hpp"
 
 #define BIT(n) (1<< n)
 #define REG_BIT(n) (1<< n)
@@ -29,8 +30,6 @@ struct intel_ip_version {
 	UInt8 step;
 };
 
-constexpr UInt32 mmPCIE_INDEX2 = 0xE;
-constexpr UInt32 mmPCIE_DATA2 = 0xF;
 /*
 class EXPORT PRODUCT_NAME : public IOService {
 	OSDeclareDefaultStructors(PRODUCT_NAME);
@@ -51,8 +50,8 @@ class MellowCore {
     void processPatcher(KernelPatcher &patcher);
     bool processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size);
 	void setRMMIOIfNecessary();
-	// V201 diagnostic: BAR2 graphics aperture mapping. Lets us read scanout buffer
-	// bytes through the GTT-translated CPU mapping (safe — no MCE risk like raw PA).
+	// V201 diagnostic BAR2 mapping. Xe-LPG uses LMEMBAR stolen-memory semantics;
+	// a mapped BAR2 is not proof that a GGTT offset is a valid CPU address.
 	void setApertureIfNecessary();
 	
 	static uint16_t configRead16(IORegistryEntry *service, uint32_t space, uint8_t offset);
@@ -72,23 +71,32 @@ class MellowCore {
 	mach_vm_address_t orgApplePanelSetDisplay {0};
 	static bool wrapApplePanelSetDisplay(IOService *that, IODisplay *display);
 	
+	// Total physical DSM reservation, not allocator-usable bytes. Zero is
+	// unknown or absent; callers must not substitute a larger allocation.
 	UInt32 stolen_size {0};
 	uint32_t framebufferId {0};
 	
 	// Public MMIO register access (used by display link training, display merge, etc.)
+	bool readReg32Checked(unsigned long reg, UInt32 &value) {
+		const uint64_t length = rmmio ? rmmio->getLength() : 0;
+		if (MellowHardware::read32(rmmioPtr, length, reg, value)) return true;
+		logRejectedMMIO("read32", reg);
+		return false;
+	}
+
 	UInt32 readReg32(unsigned long reg) {
-		if (!rmmio || !rmmioPtr) return 0;
-		if (reg + sizeof(uint32_t) <= this->rmmio->getLength()) {
-			return this->rmmioPtr[reg >> 2];
-		} else {
-			this->rmmioPtr[mmPCIE_INDEX2] = reg;
-			return this->rmmioPtr[mmPCIE_DATA2];
-		}
+		UInt32 value = 0;
+		readReg32Checked(reg, value);
+		return value;
 	}
 
 	// reg = byte offset (i915 convention). rmmioPtr is uint32_t* so divide by 4.
 	void writeReg32(unsigned long reg, UInt32 val) {
-		if (!rmmio || !rmmioPtr) return;
+		const uint64_t length = rmmio ? rmmio->getLength() : 0;
+		if (!rmmioPtr || !MellowHardware::containsAligned(length, reg, 4, 4)) {
+			logRejectedMMIO("write32", reg);
+			return;
+		}
 		static int v93MmioLogCount = 0;
 
 		// Safety guard: prevent enabled display planes from being armed with SURF=0.
@@ -119,57 +127,12 @@ class MellowCore {
 			}
 		}
 
-		if (reg + sizeof(uint32_t) <= this->rmmio->getLength()) {
-			this->rmmioPtr[reg >> 2] = val;
-		} else {
-			this->rmmioPtr[mmPCIE_INDEX2] = reg;
-			this->rmmioPtr[mmPCIE_DATA2] = val;
-		}
-	}
-	
-	UInt64 readReg64(unsigned long reg) {
-		if (!rmmio || !rmmioPtr) return 0;
-		if (reg * sizeof(uint64_t) < this->rmmio->getLength()) {
-			return this->rmmioPtr[reg];
-		} else {
-			this->rmmioPtr[mmPCIE_INDEX2] = reg;
-			return this->rmmioPtr[mmPCIE_DATA2];
-		}
+		MellowHardware::write32(rmmioPtr, length, reg, val);
 	}
 
-	void writeReg64(unsigned long reg, UInt64 val) {
-		if (!rmmio || !rmmioPtr) return;
-		static int v93Mmio64LogCount = 0;
-		const bool looksLikePlaneSurf =
-			(reg >= 0x60000 && reg <= 0xBFFFF) &&
-			((reg & 0xFFF) == 0x19C);
-		if (looksLikePlaneSurf && val == 0) {
-			const uint32_t ctlReg = static_cast<uint32_t>(reg - 0x1C);
-			const uint32_t planCtl = readReg32(ctlReg);
-			if (planCtl & 0x80000000U) {
-				const uint32_t currentSurf = readReg32(reg);
-				if (currentSurf != 0) {
-					if (v93Mmio64LogCount < 24) {
-						SYSLOG("mellow", "V93M64: blocked zero SURF@0x%lx in writeReg64; keeping current 0x%x", reg, currentSurf);
-						v93Mmio64LogCount++;
-					}
-					val = currentSurf;
-				} else {
-					if (v93Mmio64LogCount < 24) {
-						SYSLOG("mellow", "V93M64: forcing plane disable before zero SURF@0x%lx in writeReg64", reg);
-						v93Mmio64LogCount++;
-					}
-					writeReg32(ctlReg, planCtl & ~0x80000000U);
-				}
-			}
-		}
-		if ((reg * sizeof(uint64_t)) < this->rmmio->getLength()) {
-			this->rmmioPtr[reg] = val;
-		} else {
-			this->rmmioPtr[mmPCIE_INDEX2] = reg;
-			this->rmmioPtr[mmPCIE_DATA2] = val;
-		}
-	}
+	// The inherited readReg64/writeReg64 were unused, indexed a UInt32 array
+	// with a byte offset and silently truncated values. No generic replacement:
+	// Intel register pairs require documented access width/order/latching rules.
 	
 	uint32_t intel_de_rmw(uint32_t reg, uint32_t clear, uint32_t set) {
 		uint32_t old, val;
@@ -181,8 +144,12 @@ class MellowCore {
 
     private:
 	
-	// Returns true when MMIO mapping is live and safe to access.
-	bool mmioValid() const { return rmmio != nullptr && rmmioPtr != nullptr; }
+	// CPU mapping exists; this does not establish forcewake or register validity.
+	bool mmioValid() const {
+		return rmmio != nullptr && rmmioPtr != nullptr && rmmio->getLength() >= 4;
+	}
+	void logRejectedMMIO(const char *operation, unsigned long reg);
+	volatile uint32_t mmioFaultCount {0};
 	
 	void whitelist_reg_ext(uint32_t reg, uint32_t flags)
 	{
@@ -286,6 +253,7 @@ class MellowCore {
     bool isRealTGL = false;
 public:
     bool getIsRealTGL() const { return isRealTGL; }
+	bool isHardwareAdmitted() const { return ultraActive; }
 private:
     bool ultraCpuEligible = false;
     bool ultraActive = false;
@@ -299,6 +267,7 @@ private:
     uint32_t deviceId {0};
     uint16_t revision {0};
     uint32_t pciRevision {0};
+	uint32_t pciDeviceBdf {0};
     IOPCIDevice *iGPU {nullptr};
 	
 	IOMemoryMap *rmmio {nullptr};
@@ -307,6 +276,7 @@ private:
 	IOMemoryMap *aperture {nullptr};
 	volatile UInt32 *aperturePtr {nullptr};
 	uint64_t apertureLen {0};
+	bool apertureUnavailableLogged {false};
 
 	// Last RCS context object seen by IGHardwareContext::withOptions.
 	// V507 uses this to re-run the LRCA slot repair on each populateResetRegisterList call.
@@ -357,4 +327,3 @@ struct DPCDCap16 { // 16 bytes
 	// Detailed information can be found in the specification
 	uint8_t others[12] {};
 };
-

@@ -184,39 +184,17 @@ static bool shouldForceFullMetalPath() {
 }
 
 static int getV142SubmitBlitMode() {
-	int parsed = 0;
-	if (PE_parse_boot_argn("mellowV142", &parsed, sizeof(parsed))) {
-		return parsed;
-	}
 
+	// Only mode 3 submits work. Old modes 1/2 returned fabricated status values
+	// without touching a ring, which invalidated Metal readback/completion tests.
+	int parsed = 0;
+	if (PE_parse_boot_argn("mellowV142", &parsed, sizeof(parsed)))
+		return parsed == 3 ? 3 : 0;
 	if (checkKernelArgument("-mellowV142orig"))
 		return 3;
-	if (checkKernelArgument("-mellowV142pass"))
-		return 2;
-	if (checkKernelArgument("-mellowV142ok"))
-		return 1;
-	if (checkKernelArgument("-mellowV142hardunsupported"))
-		return 0;
-	if (checkKernelArgument("-mellowV142unsupported"))
-		return 1;
-
-	// V170: The non-real-TGL Ultra spoof path cannot safely execute the TGL-format 3D
-	// blit commands that the original IGAccelBlit::submitBlit generates; the inherited
-	// RPL baseline observed the RCS EU stalling indefinitely
-	// (INSTDONE=0xfffffffe, bit-0 stuck) causing an infinite hangcheck→reset→retry loop
-	// that kills WindowServer within 120 s. Default to mode 1 (return 0 = success, no-op)
-	// so the compositor initialises without hanging. Real TGL hardware still uses mode 3.
-	// Override with -mellowV142orig or mellowV142=3 to restore original blit submission.
-	return 1;
-}
-
-static bool isV142Diag2DBypassEnabled() {
-	int enabled = 0;
-	if (PE_parse_boot_argn("mellowV142diag2d", &enabled, sizeof(enabled))) {
-		return enabled != 0;
-	}
-
-	return checkKernelArgument("-mellowV142diag2d");
+	// No verified 7D41 submission backend yet. Reject by default; callers must
+	// receive an error instead of observing success for commands never submitted.
+	return 0;
 }
 
 static bool isV88ScanoutFillEnabled() {
@@ -251,7 +229,7 @@ static uint32_t getV65Tier1WantBits(bool isRealTGL) {
 	// (V142 mode 3) is active — that path submits directly to BCS ring. Leaving
 	// BCS out of the want bits means RING_CTRL never gets the enable bit set,
 	// commands queue up and the ring stalls (gpuRestart Signature 801).
-	// For other V142 modes (0/1/2 = bypass/return0) BCS is idle, keep RCS-only.
+	// Other V142 values reject work; keep the inherited RCS-only IRQ selection.
 	if (getV142SubmitBlitMode() == 3 || checkKernelArgument("-mellowbcsirq")) {
 		return (1u << GEN11_RCS0) | (1u << GEN11_BCS);
 	}
@@ -1036,12 +1014,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		 	{"__ZN16IntelAccelerator19startGraphicsEngineEv", startGraphicsEngine, this->ostartGraphicsEngine},
 			{"__ZN16IntelAccelerator18stopGraphicsEngineEv",  stopGraphicsEngine,  this->ostopGraphicsEngine},
 
-			// V212: Hook IGScheduler{4,5}::isGpuIdle — the bool watchdog query called post-startup.
-			// startGraphicsEngine SUCCEEDS (returns non-zero = success path in decomp). But the GPU
-			// watchdog polls isGpuIdle() after init; INSTDONE bit0 stuck at 0 makes it return false
-			// → watchdog declares GPU hung → resets → startGraphicsEngine retry loop forever.
-			// Fix: on the non-real-TGL Ultra spoof path, treat the inherited
-			// INSTDONE == 0xfffffffe idle signature (first observed on RPL-P) as idle.
+			// Preserve scheduler idle decisions; no INSTDONE-based success override.
 			{"__ZNK12IGScheduler59isGpuIdleEv", wrapIGScheduler5IsGpuIdle, this->oIGScheduler5IsGpuIdle},
 			{"__ZNK12IGScheduler49isGpuIdleEv", wrapIGScheduler4IsGpuIdle, this->oIGScheduler4IsGpuIdle},
 
@@ -1130,8 +1103,8 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			 // at the lowest safe level instead.
 			 {"__ZN19IGAccelCommandQueue21beginCoalescedSegmentEv", beginCoalescedSegment, this->obeginCoalescedSegment},
 
-			 // V126b: barrierSubmission itself must keep original side effects/contract.
-			 // We route it only to scope temporary getter fallback (no broad bypass).
+			 // Preserve actual GPU ordering: unsupported barriers fail, while explicitly
+			 // selected original barriers retain their arguments and backend status.
 			 {"__Z17barrierSubmissionR19IGAccelCommandQueueR16IntelAcceleratorR24IGAccelCommandDescriptorR12IOAccelEventtPKt", barrierSubmission, this->obarrierSubmission},
 			 
 			 // V117: Hook getBlit2DContext for null-guarding only.
@@ -1169,18 +1142,15 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 		}
 
 		if (!MellowCore::callback->isRealTGL) {
-			// V111: Hook IGAccelDevice::deviceStart to force success on the
-			// non-real-TGL Ultra spoof path.
-			// Binary pattern (f_devstart) may not match every Sonoma build variant.
-			// This symbol-based hook guarantees deviceStart returns true regardless of
-			// BCS ring state, so the accelerator device is always registered with IOKit.
+			// Observe deviceStart without overriding readiness failures. A non-null
+			// MTLDevice is not evidence that the hardware has executed any commands.
 			RouteRequestPlus devStartRoute[] = {
 				{"__ZN13IGAccelDevice11deviceStartEv", deviceStart, this->odeviceStart},
 			};
 			if (RouteRequestPlus::routeAll(patcher, index, devStartRoute, address, size)) {
-				SYSLOG("mellow", "V111: hooked IGAccelDevice::deviceStart for non-real-TGL Ultra spoof-path force-success");
+				SYSLOG("mellow", "ACCEL: hooked IGAccelDevice::deviceStart with original status preserved");
 			} else {
-				SYSLOG("mellow", "V111: IGAccelDevice::deviceStart symbol not found — relying on binary patch");
+				SYSLOG("mellow", "ACCEL: IGAccelDevice::deviceStart symbol not found; no readiness bypass applied");
 			}
 		}
 
@@ -1265,57 +1235,7 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 			0xc7, 0x83, 0x48, 0x11, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x8b, 0x83, 0x58, 0x11, 0x00, 0x00, 0x90, 0x90, 0xba, 0x01, 0x00, 0x00, 0x00, 0xbe, 0x05, 0x00, 0x00, 0x00
 		};
 
-		// V46: IGAccelDevice::deviceStart bypass — NOP the BCS failure gate
-		// IGAccelDevice::deviceStart() makes one vtable check (at vtable+0x970); if it
-		// returns 0, the whole device start aborts → IOServiceOpen fails → MTLDevice=nil.
-		// Root cause: IGHardwareCommandStreamer5::init for BCS fails (BCS CTL=0x0, ring
-		// not running), sets encodeFailureStack[1]=1, and the readiness check reads that.
-		// The RCS ring IS operational (CTL=0x7000, HWS_PGA valid, 5 CSB events confirmed).
-		// NOPing the je lets deviceStart always take the success path so IOServiceOpen
-		// succeeds, MTLDevice is non-nil, and WindowServer stops hanging.
-		//
-		// Pattern (masked, Sonoma-variant tolerant):
-		//   ff 90 70 09 00 00  callq *0x970(%rax)   ← readiness vtable call
-		//   84 c0              testb %al,%al
-		//   74 xx              je failure_path       ← PATCH: 74 xx → 90 90
-		//   48 8d xx           lea ...               ← allow minor compiler/reg variance
-		static const uint8_t f_devstart[] = {
-			0xff, 0x90, 0x70, 0x09, 0x00, 0x00,
-			0x84, 0xc0, 0x74, 0x00, 0x48, 0x8d, 0x00
-		};
-		static const uint8_t m_devstart[] = {
-			0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-			0xff, 0xff, 0xff, 0x00, 0xff, 0xff, 0x00
-		};
-		static const uint8_t r_devstart[] = {
-			0xff, 0x90, 0x70, 0x09, 0x00, 0x00,
-			0x84, 0xc0, 0x90, 0x90, 0x48, 0x8d, 0x00
-		};
-		static const uint8_t rm_devstart[] = {
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00
-		};
-
-		// Some Sonoma builds encode the same readiness failure jump as long form:
-		//   ff 90 70 09 00 00; 84 c0; 0f 84 xx xx xx xx
-		// Patch 0f 84 rel32 -> 6x NOP to force success path.
-		// Keep this optional (non-fatal) to avoid boot regressions when pattern differs.
-		static const uint8_t f_devstart_long[] = {
-			0xff, 0x90, 0x70, 0x09, 0x00, 0x00,
-			0x84, 0xc0, 0x0f, 0x84, 0x00, 0x00, 0x00, 0x00
-		};
-		static const uint8_t m_devstart_long[] = {
-			0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-			0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00
-		};
-		static const uint8_t r_devstart_long[] = {
-			0xff, 0x90, 0x70, 0x09, 0x00, 0x00,
-			0x84, 0xc0, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90
-		};
-		static const uint8_t rm_devstart_long[] = {
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
-		};
+		// Device readiness branches stay intact: failed BCS startup must fail.
 
 		// V139: non-real-TGL Ultra spoof-path mitigation for GP faults inside
 		// blit3d_submit_rectlist.
@@ -1411,31 +1331,14 @@ bool Gen11::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t 
 				           MellowCore::callback->deviceId);
 				r3bbb[4] = compatSubSlices;
 
-				// Ultra spoof path: hardcode topology and bypass the TGL BCS readiness check.
+				// Ultra spoof path: inherited topology patches; readiness checks remain intact.
 				LookupPatchPlus const patchesUltra[] = {
 					{activeKext, f3b, r3b, arrsize(f3b),	1},      // L3BankCount=8
 					{activeKext, f3bb, r3bb, arrsize(f3bb),	1},    // MaxEU/SS=8
 					{activeKext, f3bbb, r3bbb, arrsize(f3bbb),	1},// NumSubSlices
-					{activeKext, f_devstart, m_devstart, r_devstart, rm_devstart, arrsize(f_devstart), 1}, // BCS bypass
 				};
 				PANIC_COND(!LookupPatchPlus::applyAll(patcher, patchesUltra, address, size), "mellow",
 					"kextG11HWT Failed to apply Ultra compatibility patches!");
-
-				// Optional secondary signature for Sonoma variants with long JE encoding.
-				/*LookupPatchPlus const patchUltraDevstartLong {
-					activeKext,
-					f_devstart_long,
-					m_devstart_long,
-					r_devstart_long,
-					rm_devstart_long,
-					arrsize(f_devstart_long),
-					1
-				};
-				if (patchUltraDevstartLong.apply(patcher, address, size)) {
-					SYSLOG("mellow", "V52: Applied optional long-form deviceStart readiness bypass");
-				} else {
-					SYSLOG("mellow", "V52: Optional long-form deviceStart bypass not found on this build");
-				}*/
 
 				// Optional SSE unaligned-store mitigation for blit3d_submit_rectlist.
 				LookupPatchPlus const patchV139Store10 {
@@ -3951,6 +3854,7 @@ static void v45ScheduleDelayedCheck(void *accelInstance, unsigned delayMs);
 
 unsigned long Gen11::start(void *that,void  *param_1)
 {
+	Gen11::gGfxAccelStartDone = false;
 	// V44: Configurable scheduler type.
 	// populateAccelConfig reads "GraphicsSchedulerSelect" from the IORegistry.
 	// Types: 3=IGGuC (firmware), 4=IGScheduler4, 5=IGScheduler5 (host preemptive).
@@ -4247,9 +4151,12 @@ unsigned long Gen11::start(void *that,void  *param_1)
 
 	auto ret= FunctionCast(start, callback->ostart)(that,param_1);
 
-	// V221: Signal waitForStamp hook that the GFX interrupt handler is now installed.
-	Gen11::gGfxAccelStartDone = true;
-	SYSLOG("mellow", "V221: GFX start() complete — gGfxAccelStartDone=true ret=%lu", ret);
+	// Returning from start is not success. Do not run post-start recovery writes
+	// or mark the accelerator ready after the original backend rejected startup.
+	Gen11::gGfxAccelStartDone = ret != 0;
+	SYSLOG("mellow", "ACCEL_START_DONE=%d ret=%lu", Gen11::gGfxAccelStartDone, ret);
+	if (!ret)
+		return ret;
 
 	// V65: IMMEDIATELY after original start() returns, re-enable RCS0 interrupts.
 	// Apple's init code may have overwritten our pre-start settings.
@@ -4907,32 +4814,19 @@ unsigned long Gen11::start(void *that,void  *param_1)
 
 uint8_t Gen11::deviceStart(void *that)
 {
-	// V111: Force IGAccelDevice::deviceStart to succeed on the non-real-TGL
-	// Ultra spoof path.
-	// The original checks encodeFailureStack[1] which is set when BCS ring fails to
-	// start. The inherited RPL-under-TGL baseline showed BCS init failure (RPL uses different
-	// ring programming). We allow the original to run and then force success if it
-	// returned false, preventing CoreDisplay from seeing a null accelerator device.
-	auto ret = FunctionCast(deviceStart, callback->odeviceStart)(that);
-	const bool isRealTGL = MellowCore::callback && MellowCore::callback->isRealTGL;
-	if (!isRealTGL && !ret) {
-		SYSLOG("mellow", "V111: IGAccelDevice::deviceStart returned false on non-real-TGL Ultra spoof path — forcing true");
-		return true;
-	}
-	DBGLOG("mellow", "V111: IGAccelDevice::deviceStart returned %d", ret);
+
+	if (!callback || !callback->odeviceStart || !that)
+		return false;
+	const auto ret = FunctionCast(deviceStart, callback->odeviceStart)(that);
+	if (!ret)
+		SYSLOG("mellow", "ACCEL_DEVICE_START_FAILED: preserving backend failure");
 	return ret;
 }
 
 IOReturn Gen11::wrapPavpSessionCallback( void *intelAccelerator, int32_t sessionCommand, uint32_t sessionAppId, uint32_t *a4, bool flag) {
-
-	//void* pPavpContext = *getMember<void**>(intelAccelerator, 0x1278);
-	//void* pStampTrackingStruct = *(void**)getMember<char*>(pPavpContext, 0xb8);
-	
-	if (sessionCommand == 4) {
-		//return kIOReturnTimeout;
-		return kIOReturnSuccess;
-	}
-
+	if (!callback || !callback->orgPavpSessionCallback)
+		return kIOReturnUnsupported;
+	// Protected-session completion is owned by the backend, including command 4.
 	return FunctionCast(wrapPavpSessionCallback, callback->orgPavpSessionCallback)(intelAccelerator, sessionCommand, sessionAppId, a4, flag);
 }
 
@@ -6237,232 +6131,40 @@ void  Gen11::initBlitUsage(void *that)
 }
 
 unsigned long Gen11::submitBlit(void *that, void *param_1, void *param_2, void *param_3, bool param_4) {
-	// V186: For spoofed non-TGL, if V142 is configured to bypass submitBlit,
-	// return before any task/context touching logic. The V149/V171 path writes
-	// task+0x298 and can poison task lifetime on some boots, later crashing in
-	// IGAccelTask::release from the garbage collector interrupt path.
-	if (!MellowCore::callback->isRealTGL) {
-		static int v186Mode = -1;
-		if (v186Mode < 0) {
-			v186Mode = getV142SubmitBlitMode();
-			SYSLOG("mellow", "V186: early submitBlit spoof mode=%d (0=unsupported,1=ret0,2=ret1,3=orig)", v186Mode);
-		}
 
-		if (v186Mode != 3) {
-			if (isV142Diag2DBypassEnabled() && param_1) {
-				auto *blit = reinterpret_cast<uint8_t *>(param_1);
-				const bool has3DFlags =
-					((blit[0x3C] & 1U) != 0) ||
-					((blit[0x84] & 1U) != 0) ||
-					(*reinterpret_cast<uint64_t *>(blit + 0x20) != 0) ||
-					(*reinterpret_cast<uint64_t *>(blit + 0x68) != 0);
-				const uint32_t routeSel = (blit[0xA2] >> 3U) & 0x3U;
-				static int v186DiagCount = 0;
-				if (v186DiagCount < 64) {
-					v186DiagCount++;
-					SYSLOG("mellow", "V186D[%d]: mode=%d routeSel=%u has3D=%d task=%p",
-						   v186DiagCount, v186Mode, routeSel, (int)has3DFlags, param_3);
-				}
-			}
-			if (v186Mode == 2)
-				return 1;
-			if (v186Mode == 1)
-				return 0;
-			return static_cast<uint32_t>(kIOReturnUnsupported);
+	if (!callback || !MellowCore::callback || !callback->osubmitBlit)
+		return static_cast<uint32_t>(kIOReturnUnsupported);
+
+	// Preserve native driver's argument validation and ownership on real TGL.
+	if (MellowCore::callback->isRealTGL)
+		return FunctionCast(submitBlit, callback->osubmitBlit)(that, param_1, param_2, param_3, param_4);
+
+	if (getV142SubmitBlitMode() != 3) {
+		static bool loggedUnsupported = false;
+		if (!loggedUnsupported) {
+			loggedUnsupported = true;
+			SYSLOG("mellow", "BLIT_NOT_SUBMITTED: unsupported backend (mellowV142=3 selects experimental original)");
 		}
+		return static_cast<uint32_t>(kIOReturnUnsupported);
 	}
 
-	// V149: blit3D context is cached at task+0x298 per IGAccelTask::getBlit3DContext IDA.
-	// Previous code used 0xb8 — that overwrote an unrelated IGAccelTask member.
-	auto ensureTaskContext = [&](void *task, const char *origin) -> void * {
-		if (!task || MellowCore::callback->isRealTGL)
-			return task ? getMember<void *>(task, 0x298) : nullptr;
+	if (!that || !param_1 || !param_2 || !param_3)
+		return static_cast<uint32_t>(kIOReturnBadArgument);
 
-		void *taskCtx = getMember<void *>(task, 0x298);
-		if (taskCtx)
-			return taskCtx;
+	// These offsets belong to the inherited TGL driver ABI, not to Metal itself.
+	// Keep the incoming task and its own context. A global cached task/context
+	// cannot replace them: its retain count and owning address space are unknown.
+	const auto *blit = reinterpret_cast<const uint8_t *>(param_1);
+	const uint32_t route = (blit[0xA2] >> 3U) & 0x3U;
+	if (route == 3)
+		return static_cast<uint32_t>(kIOReturnUnsupported);
+	void *taskVtable = getMember<void *>(param_3, 0);
+	void *taskContext = getMember<void *>(param_3, 0x298);
+	if (!taskVtable || !taskContext || !getMember<void *>(taskContext, 0xb8))
+		return static_cast<uint32_t>(kIOReturnNotReady);
 
-		// param_1=true triggers allocation; Apple then stores result at task+0x298 internally.
-		// V171: Our getBlit3DContext hook returns the global cached ctx but does NOT write
-		// task+0x298. Apple's original would store it per-task. Do it explicitly here so
-		// the invalidTask check (getMember<void*>(task,0x298) == nullptr) passes.
-		void *ctx = callback->getBlit3DContext(task, true);
-		if (!ctx)
-			return nullptr;
-
-		getMember<void *>(task, 0x298) = ctx;
-
-		if (isExperimentalMonitorEnabled()) {
-			static int v149Count = 0;
-			if (v149Count < 32) {
-				v149Count++;
-				SYSLOG("mellow", "V149[%d]: %s task=%p stored ctx@298=%p", v149Count, origin, task, ctx);
-			}
-		}
-
-		return ctx;
-	};
-
-	bool invalidTask = (param_3 == nullptr);
-	if (isExperimentalMonitorEnabled()) {
-		static int v137SubmitEntryCount = 0;
-		if (v137SubmitEntryCount < 40) {
-			v137SubmitEntryCount++;
-			void *entryVtable = param_3 ? getMember<void *>(param_3, 0x0) : nullptr;
-			void *entryCtx = param_3 ? getMember<void *>(param_3, 0x298) : nullptr;
-			SYSLOG("mellow", "V149.submitBlit.entry[%d]: acc=%p p1=%p p2=%p task=%p vtbl=%p ctx@298=%p b=%u c3D=%p c2D=%p cTask=%p",
-				   v137SubmitEntryCount, that, param_1, param_2, param_3, entryVtable, entryCtx,
-				   static_cast<unsigned>(param_4), callback->v131CachedBlit3DCtx,
-				   callback->v131CachedBlit2DCtx, callback->v132CachedTask);
-		}
-	}
-	if (!invalidTask) {
-		// V135: Some panics still reached Apple submitBlit with a non-null but broken task object
-		// (null vtable / null ctx field), which can lead to RIP=0 indirect calls in Apple code.
-		// Validate minimal task invariants before calling through.
-		ensureTaskContext(param_3, "submitBlit-incoming");
-		void *taskVtable = getMember<void *>(param_3, 0x0);
-		void *taskCtx = getMember<void *>(param_3, 0x298);
-		invalidTask = (taskVtable == nullptr) || (taskCtx == nullptr);
-		if (invalidTask) {
-			static int v135Count = 0;
-			if (v135Count < 16) {
-				v135Count++;
-				SYSLOG("mellow", "V149[%d]: submitBlit invalid task=%p vtbl=%p ctx@298=%p", v135Count, param_3, taskVtable, taskCtx);
-			}
-		}
-	}
-
-	if (invalidTask && callback->v132CachedTask && callback->v132CachedTask != param_3) {
-		void *cachedCtx = ensureTaskContext(callback->v132CachedTask, "submitBlit-cached");
-		void *cachedVtable = getMember<void *>(callback->v132CachedTask, 0x0);
-		if (cachedVtable && cachedCtx) {
-			if (isExperimentalMonitorEnabled()) {
-				static int v138SwapCount = 0;
-				if (v138SwapCount < 24) {
-					v138SwapCount++;
-					SYSLOG("mellow", "V138.swap[%d]: replacing task=%p with cached=%p ctx=%p",
-						   v138SwapCount, param_3, callback->v132CachedTask, cachedCtx);
-				}
-			}
-			param_3 = callback->v132CachedTask;
-			invalidTask = false;
-		}
-	}
-
-	if (invalidTask) {
-		static int v120Mode = -1;
-		if (v120Mode < 0) {
-			int parsed = 0;
-			if (!MellowCore::callback->isRealTGL) {
-				// V120 modes for spoofed path:
-				//   mellowV120=0 or -mellowV120ok   -> return success (legacy behavior)
-				//   mellowV120=1 or -mellowV120fail -> return unsupported (default)
-				//   mellowV120=2 or -mellowV120pass -> return 1
-				if (PE_parse_boot_argn("mellowV120", &parsed, sizeof(parsed))) {
-					v120Mode = parsed;
-				} else if (checkKernelArgument("-mellowV120pass")) {
-					v120Mode = 2;
-				} else if (checkKernelArgument("-mellowV120ok")) {
-					v120Mode = 0;
-				} else if (checkKernelArgument("-mellowV120fail")) {
-					v120Mode = 1;
-				} else {
-					v120Mode = 1;
-				}
-			} else {
-				v120Mode = 0;
-			}
-			SYSLOG("mellow", "V120: submitBlit NULL-task mode=%d (0=ret0,1=unsupported,2=ret1)", v120Mode);
-		}
-
-		static int v120NullCount = 0;
-		if (v120NullCount < 32) {
-			v120NullCount++;
-			SYSLOG("mellow", "V120[%d]: submitBlit NULL task that=%p p1=%p p2=%p bool=%d mode=%d",
-				   v120NullCount, that, param_1, param_2, param_4, v120Mode);
-		}
-
-		if (isExperimentalMonitorEnabled()) {
-			static int v137SubmitInvalidCount = 0;
-			if (v137SubmitInvalidCount < 40) {
-				v137SubmitInvalidCount++;
-				SYSLOG("mellow", "V137.submitBlit.invalid[%d]: task=%p cTask=%p c3D=%p c2D=%p mode=%d",
-					   v137SubmitInvalidCount, param_3, callback->v132CachedTask,
-					   callback->v131CachedBlit3DCtx, callback->v131CachedBlit2DCtx, v120Mode);
-			}
-		}
-
-		if (v120Mode == 2)
-			return 1;
-		if (v120Mode == 1)
-			return static_cast<uint32_t>(kIOReturnUnsupported);
-		return 0;
-	}
-
-	if (!MellowCore::callback->isRealTGL) {
-		// V142: after the movaps/movapd fixes, the remaining watchdog still points at
-		// Apple's original blit submit path wedging BCS. Keep original behavior by default
-		// to avoid breaking the renderer, but provide an explicit no-log test switch for
-		// non-real-TGL Ultra spoof boots when we need to prove the hang is inside
-		// submitBlit itself.
-		static int v142Mode = -1;
-		if (v142Mode < 0) {
-			v142Mode = getV142SubmitBlitMode();
-			SYSLOG("mellow", "V142: submitBlit spoof mode=%d (0=hard-unsupported,1=ret0,2=ret1,3=orig)", v142Mode);
-		}
-
-		if (v142Mode != 3) {
-			static int v142Count = 0;
-			if (v142Count < 24) {
-				v142Count++;
-				SYSLOG("mellow", "V142[%d]: bypass submitBlit acc=%p p1=%p p2=%p task=%p b=%u mode=%d",
-					   v142Count, that, param_1, param_2, param_3, static_cast<unsigned>(param_4), v142Mode);
-			}
-
-			if (v142Mode == 2)
-				return 1;
-			if (v142Mode == 1)
-				return 0;
-			// Mode 0 is intentionally harsh and should only be used for explicit diagnostics.
-			return static_cast<uint32_t>(kIOReturnUnsupported);
-		}
-	}
-
-	// V193: On the non-real-TGL Ultra spoof path, block routeSel=3 before calling
-	// Apple's submitBlit.
-	// routeSel=3 routes to blit3d_submit_commands which executes TGL-compiled EU shaders
-	// from the scratch buffer. The inherited circuit breaker assumes a non-TGL EU
-	// topology; on the RPL baseline the shader unit stalled
-	// (INSTDONE_1 bit clear), RCS hangs inside the batch at BB_ADDR, BCS then deadlocks
-	// on a MI_SEMAPHORE_WAIT for the value RCS never writes → Sig 803 GPU reset loop.
-	// routeSel=0..2 (2D blits, Apple logo, compositor) pass through safely.
-	// Side effect: cursor sprite (uses routeSel=3) becomes invisible — acceptable vs. GPU hang.
-	if (!MellowCore::callback->isRealTGL && param_1) {
-		auto *blit193 = reinterpret_cast<uint8_t *>(param_1);
-		const uint32_t routeSel193 = (blit193[0xA2] >> 3U) & 0x3U;
-		if (routeSel193 == 3) {
-			static int v193Count = 0;
-			if (v193Count < 32) {
-				v193Count++;
-				SYSLOG("mellow", "V193[%d]: blocked routeSel=3 on non-real-TGL Ultra spoof path (TGL EU shader -> RCS hang)", v193Count);
-			}
-			return 1;
-		}
-	}
-
-	// Safety guard: avoid null indirect call if route capture failed.
-	if (!callback->osubmitBlit) {
-		static bool v134Logged = false;
-		if (!v134Logged) {
-			v134Logged = true;
-			SYSLOG("mellow", "V134: osubmitBlit is null, preventing call-through crash");
-		}
-		if (!MellowCore::callback->isRealTGL)
-			return 0;
-		return static_cast<unsigned long>(kIOReturnUnsupported);
-	}
-
+	// No fabricated stamp, status, or task-field write. Accepted work is passed
+	// through exactly once and the backend result (including failure) propagates.
 	return FunctionCast(submitBlit, callback->osubmitBlit)(that, param_1, param_2, param_3, param_4);
 }
 
@@ -6529,113 +6231,29 @@ uint32_t Gen11::beginCoalescedSegment(void *that) {
 
 uint8_t Gen11::barrierSubmission(void *queue, void *accelerator, void *cmdDesc,
 								 void *event, uint16_t count, const uint16_t *list) {
+	if (!callback || !MellowCore::callback || !callback->obarrierSubmission)
+		return 0;
 	if (!MellowCore::callback->isRealTGL) {
-		// V130: spoof-path guard for deterministic barrierSubmission+0x198 crash.
-		// Boot-arg control (value or flags):
-		//   mellowV130=0 or -mellowV130fail -> bypass and return 0 (default)
-		//   mellowV130=1 or -mellowV130pass -> bypass and return 1
-		//   mellowV130=2 or -mellowV130orig -> call original implementation
-		//   mellowV130=3 or -mellowV130hybrid -> bypass during init, original during render
-		// NOTE: on the non-real-TGL Ultra spoof path this is unsafe unless explicitly
-		// forced because
-		// the original path submits Blit2D/Blit3D barriers through BCS.
-		// Use -mellowV130forceorig only when intentionally validating that path.
-		static int v130Mode = -1;
-		if (v130Mode < 0) {
-			int parsed = 0;
-			const bool forceOrig = checkKernelArgument("-mellowV130forceorig");
-			if (PE_parse_boot_argn("mellowV130", &parsed, sizeof(parsed))) {
-				v130Mode = parsed;
-			} else if (checkKernelArgument("-mellowV130orig")) {
-				v130Mode = 2;
-			} else if (checkKernelArgument("-mellowV130hybrid")) {
-				v130Mode = 3;
-			} else if (checkKernelArgument("-mellowV130pass")) {
-				v130Mode = 1;
-			} else if (checkKernelArgument("-mellowV130fail")) {
-				v130Mode = 0;
-			} else {
-				// Default: bypass+ret1 so GPU scheduler treats barrier as succeeded.
-				// ret0 causes a spin/wait loop in the scheduler → hard freeze.
-				v130Mode = 1;
+		int mode = 0;
+		if (!PE_parse_boot_argn("mellowV130", &mode, sizeof(mode)) &&
+			checkKernelArgument("-mellowV130orig"))
+			mode = 2;
+		// A barrier cannot succeed without ordering the preceding GPU work. The
+		// former bypass/hybrid modes returned 1 without submitting any barrier.
+		// Keep the existing explicit force flag for the unverified BCS path.
+		if (mode != 2 || !checkKernelArgument("-mellowV130forceorig")) {
+			static bool loggedUnsupported = false;
+			if (!loggedUnsupported) {
+				loggedUnsupported = true;
+				SYSLOG("mellow", "BARRIER_NOT_SUBMITTED: no validated ordering backend");
 			}
-
-			if (v130Mode == 2 && !forceOrig) {
-				SYSLOG("mellow", "V150: mellowV130orig requested on non-real-TGL Ultra spoof path; forcing mode=1 to avoid BCS barrier stall (use -mellowV130forceorig to override)");
-				v130Mode = 1;
-			}
-			SYSLOG("mellow", "V130: INIT barrierSubmission spoof mode=%d (0=bypass-ret0, 1=bypass-ret1, 2=call-original, 3=hybrid init-bypass/render-orig) forceOrig=%d",
-				   v130Mode, forceOrig ? 1 : 0);
+			return 0;
 		}
-
-		static int v130CallCount = 0;
-		static int v130CallInitPhase = 0;
-		static int v130CallRenderPhase = 0;
-		static int v130HybridWarmup = -1;
-		if (v130HybridWarmup < 0) {
-			int parsedWarmup = 12;
-			if (PE_parse_boot_argn("mellowV130warmup", &parsedWarmup, sizeof(parsedWarmup))) {
-				if (parsedWarmup < 0) parsedWarmup = 0;
-				if (parsedWarmup > 200) parsedWarmup = 200;
-			}
-			v130HybridWarmup = parsedWarmup;
-			if (v130Mode == 3) {
-				SYSLOG("mellow", "V130: hybrid warmup=%d calls (override with mellowV130warmup=<0..200>)", v130HybridWarmup);
-			}
-		}
-		
-		v130CallCount++;
-		// V151 DIAGNOSTIC: Enhanced logging to trace call patterns through init vs render phases
-		// For hybrid mode, keep bypass window short to avoid WindowServer init starvation.
-		bool isInitPhase = v130CallCount <= v130HybridWarmup;
-		if (isInitPhase) v130CallInitPhase++;
-		else v130CallRenderPhase++;
-		
-		if (v130CallCount <= 24 || (v130CallCount > 100 && v130CallCount <= 124) ||
-			(v130CallCount > 1000 && v130CallCount % 100 == 0)) {
-			SYSLOG("mellow", "V130[%d|init=%d|render=%d]: phase=%s q=%p acc=%p cmd=%p evt=%p count=%u mode=%d",
-				   v130CallCount, v130CallInitPhase, v130CallRenderPhase,
-				   isInitPhase ? "INIT" : "RENDER", queue, accelerator, cmdDesc, event,
-				   static_cast<unsigned>(count), v130Mode);
-		}
-
-		uint8_t retVal = 0;
-		if (v130Mode == 3 && !isInitPhase) {
-			if (v130CallCount <= 24 || (v130CallCount > 100 && v130CallCount <= 124)) {
-				SYSLOG("mellow", "V130[%d]: HYBRID render phase -> ORIGINAL path", v130CallCount);
-			}
-			retVal = FunctionCast(barrierSubmission, callback->obarrierSubmission)(queue, accelerator,
-																				 cmdDesc, event,
-																				 count, list);
-			if (v130CallCount <= 24 || (v130CallCount > 100 && v130CallCount <= 124)) {
-				SYSLOG("mellow", "V130[%d]: HYBRID original returned %u", v130CallCount, static_cast<unsigned>(retVal));
-			}
-			return retVal;
-		}
-
-		// Log the return path for first few calls to capture mode decision
-		if (v130Mode == 2) {
-			if (v130CallCount <= 24) {
-				SYSLOG("mellow", "V130[%d]: RETURNING ORIGINAL path (mode=2)", v130CallCount);
-			}
-			retVal = FunctionCast(barrierSubmission, callback->obarrierSubmission)(queue, accelerator,
-																				 cmdDesc, event,
-																				 count, list);
-			if (v130CallCount <= 24) {
-				SYSLOG("mellow", "V130[%d]: ORIGINAL returned %u", v130CallCount, static_cast<unsigned>(retVal));
-			}
-			return retVal;
-		}
-
-		retVal = static_cast<uint8_t>((v130Mode == 1 || v130Mode == 3) ? 1 : 0);
-		if (v130CallCount <= 24) {
-			SYSLOG("mellow", "V130[%d]: RETURNING BYPASS path (mode=%d, ret=%u)", v130CallCount, v130Mode, static_cast<unsigned>(retVal));
-		}
-		return retVal;
+		if (!queue || !accelerator || !cmdDesc || !event || (count && !list))
+			return 0;
 	}
-	return FunctionCast(barrierSubmission, callback->obarrierSubmission)(queue, accelerator,
-																		 cmdDesc, event,
-																		 count, list);
+	return FunctionCast(barrierSubmission, callback->obarrierSubmission)(queue,
+		accelerator, cmdDesc, event, count, list);
 }
 
 void * Gen11::getBlit2DContext(void *that,bool param_1)
@@ -6925,15 +6543,15 @@ IOReturn Gen11::wrapFBClientDoAttribute(void *fbclient, uint32_t attribute, unsi
 }
 
 unsigned long Gen11::loadGuCBinary(void *that) {
-	// V52: Real TGL can authenticate and load GuC firmware natively.
-	// The non-real-TGL Ultra spoof path cannot use the native TGL GuC flow; stub
-	// to return 1 and use host scheduling instead.
-	if (MellowCore::callback->isRealTGL) {
-		SYSLOG("mellow", "loadGuCBinary: real TGL — calling original for GuC firmware load");
+	if (!callback || !MellowCore::callback || !that)
+		return 0;
+	if (MellowCore::callback->isRealTGL && callback->oloadGuCBinary) {
 		return FunctionCast(loadGuCBinary, callback->oloadGuCBinary)(that);
 	}
-	SYSLOG("mellow", "loadGuCBinary: non-real-TGL Ultra spoof path — stubbed to return 1 (host scheduling)");
-	return 1;
+	// There is no 7D41 GuC authentication/submission implementation here. Claiming
+	// firmware load succeeded cannot select or implement a host scheduler.
+	SYSLOG("mellow", "GUC_NOT_LOADED: no implemented firmware backend for this hardware");
+	return 0;
 }
 
 UInt8 Gen11::wrapLoadGuCBinary(void *that) {
@@ -6987,49 +6605,13 @@ bool Gen11::wrapInitSchedControl(void *that) {
 }
 
 void *Gen11::wrapIgBufferWithOptions(void *accelTask, void* size, unsigned int type, unsigned int flags) {
-	void *r = nullptr;
 
-	if (callback->performingFirmwareLoad) {
-		callback->dummyFirmwareBuffer = Buffer::create<uint8_t>(*(unsigned long*)size);
-
-		const void *fw = nullptr;
-		const void *fwsig = nullptr;
-		size_t fwsize = 0;
-		size_t fwsigsize = 0;
-
-
-		/*fw = GuCFirmwareKBL;
-		fwsig = GuCFirmwareKBLSignature;
-		fwsize = GuCFirmwareKBLSize;
-		fwsigsize = GuCFirmwareSignatureSize;*/
-
-		unsigned long newsize = fwsize > *(unsigned long*)size ? ((fwsize + 0xFFFF) & (~0xFFFF)) : *(unsigned long*)size;
-		r = FunctionCast(wrapIgBufferWithOptions, callback->orgIgBufferWithOptions)(accelTask, (void*)newsize,type,flags);
-		if (r && callback->dummyFirmwareBuffer) {
-			auto status = MachInfo::setKernelWriting(true, KernelPatcher::kernelWriteLock);
-			if (status == KERN_SUCCESS) {
-				callback->realFirmwareBuffer = static_cast<uint8_t **>(r)[7];
-				static_cast<uint8_t **>(r)[7] = callback->dummyFirmwareBuffer;
-				lilu_os_memcpy(callback->realFirmwareBuffer, fw, fwsize);
-				lilu_os_memcpy(callback->signaturePointer, fwsig, fwsigsize);
-				callback->realBinarySize = static_cast<uint32_t>(fwsize);
-				*callback->firmwareSizePointer = static_cast<uint32_t>(fwsize);
-				MachInfo::setKernelWriting(false, KernelPatcher::kernelWriteLock);
-			} else {
-				//SYSLOG("igfx", "ig buffer protection upgrade failure %d", status);
-			}
-		} else if (callback->dummyFirmwareBuffer) {
-			//SYSLOG("igfx", "ig shared buffer allocation failure");
-			Buffer::deleter(callback->dummyFirmwareBuffer);
-			callback->dummyFirmwareBuffer = nullptr;
-		} else {
-			//SYSLOG("igfx", "dummy buffer allocation failure");
-		}
-	} else {
-		r = FunctionCast(wrapIgBufferWithOptions, callback->orgIgBufferWithOptions)(accelTask, size,type,flags);
-	}
-
-	return r;
+	// No replacement firmware/signature payload is provided by this source.
+	// The old path allocated a dummy buffer, copied from null payloads, set the
+	// firmware size to zero and changed the size argument ABI. Keep it intact.
+	if (!callback || !callback->orgIgBufferWithOptions)
+		return nullptr;
+	return FunctionCast(wrapIgBufferWithOptions, callback->orgIgBufferWithOptions)(accelTask, size, type, flags);
 }
 
 UInt64 Gen11::wrapIgBufferGetGpuVirtualAddress(void *that) {
@@ -8327,8 +7909,8 @@ uint32_t Gen11::v85SurfAddr = 0;
 IOBufferMemoryDescriptor *Gen11::v116DummyBuf = nullptr;
 uint64_t Gen11::v116DummyPhys = 0;
 
-// V221: Becomes true when IntelAccelerator::start() returns. Used by wrapWaitForStamp
-// to block CoreDisplay's stamp-3 wait until the GFX interrupt handler is installed.
+// Records successful IntelAccelerator::start(); it is not proof of GPU execution
+// or a replacement for a completed fence.
 volatile bool Gen11::gGfxAccelStartDone = false;
 
 // V54: IRQ watchdog — re-enables Master IRQ if the driver disables it during init.
@@ -9772,33 +9354,23 @@ void Gen11::IGScheduler5resume(void *that) {
 
 }
 
-// V212: The GPU watchdog calls isGpuIdle() after engine init to decide if the GPU is healthy.
-// On the non-real-TGL Ultra spoof path, preserve the inherited RPL-P observation
-// that INSTDONE bit0 may remain 0; the original then returns false and the watchdog resets the GPU
-// → startGraphicsEngine retry loop. startGraphicsEngine itself SUCCEEDS (return value is non-zero
-// = success path); the reset is triggered entirely by this watchdog query.
+// The backend owns idle/fence state. Preserve it even during failed startup.
 bool Gen11::wrapIGScheduler5IsGpuIdle(const void *that) {
-	bool idle = FunctionCast(wrapIGScheduler5IsGpuIdle, callback->oIGScheduler5IsGpuIdle)(that);
-	if (!idle) {
-		uint32_t instdone = MellowCore::callback->readReg32(RING_INSTDONE(RENDER_RING_BASE));
-		if ((instdone & ~1U) == 0xfffffffe) {
-			SYSLOG("mellow", "V212[5]: isGpuIdle override INSTDONE=0x%08x → idle", instdone);
-			return true;
-		}
-	}
-	return idle;
+
+	if (!callback || !callback->oIGScheduler5IsGpuIdle || !that)
+		return false;
+	// A register value of 0xfffffffe (or a failed 0xffffffff MMIO read) does
+	// not prove that queues are idle. Preserve the scheduler's own decision.
+	return FunctionCast(wrapIGScheduler5IsGpuIdle, callback->oIGScheduler5IsGpuIdle)(that);
 }
 
 bool Gen11::wrapIGScheduler4IsGpuIdle(const void *that) {
-	bool idle = FunctionCast(wrapIGScheduler4IsGpuIdle, callback->oIGScheduler4IsGpuIdle)(that);
-	if (!idle) {
-		uint32_t instdone = MellowCore::callback->readReg32(RING_INSTDONE(RENDER_RING_BASE));
-		if ((instdone & ~1U) == 0xfffffffe) {
-			SYSLOG("mellow", "V212[4]: isGpuIdle override INSTDONE=0x%08x → idle", instdone);
-			return true;
-		}
-	}
-	return idle;
+
+	if (!callback || !callback->oIGScheduler4IsGpuIdle || !that)
+		return false;
+	// A register value of 0xfffffffe (or a failed 0xffffffff MMIO read) does
+	// not prove that queues are idle. Preserve the scheduler's own decision.
+	return FunctionCast(wrapIGScheduler4IsGpuIdle, callback->oIGScheduler4IsGpuIdle)(that);
 }
 
 typedef enum AGDCVendorClass {

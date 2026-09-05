@@ -55,3 +55,22 @@ baseline, nor modified or stripped Intel DMC firmware payloads. Firmware
 compatibility profiles currently use the Apple driver CSR initializer and
 experimental MMIO/power-well setup; they are not evidence of native Xe-LPG
 firmware support.
+
+Local 7D41 development snapshot, 2026-09-05
+-----------------------------------------
+This snapshot modifies NiSeullent/Mellow commit
+f895d89653ea5cad3a534cce46a62d0f59384d71. Local changes include checked hardware
+access, startup and pattern admission, honest command completion, guarded
+patches, host tests, and reproducible cross-build tools. Version 0.1.1 is a local
+development label, not an official upstream release or a hardware support claim.
+Original licenses and per-file notices are preserved. HDE64 test decoder source
+and its license/provenance are retained in tests/accel_hde.
+
+Local integration version 0.2.0, 2026-09-05: adds Xe VM/PTE/PDE, IOKit DMA pin adapter, private CPU page-table builder, CSS parser, queue/fence lifecycle, VM-to-queue bridge, actual Intel offline compiler evidence, and ABI/probe tooling. These changes do not implement a complete hardware submission or Metal userspace driver.
+
+Local integration version 0.3.0, 2026-09-05: adds actual BAR0/forcewake adapters,
+pinned page-table backing, GuC MMIO/CTB/HXG transport, Intel Zebin staging and
+actual Tahoe binary/export eligibility analysis. Hardware submission and Metal
+runtime remain incomplete. Pinned protocol references are documented in
+XE-MMIO.md, XE-GUC-TRANSPORT.md and XE-ZEBIN.md. Apple system binaries are
+analysis inputs and are not included in this driver development package.

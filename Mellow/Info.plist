@@ -15,11 +15,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>0.4.1</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>0.1.0</string>
+	<string>0.4.1</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>DisplayAppleIDInjection</key>
@@ -99,5 +99,9 @@
 	</dict>
 	<key>OSBundleRequired</key>
 	<string>Safe Boot</string>
+	<key>MellowDevelopmentBuild</key>
+	<true/>
+	<key>MellowValidationStatus</key>
+	<string>GuC firmware, context execution coordinator, IRQ/fence and public Metal client; physical GPU runtime and Metal driver unverified</string>
 </dict>
 </plist>

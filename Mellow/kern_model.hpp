@@ -4,7 +4,7 @@
 #ifndef kern_model_hpp
 #define kern_model_hpp
 
-#include <Headers/kern_util.hpp>
+#include <stdint.h>
 
 struct UltraDevice {
 	uint16_t deviceId {0};
