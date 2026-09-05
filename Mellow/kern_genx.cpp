@@ -22,6 +22,79 @@ void Genx::init() {
 
 
 
+// Bounded form of the ICL DVMT formula replacement described by WhateverGreen
+// kern_igfx_memory.cpp. Only adjacent SHL/AND on the same 32-bit register are
+// accepted here; broader compiler variants need an explicit binary audit.
+static bool patchStolenMemoryFormula(mach_vm_address_t functionStart,
+	mach_vm_address_t imageStart, size_t imageSize, uint32_t stolenSize) {
+	if (!stolenSize || !imageStart || imageSize < 32 || functionStart < imageStart ||
+		functionStart - imageStart > imageSize - 32)
+		return false;
+
+	mach_vm_address_t cursor = functionStart;
+	mach_vm_address_t shiftAddress = 0;
+	uint8_t shiftLength = 0, shiftRegister = 0;
+	for (unsigned instruction = 0; instruction < 64; ++instruction) {
+		// hde64.h requires 32 readable bytes, including at a kext's final page.
+		if (cursor < imageStart || cursor - imageStart > imageSize - 32)
+			return false;
+		hde64s decoded {};
+		const auto length = Disassembler::hdeDisasm(cursor, &decoded);
+		if (!length || length > 15 || length != decoded.len || (decoded.flags & F_ERROR))
+			return false;
+
+		// Never scan through a return or a branch into another basic block/function.
+		if (decoded.opcode == 0xC3 || decoded.opcode == 0xC2 ||
+			decoded.opcode == 0xE9 || decoded.opcode == 0xEB ||
+			(decoded.opcode >= 0x70 && decoded.opcode <= 0x7F) ||
+			(decoded.opcode == 0x0F && decoded.opcode2 >= 0x80 && decoded.opcode2 <= 0x8F) ||
+			(decoded.opcode == 0xFF && (decoded.modrm_reg == 4 || decoded.modrm_reg == 5)))
+			return false;
+
+		const bool plain32 = !decoded.p_rep && !decoded.p_lock && !decoded.p_seg &&
+			!decoded.p_66 && !decoded.p_67 && (!decoded.rex || decoded.rex == 0x41);
+		const bool isShift = plain32 && decoded.opcode == 0xC1 &&
+			decoded.modrm_mod == 3 && decoded.modrm_reg == 4 &&
+			(decoded.flags & F_IMM8) && decoded.imm.imm8 == 0x11 &&
+			length == (decoded.rex_b ? 4U : 3U);
+		const bool andEax = plain32 && !decoded.rex && decoded.opcode == 0x25 && length == 5;
+		const bool andReg = plain32 && decoded.opcode == 0x81 &&
+			decoded.modrm_mod == 3 && decoded.modrm_reg == 4 &&
+			length == (decoded.rex_b ? 7U : 6U);
+		const bool isAnd = (andEax || andReg) && (decoded.flags & F_IMM32) &&
+			decoded.imm.imm32 == 0xFE000000;
+		const uint8_t andRegister = andEax ? 0 : (decoded.rex_b << 3) | decoded.modrm_rm;
+
+		if (shiftAddress && isAnd && andRegister == shiftRegister) {
+			uint8_t replacement[7] {0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
+			unsigned out = 0;
+			if (andRegister >= 8)
+				replacement[out++] = 0x41;
+			replacement[out++] = 0xB8 + (andRegister & 7U);
+			// Emit little-endian bytes without an unaligned uint32_t store.
+			for (unsigned byte = 0; byte < 4; ++byte)
+				replacement[out++] = static_cast<uint8_t>(stolenSize >> (byte * 8));
+			if (out > length || shiftLength > 4 || length > sizeof(replacement))
+				return false;
+			if (MachInfo::setKernelWriting(true, KernelPatcher::kernelWriteLock) != KERN_SUCCESS)
+				return false;
+			const uint8_t nops[4] {0x90, 0x90, 0x90, 0x90};
+			lilu_os_memcpy(reinterpret_cast<void *>(shiftAddress), nops, shiftLength);
+			lilu_os_memcpy(reinterpret_cast<void *>(cursor), replacement, length);
+			const auto restore = MachInfo::setKernelWriting(false, KernelPatcher::kernelWriteLock);
+			if (restore != KERN_SUCCESS)
+				SYSLOG("mellow", "FBMemMgr_Init: kernel-write protection restore failed (%d)", restore);
+			return restore == KERN_SUCCESS;
+		}
+		// Reject stale SHL matches if any intervening instruction could change dataflow.
+		shiftAddress = isShift ? cursor : 0;
+		shiftLength = isShift ? static_cast<uint8_t>(length) : 0;
+		shiftRegister = (decoded.rex_b << 3) | decoded.modrm_rm;
+		cursor += length;
+	}
+	return false;
+}
+
 bool Genx::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
 
     if (kextG11FB0.loadIndex == index) {
@@ -266,81 +339,15 @@ bool Genx::processKext(KernelPatcher &patcher, size_t index, mach_vm_address_t a
 
 		PANIC_COND(!LookupPatchPlus::applyAll(patcher, patches , address, size), "mellow", "kextG11FB0 Failed to apply patches!");
 
-			auto startAddress = patcher.solveSymbol(index, "__ZN24AppleIntelBaseController13FBMemMgr_InitEv", address, size);
-			if (startAddress){
-				hde64s handle;
-				uint64_t shllAddr = 0, andlAddr = 0;
-				uint32_t shllSize = 0, andlSize = 0;
-				uint32_t shllDstr = 0, andlDstr = 0;
-				
-				uint8_t movl[] = {0x41, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x90};
-				uint8_t nops[] = {0x90, 0x90, 0x90, 0x90};
-				
-				for (auto index = 0; index < 64; index += 1) {
-					auto size = Disassembler::hdeDisasm(startAddress, &handle);
-					
-					if (handle.flags & F_ERROR) {
-						break;
-					}
-					
-					// Instruction: shll $0x11, %???
-					// 3 bytes long if DSTReg < %r8d, otherwise 4 bytes long
-					if (handle.opcode == 0xC1 && handle.imm.imm8 == 0x11) {
-						shllAddr = startAddress;
-						shllSize = handle.len;
-						shllDstr = (handle.rex_b << 3) | handle.modrm_rm;
-					}
-					
-					// Instruction: andl $0xFE000000, %???
-					// 5 bytes long if DSTReg is %eax; 6 bytes long if DSTReg < %r8d; otherwise 7 bytes long.
-					if ((handle.opcode == 0x25 || handle.opcode == 0x81) && handle.imm.imm32 == 0xFE000000) {
-						andlAddr = startAddress;
-						andlSize = handle.len;
-						andlDstr = (handle.rex_b << 3) | handle.modrm_rm;
-					}
-					
-					// Guard: Calculate and apply the binary patch if we have found both instructions
-					if (shllAddr && andlAddr) {
-						// Update the `movl` instruction with the actual amount of DVMT preallocated memory
-						*reinterpret_cast<uint32_t*>(movl + 2) = MellowCore::callback->stolen_size;
-						SYSLOG("mellow", "FBMemMgr_Init: patching stolen_size=0x%x", MellowCore::callback->stolen_size);
-						
-						// Update the `movl` instruction with the actual destination register
-						// Find the actual starting point of the patch and the number of bytes to patch
-						uint8_t* patchStart;
-						uint32_t patchSize;
-						if (andlDstr >= 8) {
-							// %r8d, %r9d, ..., %r15d
-							movl[1] += (andlDstr - 8);
-							patchStart = movl;
-							patchSize = 7;
-						} else {
-							// %eax, %ecx, ..., %edi
-							movl[1] += andlDstr;
-							patchStart = (movl + 1);
-							patchSize = andlDstr == 0 ?  5 : 6;
-						}
-						
-						// Guard: Prepare to apply the binary patch
-						if (MachInfo::setKernelWriting(true, KernelPatcher::kernelWriteLock) != KERN_SUCCESS) {
-						}
-						
-						// Replace `shll` with `nop`s
-						// The number of nops is determined by the actual instruction length
-						lilu_os_memcpy(reinterpret_cast<void*>(shllAddr), nops, shllSize);
-						
-						// Replace `andl` with `movl`
-						// The patch contents and size are determined by the destination register of `andl`
-						lilu_os_memcpy(reinterpret_cast<void*>(andlAddr), patchStart, patchSize);
-						
-						// Finished applying the binary patch
-						MachInfo::setKernelWriting(false, KernelPatcher::kernelWriteLock);
-					}
-					
-					startAddress += size;
-				}
-			}
-		
+		const auto formulaAddress = patcher.solveSymbol(index,
+			"__ZN24AppleIntelBaseController13FBMemMgr_InitEv", address, size);
+		if (!formulaAddress) {
+			patcher.clearError();
+			SYSLOG("mellow", "FBMemMgr_Init: symbol unavailable; stolen-size patch skipped");
+		} else if (!patchStolenMemoryFormula(formulaAddress, address, size,
+			MellowCore::callback->stolen_size)) {
+			SYSLOG("mellow", "FBMemMgr_Init: no validated writable formula; stolen-size patch skipped");
+		}
 		
         DBGLOG("mellow", "Loaded ApppeIntelICLLPGraphicsFramebuffer!");
         return true;

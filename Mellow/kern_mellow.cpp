@@ -8,6 +8,7 @@
 #include "DYLDPatches.hpp"
 #include "HDMI.hpp"
 #include "kern_patcherplus.hpp"
+#include "RuntimeReadiness.hpp"
 #include <Headers/kern_api.hpp>
 #include <Headers/kern_devinfo.hpp>
 
@@ -228,6 +229,35 @@ void MellowCore::processPatcher(KernelPatcher &patcher) {
 		DeviceInfo::deleter(devInfo);
 		return;
 	}
+	pciDeviceBdf = static_cast<uint32_t>(iGPU->getBusNumber()) << 16 |
+	               static_cast<uint32_t>(iGPU->getDeviceNumber()) << 11 |
+	               static_cast<uint32_t>(iGPU->getFunctionNumber()) << 8;
+	// Diagnostic correlation for the user-space probe. These values come from
+	// config reads above, before this plugin installs its ID-read wrappers.
+	// IORegistry properties are not a cryptographic hardware attestation.
+	bool identityPublished = iGPU->setProperty("MellowPhysicalVendorID", static_cast<uint64_t>(vendorId), 32);
+	identityPublished = iGPU->setProperty("MellowPhysicalDeviceID", static_cast<uint64_t>(deviceId), 32) && identityPublished;
+	identityPublished = iGPU->setProperty("MellowPhysicalBDF", static_cast<uint64_t>(pciDeviceBdf), 32) && identityPublished;
+	identityPublished = iGPU->setProperty("MellowPhysicalIdentitySource", "pci-config-before-spoof") && identityPublished;
+	uint64_t nativeEvidence = deviceId == 0x7D41U ? MellowRuntime::PhysicalIdentity7D41 : 0;
+	if (checkKernelArgument("-mellowtahoe")) nativeEvidence |= MellowRuntime::BootOptIn;
+	if (!checkKernelArgument("-igfxvesa")) nativeEvidence |= MellowRuntime::VesaDisabled;
+	const auto nativeReadiness = MellowRuntime::evaluate(nativeEvidence);
+	identityPublished = iGPU->setProperty("MellowNativeXeVerifiedMask", nativeReadiness.verified, 64) && identityPublished;
+	identityPublished = iGPU->setProperty("MellowNativeXeMissingMask", nativeReadiness.missing, 64) && identityPublished;
+	identityPublished = iGPU->setProperty("MellowNativeXeStage", MellowRuntime::stageName(nativeReadiness.stage)) && identityPublished;
+	identityPublished = iGPU->setProperty("MellowNativeXeBackendIntegrated",
+		static_cast<uint64_t>(MellowRuntime::BackendOwnerIntegrated), 8) && identityPublished;
+	identityPublished = iGPU->setProperty("MellowNativeXeMetalReady",
+		static_cast<uint64_t>(nativeReadiness.mayAdvertiseMetal), 8) && identityPublished;
+	if (!identityPublished)
+		SYSLOG("mellow", "physical identity diagnostic publication incomplete; correlate with PCI startup log");
+	SYSLOG("mellow", "native Xe backend evidence stage=%s verified=0x%llx missing=0x%llx first-missing=%s NativeMetalReady=%d",
+		MellowRuntime::stageName(nativeReadiness.stage),
+		static_cast<unsigned long long>(nativeReadiness.verified),
+		static_cast<unsigned long long>(nativeReadiness.missing),
+		MellowRuntime::evidenceName(MellowRuntime::firstMissing(nativeReadiness.missing)),
+		nativeReadiness.mayAdvertiseMetal);
 
 	ultraActive = true;
 	isRealTGL = false;
@@ -262,19 +292,18 @@ void MellowCore::processPatcher(KernelPatcher &patcher) {
 		seedIGPUPropertiesOnEntry(iGPU, branding);
 	}
 
-	auto gms = WIOKit::readPCIConfigValue(iGPU, WIOKit::kIOPCIConfigGraphicsControl, 0, 16) >> 8;
-	if (gms < 0x10) {
-		stolen_size = gms * 32;
-	} else if (gms == 0x20 || gms == 0x30 || gms == 0x40) {
-		stolen_size = gms * 32;
-	} else if (gms >= 0xF0 && gms <= 0xFE) {
-		stolen_size = ((gms & 0x0F) + 1) * 4;
+	// Xe-LPG moves this information to MMIO GGC. PCI GGC and an invented
+	// 128 MiB floor can expose memory which firmware never reserved.
+	// This is total DSM only; WOPCM/GSC subtraction and allocation are separate.
+	stolen_size = 0;
+	setRMMIOIfNecessary();
+	UInt32 ggc = 0;
+	if (readReg32Checked(MellowHardware::graphicsControl, ggc) &&
+	    MellowHardware::decodeDsmReservation(ggc, stolen_size)) {
+		SYSLOG("mellow", "DSM total reservation=0x%x GGC=0x%08x (not allocator-usable size)", stolen_size, ggc);
 	} else {
-		SYSLOG("mellow", "DVMT GMS value 0x%x is unknown; using the 128 MiB floor", gms);
+		SYSLOG("mellow", "DSM reservation unknown, GGC=0x%08x; stolen-memory size patch unavailable", ggc);
 	}
-	if (stolen_size < 128) stolen_size = 128;
-	stolen_size *= 1024 * 1024;
-	SYSLOG("mellow", "stolen_size 0x%x", stolen_size);
 
 	KernelPatcher::routeVirtual(iGPU, WIOKit::PCIConfigOffset::ConfigRead16, configRead16, &orgConfigRead16);
 	KernelPatcher::routeVirtual(iGPU, WIOKit::PCIConfigOffset::ConfigRead32, configRead32, &orgConfigRead32);
@@ -302,97 +331,104 @@ OSMetaClassBase *MellowCore::wrapSafeMetaCast(const OSMetaClassBase *anObject, c
 
 bool MellowCore::wrapIGAccelDeviceStart(void *that) {
 	auto ret = FunctionCast(wrapIGAccelDeviceStart, callback->orgIGAccelDeviceStart)(that);
-	if (!callback->isRealTGL && !ret) {
-		SYSLOG("mellow", "IOAccelF2: forcing IGAccelDevice::deviceStart success on non-real-TGL Ultra spoof path");
-		return true;
-	}
+	// A failed start must remain a failure; published capabilities cannot stand
+	// in for an initialized accelerator and working command execution.
 	DBGLOG("mellow", "IOAccelF2: IGAccelDevice::deviceStart returned %d", ret);
 	return ret;
 }
 
-void MellowCore::setRMMIOIfNecessary() {
-	if (UNLIKELY(!this->rmmio || !this->rmmio->getLength())) {
-		if (!this->iGPU) {
-			SYSLOG("mellow", "BAR0 map skipped: no active iGPU");
-			this->rmmioPtr = nullptr;
-			return;
-		}
-		this->rmmio = this->iGPU->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
-		if (!this->rmmio || !this->rmmio->getLength()) {
-			SYSLOG("mellow", "BAR0 MMIO map failed");
-			this->rmmioPtr = nullptr;
-			return;
-		}
-		this->rmmioPtr = reinterpret_cast<volatile uint32_t *>(this->rmmio->getVirtualAddress());
-		if (!this->rmmioPtr) {
-			SYSLOG("mellow", "BAR0 MMIO map has no virtual address");
-			return;
-		}
+void MellowCore::logRejectedMMIO(const char *operation, unsigned long reg) {
+	const uint32_t count = __sync_fetch_and_add(&mmioFaultCount, 1U);
+	if (count < 16) {
+		SYSLOG("mellow", "MMIO rejected %s byteOffset=0x%lx BAR0 length=0x%llx (no indirect fallback)",
+		       operation, reg, static_cast<uint64_t>(rmmio ? rmmio->getLength() : 0));
+	}
+}
 
-		// E0001 is deliberately read-only: prove that the admitted physical
-		// device has a mapped BAR0 and capture two established display-domain
-		// registers before any result is interpreted as GPU acceleration.
-		const uint32_t pwrWellCtl1 = this->readReg32(0x45400);
-		const uint32_t dcStateEn = this->readReg32(0x45504);
+void MellowCore::setRMMIOIfNecessary() {
+	if (mmioValid()) return;
+	rmmioPtr = nullptr;
+	OSSafeReleaseNULL(rmmio);
+	if (!iGPU) {
+		SYSLOG("mellow", "BAR0 map skipped: no active iGPU");
+		return;
+	}
+	auto *mapping = iGPU->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0, kIOMapInhibitCache);
+	if (!mapping || mapping->getLength() < sizeof(UInt32) ||
+	    !mapping->getVirtualAddress() || (mapping->getVirtualAddress() & 3U)) {
+		SYSLOG("mellow", "BAR0 map failed or returned invalid length/address");
+		OSSafeReleaseNULL(mapping);
+		return;
+	}
+	rmmio = mapping;
+	rmmioPtr = reinterpret_cast<volatile UInt32 *>(mapping->getVirtualAddress());
+
+	// Read-only display-domain evidence; a mapping is not acceleration proof.
+	UInt32 pwrWellCtl1 = 0, dcStateEn = 0;
+	if (readReg32Checked(0x45400, pwrWellCtl1) && readReg32Checked(0x45504, dcStateEn)) {
 		SYSLOG("mellow", "E0001 BAR0 mapped len=0x%llx PWR_WELL_CTL1=0x%08x DC_STATE_EN=0x%08x",
-		       static_cast<uint64_t>(this->rmmio->getLength()), pwrWellCtl1, dcStateEn);
+		       static_cast<uint64_t>(mapping->getLength()), pwrWellCtl1, dcStateEn);
 	}
 }
 
 void MellowCore::setApertureIfNecessary() {
-	if (UNLIKELY(!this->aperture || !this->aperture->getLength())) {
-		this->aperture = this->iGPU->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress2);
-		if (this->aperture) {
-			this->aperturePtr = reinterpret_cast<volatile uint32_t *>(this->aperture->getVirtualAddress());
-			this->apertureLen = this->aperture->getLength();
-			SYSLOG("mellow", "V201: BAR2 aperture mapped, len=0x%llx", this->apertureLen);
-		} else {
-			SYSLOG("mellow", "V201: BAR2 aperture map FAILED");
+	// Xe-LPG BAR2 is LMEMBAR system-stolen memory. The inherited users pass
+	// GGTT offsets; mapping them as old TGL aperture offsets is incorrect.
+	// Until a DSM/DM-PTE aware path exists, report the legacy aperture absent.
+	if (!isRealTGL) {
+		aperturePtr = nullptr;
+		apertureLen = 0;
+		OSSafeReleaseNULL(aperture);
+		if (!apertureUnavailableLogged) {
+			apertureUnavailableLogged = true;
+			SYSLOG("mellow", "BAR2 legacy GGTT aperture unavailable on Xe-LPG; requires DSM/DM-PTE aware access");
 		}
+		return;
 	}
+	if (aperture && aperturePtr && apertureLen >= sizeof(UInt32)) return;
+	aperturePtr = nullptr;
+	apertureLen = 0;
+	OSSafeReleaseNULL(aperture);
+	if (!iGPU) {
+		SYSLOG("mellow", "BAR2 map skipped: no active iGPU");
+		return;
+	}
+	auto *mapping = iGPU->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress2, kIOMapInhibitCache);
+	if (!mapping || mapping->getLength() < sizeof(UInt32) ||
+	    !mapping->getVirtualAddress() || (mapping->getVirtualAddress() & 3U)) {
+		SYSLOG("mellow", "BAR2 map failed or returned invalid length/address");
+		OSSafeReleaseNULL(mapping);
+		return;
+	}
+	aperture = mapping;
+	aperturePtr = reinterpret_cast<volatile UInt32 *>(mapping->getVirtualAddress());
+	apertureLen = mapping->getLength();
+	SYSLOG("mellow", "V201: BAR2 mapped, len=0x%llx; address semantics require platform validation", apertureLen);
 }
 
-// V221: waitForStamp hook — delays CoreDisplay's stamp-3 wait until IntelAccelerator::start()
-// has returned (and thus the GFX interrupt handler is installed). Without this, stamp 3 is
-// submitted during FB init while the GFX kext hasn't started yet; the interrupt fires but sits
-// unserviced for 5s, causing CoreDisplay_CreateDisplayForCGXDisplayDevice to assert.
+// Observe the startup dependency failure without forging a completed fence.
+// Fixing interrupt/start ordering requires hardware evidence; claiming stamp
+// completion can let clients consume unfinished GPU memory or reuse it too soon.
 static mach_vm_address_t orgWaitForStamp = 0;
 static IOReturn wrapWaitForStamp(void *that, int32_t channel, unsigned int stamp, unsigned int *outStamp) {
 	IOReturn ret = FunctionCast(wrapWaitForStamp, orgWaitForStamp)(that, channel, stamp, outStamp);
 	if (ret != kIOReturnSuccess && !Gen11::gGfxAccelStartDone) {
-		// Stamp timed out before GFX start() completed. The GPU DID execute the ring
-		// (HEAD==TAIL, IPEHR=MI_REPORT_HEAD) but the interrupt handler isn't installed
-		// yet so gpu_stamp was never bumped. Returning success here lets CoreDisplay
-		// proceed, which unblocks IOKit matching so GFX kext can start. GFX's interrupt
-		// handler will then process the pending GT_INTR_DW0 backlog when it installs.
-		// Blocking here causes a deadlock (CoreDisplay stuck → GFX never matches).
-		SYSLOG("mellow", "V221: stamp(%d,%u) timed out before GFX start — faking success to unblock CoreDisplay",
-			   channel, stamp);
-		if (outStamp) *outStamp = stamp;
-		return kIOReturnSuccess;
+		SYSLOG("mellow", "V221: stamp(%d,%u) failed before GFX start, preserving ret=0x%x and actual outStamp",
+			   channel, stamp, ret);
 	}
 	return ret;
 }
 
-// V500: IOAccelLegacySurface::set_id_mode(uint32_t id, uint32_t mode) active fix.
-// Hardware rejects mode bits covered by 0xff8073c0 with kIOReturnUnsupported.
-// On the non-real-TGL Ultra spoof path, strip those bits before the call so the
-// GPU task gets a valid scheduling mode instead of silently failing.
+// Observe the surface mode failure without silently rewriting client semantics.
+// The inherited 0xff8073c0 mask has no validated Tahoe ABI contract.
 static mach_vm_address_t orgSetIdMode = 0;
 static IOReturn wrapSetIdMode(void *that, uint32_t id, uint32_t mode) {
-    uint32_t patchedMode = mode;
-    if (MellowCore::callback && !MellowCore::callback->getIsRealTGL())
-        patchedMode = mode & ~0xff8073c0u;  // strip TGL-only preemption/mode bits
-
-    IOReturn ret = FunctionCast(wrapSetIdMode, orgSetIdMode)(that, id, patchedMode);
+    IOReturn ret = FunctionCast(wrapSetIdMode, orgSetIdMode)(that, id, mode);
 
     static int v500Count = 0;
     if (v500Count < 32) {
         ++v500Count;
-        if (patchedMode != mode)
-            SYSLOG("mellow", "V500[%d]: set_id_mode stripped 0x%x→0x%x id=0x%x ret=0x%x",
-                   v500Count, mode, patchedMode, id, ret);
-        else if (ret != kIOReturnSuccess)
+        if (ret != kIOReturnSuccess)
             SYSLOG("mellow", "V500[%d]: set_id_mode FAILED ret=0x%x id=0x%x mode=0x%x",
                    v500Count, ret, id, mode);
     }
@@ -465,8 +501,7 @@ bool MellowCore::processKext(KernelPatcher &patcher, size_t index, mach_vm_addre
 			}
 		}*/
 
-		// V221: Hook IOAccelEventMachine2::waitForStamp to delay CoreDisplay's stamp-3 wait
-		// until IntelAccelerator::start() has returned and the GFX IRQ handler is installed.
+		// Observe wait/start ordering while preserving the driver's completion result.
 		RouteRequestPlus wfsRequest[] = {
 			{"__ZN20IOAccelEventMachine212waitForStampEijPj", wrapWaitForStamp, orgWaitForStamp},
 		};
@@ -539,41 +574,33 @@ bool MellowCore::processKext(KernelPatcher &patcher, size_t index, mach_vm_addre
 uint16_t MellowCore::configRead16(IORegistryEntry *service, uint32_t space, uint8_t offset) {
 	if (callback && callback->orgConfigRead16) {
 		auto result = callback->orgConfigRead16(service, space, offset);
-		if (offset == WIOKit::kIOPCIConfigDeviceID && service != nullptr) {
-			auto name = service->getName();
-			if (name && name[0] == 'I' && name[1] == 'G' && name[2] == 'P' && name[3] == 'U') {
-				uint32_t device;
-				if (WIOKit::getOSDataValue(service, "device-id", device) && device != result) {
-					return device;
-				}
-			}
+		uint32_t device;
+		if (callback->ultraActive && service == callback->iGPU &&
+		    WIOKit::getOSDataValue(service, "device-id", device)) {
+			return MellowHardware::spoofConfig16(space, callback->pciDeviceBdf, offset,
+			                                    result, callback->deviceId, device);
 		}
 
 		return result;
 	}
 
-	return 0;
+	return 0xFFFFU;
 }
 
 uint32_t MellowCore::configRead32(IORegistryEntry *service, uint32_t space, uint8_t offset) {
 	if (callback && callback->orgConfigRead32) {
 		auto result = callback->orgConfigRead32(service, space, offset);
-		// According to lvs unaligned reads may happen
-		if ((offset == WIOKit::kIOPCIConfigDeviceID || offset == WIOKit::kIOPCIConfigVendorID) && service != nullptr) {
-			auto name = service->getName();
-			if (name && name[0] == 'I' && name[1] == 'G' && name[2] == 'P' && name[3] == 'U') {
-				uint32_t device;
-				if (WIOKit::getOSDataValue(service, "device-id", device) && device != (result & 0xFFFF)) {
-					device = (result & 0xFFFF) | (device << 16);
-					return device;
-				}
-			}
+		uint32_t device;
+		if (callback->ultraActive && service == callback->iGPU &&
+		    WIOKit::getOSDataValue(service, "device-id", device)) {
+			return MellowHardware::spoofConfig32(space, callback->pciDeviceBdf, offset,
+			                                    result, callback->deviceId, device);
 		}
 
 		return result;
 	}
 
-	return 0;
+	return 0xFFFFFFFFU;
 }
 
 size_t MellowCore::wrapFunctionReturnZero() { return 0; }
@@ -636,4 +663,3 @@ bool MellowCore::wrapApplePanelSetDisplay(IOService *that, IODisplay *display) {
 	bool ret = FunctionCast(wrapApplePanelSetDisplay, callback->orgApplePanelSetDisplay)(that, display);
 	return ret;
 }
-

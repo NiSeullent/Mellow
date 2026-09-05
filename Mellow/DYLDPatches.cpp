@@ -10,21 +10,6 @@
 DYLDPatches *DYLDPatches::callback = nullptr;
 void DYLDPatches::init() { callback = this; }
 
-static bool shouldForceFullMetalPath() {
-	int enabled = 0;
-	if (PE_parse_boot_argn("mellowfullmtldyld", &enabled, sizeof(enabled))) {
-		return enabled != 0;
-	}
-	if (checkKernelArgument("-mellowfullmtldyld")) {
-		return true;
-	}
-	// Legacy: unified arg still accepted as fallback.
-	if (PE_parse_boot_argn("mellowfullmtl", &enabled, sizeof(enabled))) {
-		return enabled != 0;
-	}
-	return checkKernelArgument("-mellowfullmtl");
-}
-
 void DYLDPatches::processPatcher(KernelPatcher &patcher) {
 
     auto *entry = IORegistryEntry::fromPath("/", gIODTPlane);
@@ -67,8 +52,15 @@ void DYLDPatches::wrapCsValidatePage(vnode *vp, memory_object_t pager, memory_ob
 		SYSLOG("DYLD", "VA_BUNDLE_SEEN: %s", path);
 	}
 
+    // These inherited DRM/device-ID patterns were derived from older macOS
+    // binaries. They are diagnostic-only and must not run on Tahoe merely
+    // because the kernel plugin was allowed to load.
+    if (getKernelVersion() != KernelVersion::Sonoma ||
+        !checkKernelArgument("-mellowlegacydyld"))
+        return;
+
     if (!UserPatcher::matchSharedCachePath(path)) {
-        if (LIKELY(strncmp(path, kCoreLSKDMSEPath, arrsize(kCoreLSKDMSEPath))) ||
+        if (LIKELY(strncmp(path, kCoreLSKDMSEPath, arrsize(kCoreLSKDMSEPath))) &&
             LIKELY(strncmp(path, kCoreLSKDPath, arrsize(kCoreLSKDPath)))) {
             return;
         }
@@ -174,226 +166,8 @@ void DYLDPatches::wrapCsValidatePage(vnode *vp, memory_object_t pager, memory_ob
 		SYSLOG("DYLD", "V50: Applied ICL Metal device-ID bypass (f2, mask-based)");
 	}
 	
-	// Stage-3 Metal (hardcoded): assertion bypass + RunFullDisplayPipe NULL-guard
-	// + GetMTLTexture/CQ stubs. AccessComplete is live (not skipped).
-
-	//CoreDisplay_CreateDisplayForCGXDisplayDevice: NOP jne to __assert_rtn (Sonoma 14.7.1)
-	static const uint8_t f3b_sonoma[] = {0x75, 0x0A, 0xE8, 0x79, 0x03, 0x0B, 0x00, 0xE9, 0xE6, 0xF6, 0xFF, 0xFF, 0x83, 0xBD, 0xC0, 0xFE, 0xFF, 0xFF, 0x00, 0x48, 0x8D, 0x05, 0xF2, 0x76, 0x0C, 0x00};
-	static const uint8_t r3b_sonoma[] = {0x90, 0x90, 0xE8, 0x79, 0x03, 0x0B, 0x00, 0xE9, 0xE6, 0xF6, 0xFF, 0xFF, 0x83, 0xBD, 0xC0, 0xFE, 0xFF, 0xFF, 0x00, 0x48, 0x8D, 0x05, 0xF2, 0x76, 0x0C, 0x00};
-
-	//CoreDisplay::DisplaySurface::GetMTLTexture - return NULL (Sonoma 14.7.1)
-	static const uint8_t f_getmtltex_sonoma[] = {0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x41, 0x55, 0x41, 0x54, 0x53, 0x48, 0x81, 0xec, 0x68, 0x01, 0x00, 0x00, 0x49, 0x89, 0xf6, 0x49, 0x89, 0xff};
-	static const uint8_t r_getmtltex_sonoma[] = {0x31, 0xC0, 0xC3, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
-	
-	//CoreDisplay::MetalDevice::GetMTLCommandQueue() const - return NULL (Sonoma 14.7.1)
-	//Called from AccessComplete with rdi=NULL (NULL MetalDevice), crashes at mov rax,[rdi+8] (+30).
-	static const uint8_t f_getmtlcq_sonoma[] = {0x55, 0x48, 0x89, 0xe5, 0x41, 0x57, 0x41, 0x56, 0x53, 0x48, 0x81, 0xec, 0x88, 0x00, 0x00, 0x00, 0x48, 0x8b, 0x05, 0xe9, 0x29, 0x88, 0x3f, 0x48, 0x8b, 0x00};
-	static const uint8_t r_getmtlcq_sonoma[] = {0x31, 0xc0, 0xc3, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90};
-
-	//CoreDisplay::DisplayPipe::RunFullDisplayPipe - NULL vcall guard at entry (Sonoma 14.7.1)
-	//test rdi,rdi; jz +6 instead of mov rax,[rdi]; call [rax+0x28] — skips crash when rdi==NULL.
-	static const uint8_t f_runfdp_guard_sonoma[] = {0x49, 0x8b, 0xbe, 0x88, 0x08, 0x00, 0x00, 0x48, 0x8b, 0x07, 0xff, 0x50, 0x28};
-	static const uint8_t r_runfdp_guard_sonoma[] = {0x49, 0x8b, 0xbe, 0x88, 0x08, 0x00, 0x00, 0x48, 0x85, 0xff, 0x74, 0x06, 0x90};
-
-	// V60: RunFullDisplayPipe isRemovable crash guard (Sonoma 14.7.1)
-	// At RunFullDisplayPipe+2103, objc_msgSend is called as [device isRemovable].
-	// On spoofed RPL/ADL the receiver (from rbp-0x490) is an __NSCFNumber, not a real
-	// display device — causing NSInvalidArgumentException / WindowServer crash loop.
-	// Fix: replace the 6-byte call with mov al,1 (returns 1 = removable).
-	// The jne at +2110 jumps when al≠0 (isRemovable=true) to skip the Assert block.
-	// Returning 0 (xor eax,eax) caused the jne to NOT be taken → CoreDisplay::Assert fires.
-	// Returning 1 causes jne to be taken → Assert at fn+2156 (imgOff 0xC5FA6) is skipped.
-	// Pattern is unique (1 match) at offset +0xC5F5A in CoreDisplay 14.7.1 __TEXT.
-	static const uint8_t f_isrm_guard_sonoma[] = {
-		0x48,0x8b,0x35,0xc7,0xf3,0x07,0x3e,  // mov rsi,[rip+...] (isRemovable selector)
-		0x48,0x8b,0xbd,0x70,0xfb,0xff,0xff,  // mov rdi,[rbp-0x490] (receiver = NSNumber)
-		0xff,0x15,0xa2,0xa8,0x8d,0x3f,       // call [rip+...] (objc_msgSend)
-		0x84,0xc0                             // test al, al
-	};
-	static const uint8_t r_isrm_guard_sonoma[] = {
-		0x48,0x8b,0x35,0xc7,0xf3,0x07,0x3e,  // (keep: selector load)
-		0x48,0x8b,0xbd,0x70,0xfb,0xff,0xff,  // (keep: receiver load)
-		0xb0,0x01,0x90,0x90,0x90,0x90,       // mov al,1; nop×4 (return 1 → jne taken → skip Assert)
-		0x84,0xc0                             // (keep: test al,al)
-	};
-
-	// V187: CoreDisplay::DisplaySurface::AccessComplete crash guard (Sonoma 14.7.1).
-	// Current WindowServer recycle loop crashes at:
-	//   std::__hash_table<...>::find + 0x4
-	//   CoreDisplay::DisplaySurface::AccessComplete + 1928
-	// with KERN_INVALID_ADDRESS at 0x80 on spoofed RPL/ADL.
-	// Short-circuit AccessComplete to avoid dereferencing invalid internal state.
-	// Preserve real TGL behavior by applying only on !isRealTGL.
-	static const uint8_t f_accesscomplete_guard_sonoma[] = {
-		0x55,0x48,0x89,0xe5,0x41,0x57,0x41,0x56,
-		0x41,0x55,0x41,0x54,0x53,0x48,0x81,0xec,
-		0xd8,0x01,0x00,0x00,0x48,0x8b,0x05,0xc1,
-		0xaa,0x8f,0x3f,0x48,0x8b,0x00,0x48,0x89
-	};
-	static const uint8_t r_accesscomplete_guard_sonoma[] = {
-		0x31,0xc0,0xc3,0x90,0x90,0x90,0x90,0x90,
-		0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,
-		0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,
-		0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90
-	};
-
-	// V188: Narrow guard for the active Sonoma WindowServer crash site.
-	// Crash frame:
-	//   std::__hash_table<id<MTLRenderPipelineState>...>::find + 0x4
-	// with rdi=0x78/0x80-like garbage, causing mov r9,[rdi+8] fault.
-	// Strategy: short-circuit this specific hash-table find specialization to
-	// return a null/end iterator, letting AccessComplete continue through its
-	// existing fallback path instead of stubbing the whole function.
-	static const uint8_t f_hashfind_mtlps_guard_sonoma[] = {
-		0x55,0x48,0x89,0xe5,0x4c,0x8b,0x4f,0x08,
-		0x4d,0x85,0xc9,0x0f,0x84,0xcc,0x00,0x00,
-		0x00,0x4c,0x89,0xc8,0x48,0xd1,0xe8,0x48,
-		0xb9,0x55,0x55,0x55,0x55,0x55,0x55,0x55
-	};
-	static const uint8_t r_hashfind_mtlps_guard_sonoma[] = {
-		0x31,0xc0,0xc3,0x90,0x90,0x90,0x90,0x90,
-		0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,
-		0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,
-		0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90
-	};
-
-	// V189: Smart AccessComplete patch — MINIMAL variant (Sonoma 14.7.1).
-	// Earlier full-signal-path variant (jumping to loc_7FF8022E40E0) caused full system
-	// deadlock: it called _CGRegionCreateEmptyRegion / CFTypePtr::operator= before the
-	// lock dec, and those CG calls deadlocked against WS-held locks. WS state stayed at
-	// 0x3 (no degrade) but system froze on Apple-logo flash.
-	//
-	// New strategy: jump from prologue +0x2F directly to loc_7FF8022E4150 — the absolute
-	// minimal completion-signal block:
-	//   mov rax, [r15+0x178]                         ; surface backing
-	//   test rax, rax
-	//   jz short loc_7FF8022E4163
-	//   lock dec dword ptr [rax+0x170]               ; ← KERNEL WAKEUP (the only signal)
-	//   mov qword ptr [r15+0x178], 0                 ; clear backing
-	//   <canary check + ret>
-	// No CG calls, no CFTypePtr, no region housekeeping. Just the atomic dec that wakes
-	// the kernel-side waiter, then return.
-	//
-	// Find pattern (16 bytes at function offset +0x2F):
-	//   mov rdi, [rdi+0x178]      48 8B BF 78 01 00 00
-	//   test rdi, rdi              48 85 FF
-	//   jz loc_7FF8022E40B8        0F 84 15 22 00 00     (rel offset 0x2215)
-	// Replace with:
-	//   jmp loc_7FF8022E4150       E9 B8 22 00 00        (rel offset 0x22B8)
-	//   + 11 NOPs
-	static const uint8_t f_accesscomplete_v189_sonoma[] = {
-		0x48,0x8B,0xBF,0x78,0x01,0x00,0x00,
-		0x48,0x85,0xFF,
-		0x0F,0x84,0x15,0x22,0x00,0x00
-	};
-	static const uint8_t r_accesscomplete_v189_sonoma[] = {
-		0xE9,0xB8,0x22,0x00,0x00,
-		0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90,0x90
-	};
-
-	if (getKernelVersion() >= KernelVersion::Ventura) {
-		const bool isRealTGL = MellowCore::callback && MellowCore::callback->isRealTGL;
-		const bool forceFullMTL = shouldForceFullMetalPath();
-		//const bool applyCoreDisplaySafety = isRealTGL || forceFullMTL || !isRealTGL;
-		{
-			const bool fullMTLActive = isRealTGL || forceFullMTL;
-			static bool loggedFullMTL = false;
-			if (!loggedFullMTL) {
-				loggedFullMTL = true;
-				SYSLOG("DYLD", "FULL_MTL_ACTIVE=%d (isRealTGL=%d forceFullMTL=%d)",
-				       fullMTLActive, isRealTGL, forceFullMTL);
-			}
-		}
-		// COMMENTED OUT (2026-05-09): the gate `applyCoreDisplaySafety = isRealTGL || forceFullMTL || !isRealTGL`
-		// is a tautology (A || B || !A == true), so these two patches were always being applied
-		// regardless of mode. Disabling the branch entirely as a diagnostic to see whether the
-		// CoreDisplay assertion bypass and RunFullDisplayPipe NULL guard are actually needed
-		// alongside the V189 signal-path patch. Re-enable if WS/cursor init regresses.
-		/*
-		if (applyCoreDisplaySafety) {
-			const DYLDPatch assertionPatch[] = {
-				{f3b_sonoma, r3b_sonoma, "CoreDisplay assertion bypass (Sonoma)"},
-			};
-			DYLDPatch::applyAll(assertionPatch, const_cast<void *>(data), PAGE_SIZE);
-
-			const DYLDPatch fdpGuardPatch[] = {
-				{f_runfdp_guard_sonoma, r_runfdp_guard_sonoma, "RunFullDisplayPipe NULL vcall guard (Sonoma)"},
-			};
-			DYLDPatch::applyAll(fdpGuardPatch, const_cast<void *>(data), PAGE_SIZE);
-		}
-		*/
-
-		if (!isRealTGL && !forceFullMTL) {
-			// For spoofed (non-TGL) hardware the CoreDisplay MetalDevice is never
-			// validly constructed — its internal mtlDevice field holds an
-			// NSTaggedPointerString rather than a real MTLDevice object.
-			// Stubbing both accessors to NULL prevents objc_msgSend from
-			// dispatching Metal methods onto the garbage pointer.
-			//
-			// Gated on !forceFullMTL: the whole point of -mellowfullmtl on
-			// spoofed hardware is to drive the real Metal path (see
-			// kern_gen11.cpp:7346 and the !wegCoexist || forceFullMTL branches
-			// around kern_gen11.cpp:1075). Stubbing GetMTLTexture /
-			// GetMTLCommandQueue and truncating AccessComplete here would
-			// neuter the very accessors that path needs, so when forceFullMTL
-			// is set we skip these patches and let the real Metal accessors
-			// run. Trade-off: loses the RunFullDisplayPipe isRemovable crash
-			// guard under forceFullMTL — re-add it (with its own gate) if RFDP
-			// hits a NULL vcall on spoofed hardware in that mode.
-			// DISABLED (2026-05-16): GFX pipeline is now robust enough that MetalDevice may
-			// be validly constructed. Stubbing these to NULL blocks real Metal compositing
-			// while other WS code still tries to drive the MTL path → MTLCompilerService
-			// abort loop. Re-enable only if objc_msgSend crashes on a NULL mtlDevice.
-			/*
-			const DYLDPatch getMtlTextureSafetyPatch[] = {
-				{f_getmtltex_sonoma, r_getmtltex_sonoma, "GetMTLTexture return NULL (Sonoma)"},
-			};
-			DYLDPatch::applyAll(getMtlTextureSafetyPatch, const_cast<void *>(data), PAGE_SIZE);
-
-			const DYLDPatch getMtlCommandQueueSafetyPatch[] = {
-				{f_getmtlcq_sonoma, r_getmtlcq_sonoma, "GetMTLCommandQueue return NULL (Sonoma)"},
-			};
-			DYLDPatch::applyAll(getMtlCommandQueueSafetyPatch, const_cast<void *>(data), PAGE_SIZE);
-			*/
-
-			const DYLDPatch isRemovableGuardPatch[] = {
-				{f_isrm_guard_sonoma, r_isrm_guard_sonoma, "RunFullDisplayPipe isRemovable crash guard (Sonoma)"},
-			};
-			DYLDPatch::applyAll(isRemovableGuardPatch, const_cast<void *>(data), PAGE_SIZE);
-
-			// V187 vs V189 selection.
-			// -mellowv189 (opt-in): apply the smart signal-path patch instead of V187.
-			//   V189 lets the prologue run, then jumps from +0x2F to loc_7FF8022E40E0
-			//   (the completion-signal path: lock dec on surface->[+0x178]+0x170).
-			//   This unblocks the WS 234 ms timeout while still avoiding the Metal crash.
-			// Default: V187 (full-stub, safe but never signals — Apple flash freezes).
-			static bool loggedV189Decision = false;
-			const bool wantV189 = checkKernelArgument("-mellowv189");
-			if (!loggedV189Decision) {
-				loggedV189Decision = true;
-				SYSLOG("DYLD", "V189: -mellowv189 detected=%d", wantV189);
-			}
-			if (wantV189) {
-				if (UNLIKELY(KernelPatcher::findAndReplace(const_cast<void *>(data), PAGE_SIZE,
-						f_accesscomplete_v189_sonoma, sizeof(f_accesscomplete_v189_sonoma),
-						r_accesscomplete_v189_sonoma, sizeof(r_accesscomplete_v189_sonoma)))) {
-					SYSLOG("DYLD", "V189: AccessComplete signal-path jump applied");
-				}
-			} else {
-				if (UNLIKELY(KernelPatcher::findAndReplace(const_cast<void *>(data), PAGE_SIZE,
-						f_accesscomplete_guard_sonoma, sizeof(f_accesscomplete_guard_sonoma),
-						r_accesscomplete_guard_sonoma, sizeof(r_accesscomplete_guard_sonoma)))) {
-					SYSLOG("DYLD", "V187: AccessComplete crash guard applied");
-				}
-			}
-
-			// V188: narrower hash-find guard — caused black screen regression, debug only.
-			if (checkKernelArgument("-mellowV188htfind")) {
-				const DYLDPatch hashFindGuardPatch[] = {
-					{f_hashfind_mtlps_guard_sonoma, r_hashfind_mtlps_guard_sonoma, "MTLRenderPipelineState hash::find crash guard V188 (Sonoma)"},
-				};
-				DYLDPatch::applyAll(hashFindGuardPatch, const_cast<void *>(data), PAGE_SIZE);
-			}
-		}
-	}
+    // CoreDisplay GetMTLTexture/GetMTLCommandQueue/AccessComplete bypasses
+    // intentionally removed. Returning NULL, stubbing AccessComplete, or
+    // jumping to its signal block cannot supply GPU work or a valid fence.
+    // Preserve the system implementation and diagnose the real backend error.
 }

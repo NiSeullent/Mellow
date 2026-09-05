@@ -2,6 +2,8 @@
 //  details.
 
 #include "kern_mellow.hpp"
+#include "StartupPolicy.hpp"
+#include "RuntimeReadiness.hpp"
 #include <Headers/kern_api.hpp>
 #include <Headers/plugin_start.hpp>
 
@@ -21,8 +23,30 @@ PluginConfiguration ADDPR(config) {
 	nullptr,
 	0,
 	KernelVersion::Ventura,
-	KernelVersion::Sequoia,
-	[]() { mellowPlugin.init(); },
+	KernelVersion::Tahoe,
+	[]() {
+		const bool tahoeTrial = checkKernelArgument("-mellowtahoe");
+		const bool vesa = checkKernelArgument("-igfxvesa");
+		const bool nativeBackendRequested = checkKernelArgument("-mellownativexe");
+		uint64_t evidence = 0;
+		if (tahoeTrial) evidence |= MellowRuntime::BootOptIn;
+		if (!vesa) evidence |= MellowRuntime::VesaDisabled;
+		const auto readiness = MellowRuntime::evaluate(evidence);
+		const auto admission = MellowStartup::evaluate(static_cast<unsigned>(getKernelVersion()),
+			tahoeTrial, vesa, nativeBackendRequested, MellowRuntime::BackendOwnerIntegrated);
+		if (admission != MellowStartup::Admission::ResearchTrial) {
+			const auto missing = MellowRuntime::firstMissing(readiness.missing);
+			SYSLOG("mellow", "driver callbacks not registered: admission=%u native-xe-stage=%s first-missing=%s verified=0x%llx native-requested=%d",
+				static_cast<unsigned>(admission), MellowRuntime::stageName(readiness.stage),
+				MellowRuntime::evidenceName(missing), static_cast<unsigned long long>(evidence),
+				nativeBackendRequested);
+			return;
+		}
+		SYSLOG("mellow", "legacy Apple-driver research entry admitted, Darwin=%u; native-xe-stage=%s first-missing=%s; hardware execution and Metal support UNVERIFIED",
+			static_cast<unsigned>(getKernelVersion()), MellowRuntime::stageName(readiness.stage),
+			MellowRuntime::evidenceName(MellowRuntime::firstMissing(readiness.missing)));
+		mellowPlugin.init();
+	},
 };
 
 // LILU_CUSTOM_IOKIT_INIT=1

@@ -1,71 +1,54 @@
-name: Build Mellow
+name: Build and validate Mellow
 
 on:
   push:
-    branches: [ "*" ]
   pull_request:
-    branches: [ "*" ]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    name: Build Mellow Kext
-    runs-on: macos-14
+    name: Native Intel build and host tests
+    runs-on: macos-15-intel
+    timeout-minutes: 25
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-
-    - name: Set up Lilu
-      run: |
-        # Download latest Lilu release for compiling dependencies if not present
-        if [ ! -d "Lilu.kext" ]; then
-          echo "Lilu.kext not found, downloading from Acidanthera..."
-          curl -L -o lilu.zip https://github.com/acidanthera/Lilu/releases/download/1.7.2/Lilu-1.7.2-RELEASE.zip
-          unzip lilu.zip
-          rm lilu.zip
-        fi
-
-    - name: Set up MacKernelSDK
-      run: |
-        # Ensure MacKernelSDK is present (submodule fallback)
-        if [ ! -d "MacKernelSDK" ] || [ -z "$(ls -A MacKernelSDK)" ]; then
-          echo "MacKernelSDK not initialized, cloning..."
-          git submodule update --init --recursive || git clone https://github.com/acidanthera/MacKernelSDK.git MacKernelSDK
-        fi
-
-    - name: Validate Source Identity and Metadata
-      run: |
-        plutil -lint Mellow/Info.plist
-        test -f LICENSE
-        test -f NOTICE
-        test -f LICENSES/Lilu-BSD-3-Clause.txt
-        test -f LICENSES/APSL-2.0.txt
-        test ! -e Mellow/IGGucBinary.h
-        test ! -e Mellow/IGHucBinary.h
-        test ! -e Mellow/Firmware.cpp
-        test ! -e Mellow/FirmwareADLP.cpp
-        ! grep -R -E 'NootedGreen|NGreen|ngreen|NGREEN' Mellow Mellow.xcodeproj
-
-    - name: Build Kext
-      run: |
-        xcodebuild -project Mellow.xcodeproj -scheme Mellow -configuration Release CONFIGURATION_BUILD_DIR=build/Release
-
-    - name: Verify Kext
-      run: |
-        test -d build/Release/Mellow.kext
-        test -x build/Release/Mellow.kext/Contents/MacOS/Mellow
-        bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/Release/Mellow.kext/Contents/Info.plist)"
-        test "$bundle_id" = "com.NiSeullent.Mellow"
-
-    - name: Compress and Package Kext
-      run: |
-        cd build/Release
-        zip -r Mellow-Release.zip Mellow.kext
-
-    - name: Upload Build Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Mellow-Release
-        path: build/Release/Mellow-Release.zip
+      - uses: actions/checkout@v4
+      - name: Check pinned dependencies
+        run: |
+          test -f MacKernelSDK/Library/x86_64/libkmod.a
+          test -f Lilu.kext/Contents/Resources/Headers/plugin_start.hpp
+          plutil -lint Mellow/Info.plist
+      - name: Host policy and Metal evidence tests
+        run: |
+          python3 Tools/run-host-tests.py --cxx clang++ --out build/host-tests
+          python3 tests/metal_session_tests.py
+          python3 tests/metal_evidence_tests.py
+          python3 tests/acceptance_cli_tests.py
+          sh -n Tools/collect-boot-evidence.sh
+      - name: Build actual kext with Xcode
+        run: |
+          bash Tools/cross-build-native.sh Release
+      - name: Compile Intel Metal probe
+        run: |
+          xcrun swiftc -swift-version 5 -O -target x86_64-apple-macos13.0 Tools/metal-probe.swift -o build/metal-probe -framework Metal -framework IOKit -framework CryptoKit
+      - name: Package native artifacts
+        run: |
+          mkdir -p build/package
+          bundle=$(python3 -c 'import json,pathlib; a=json.load(open("build/native-Release/build-settings.json")); s=next(x["buildSettings"] for x in a if x.get("target")=="Mellow"); print(pathlib.Path(s["TARGET_BUILD_DIR"])/s["FULL_PRODUCT_NAME"])')
+          cp -R "$bundle" build/package/Mellow.kext
+          cp build/metal-probe build/package/
+          cp build/native-Release/macho-validation.json build/package/
+          printf '%s\n' 'Native build and host tests only. GPU execution on 8086:7D41, Tahoe installation, and Metal acceleration are NOT verified by CI.' > build/package/VALIDATION-SCOPE.txt
+          (cd build/package && zip -r ../Mellow-native-development.zip .)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Mellow-native-development
+          path: |
+            build/Mellow-native-development.zip
+            build/native-Release/*.log
+            build/native-Release/*.json
+            build/host-tests/host-tests.json
+          if-no-files-found: error
