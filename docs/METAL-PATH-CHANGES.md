@@ -1,3 +1,9 @@
+> **Historical record — preserved unedited.** This document predates the MELLOW
+> re-architecture. It is retained because the record of what was known, and when, is itself
+> evidence. For the current concept and architecture see [CONCEPT.md](CONCEPT.md) and
+> [ARCHITECTURE.md](ARCHITECTURE.md); for what any of it is allowed to claim, see
+> [EVIDENCE-POLICY.md](EVIDENCE-POLICY.md).
+
 # 7D41 Metal 경로 수정과 검증 범위
 
 작업 기준은 Mellow `f895d89653ea5cad3a534cce46a62d0f59384d71`이다.

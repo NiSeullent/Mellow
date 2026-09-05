@@ -1,3 +1,9 @@
+> **Historical record — preserved unedited.** Component documentation for the hand-written
+> Intel Xe backend, which compiles into the kext but has no call path
+> ([Mellow/RuntimeReadiness.hpp:84](../Mellow/RuntimeReadiness.hpp)). Scheduled to move to
+> `docs/backends/xe/` in P1. For how these modules map onto the vendor-neutral abstraction
+> see [MGAL.md](MGAL.md); for the current architecture see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 # 7D41 GuC firmware DMA 적재·인증 프로토콜
 
 `Mellow/XeGuCFirmware.*`에는 실제 MMIO 적재 프로토콜과 실패 시 메모리 수명 관리가 구현되어 있다. `XeGuCFirmwareIOKit.*`는 실제 IOPCIDevice, BAR0 매핑, IOBufferMemoryDescriptor 및 IODMACommand 동기화에 연결하는 adapter다. **원본 펌웨어를 사용하는 host 시험은 통과했지만, 물리 7D41에서 적재·BootROM 인증·GPU 실행을 시험한 결과는 없다.** 자동 시작 경로에서 모든 선행조건을 충족하는 GGTT/PAT 소유자는 아직 제공되지 않는다. 빈 callback을 성공으로 바꾸지 않는다.

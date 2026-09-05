@@ -1,127 +1,214 @@
-# Mellow architecture and the Metal target
+# Mellow architecture
 
-Mellow is currently a Lilu patch plug-in around Apple's Tiger Lake graphics
-stack. It is not a complete Xe-LPG kernel driver, user-space Metal driver, or
-shader compiler. The target is full, correct GPU execution; the present design
-is only one compatibility hypothesis for reaching it.
+> **Design draft; implementation status is separate.**
+> [PLATFORM-DECISIONS](PLATFORM-DECISIONS.md) and [PLATFORM-ARCHITECTURE](PLATFORM-ARCHITECTURE.md)
+> take precedence over conflicting assumptions below. [IMPLEMENTATION-STATUS](IMPLEMENTATION-STATUS.md)
+> records the runnable policy/intake code. No GPU, Metal, WindowServer or display acceptance has passed.
 
-All runtime behavior discussed below is **UNVERIFIED on hardware** unless an
-experiment record says otherwise.
+## 한글 요약
 
-## Current compatibility stack
+Mellow는 5개 평면으로 구성된다. **Plane 4** MellowMTL(Metal 2/3 표면 + AIR JIT),
+**Plane 3** MellowRT(워크로드 라우터와 GL/CL 제공자), **Plane 2** MGAL(벤더 중립 GPU 계약과
+MELLOW-UAPI), **Plane 1** backend 모듈과 MellowKPI, **Plane 0** `mellow-port` 백포팅 파이프라인.
+평면 사이는 좁고 명시적인 계약으로만 연결되며, 각 평면은 아래 평면 없이도 단독으로 시험할 수 있다.
+기존 Intel Xe 조각에는 통합 composition root가 없다. 새 정책/intake 코드는 별도로
+구현되어 있으며 실제 GPU/provider에 연결되지 않았다.
+아래 모든 서술은 별도 표기가 없는 한 **하드웨어 미검증**이다.
 
-```mermaid
-flowchart TB
-  OC[OpenCore DeviceProperties\n9A49 spoof + platform-id] --> IOREG[IORegistry IGPU]
-  HW[Physical Core Ultra iGPU] --> PCI[Mellow physical PCI + CPU gate]
-  LILU[Lilu] --> MEL[Mellow.kext]
-  PCI --> MEL
-  MEL --> IOAF[IOAcceleratorFamily2 patches]
-  MEL --> TGLFB[AppleIntelTGLGraphicsFramebuffer]
-  MEL --> TGLGFX[AppleIntelTGLGraphics]
-  MEL --> DYLD[DYLD/CoreDisplay diagnostics and workarounds]
-  IOREG --> TGLFB
-  TGLFB --> DISP[Display engine / scanout]
-  TGLGFX --> IOAF
-  TGLMTL[Expected Apple TGL MTL/GL/VA bundles] --> IOAF
-  DYLD --> TGLMTL
-  TGLFB --> HW
-  TGLGFX --> HW
-```
+---
 
-The important boundaries are:
+All runtime behavior described below is **UNVERIFIED on hardware** unless an experiment record
+says otherwise. See [EVIDENCE-POLICY.md](EVIDENCE-POLICY.md).
 
-- OpenCore properties present a TGL-compatible identity to Apple's matching
-  logic. Mellow separately reads the physical PCI configuration identity so an
-  injected `device-id` cannot bypass its Ultra allow-list.
-- Mellow routes symbols and applies binary patches in Apple framebuffer,
-  accelerator, IOAccelerator, and selected user-space paths. Many of these are
-  inherited or OS-build-specific experiments.
-- Apple TGL binaries remain responsible for most memory management, context
-  creation, command encoding, shader handling, and display behavior. A source
-  hook being present does not demonstrate that those binaries satisfy Xe-LPG
-  hardware contracts.
-- Mellow's ADL-P DMC mode is a compatibility profile plus Apple-initializer
-  fallback. It is not a native Meteor/Arrow Lake firmware implementation.
-- Mellow does not redistribute Apple graphics binaries. The required bundle
-  source, version match, integrity, and lawful installation are external
-  deployment concerns and must be documented for each test environment.
-
-## Full acceleration target
+## The five planes
 
 ```mermaid
 flowchart TB
-  API[Metal API / WindowServer] --> CAPS[Truthful capabilities and resource model]
-  CAPS --> COMP[MSL/Metal IR compiler path]
-  COMP --> ISA[Xe-LPG-compatible shader ISA + metadata]
-  API --> IOABI[IOAccelerator user/kernel ABI]
-  IOABI --> RES[Buffers, textures, heaps, residency]
-  RES --> VM[GGTT/PPGTT, GPU VA, IOMMU, cache coherency]
-  IOABI --> QUEUE[Command queues, contexts, rings/doorbells]
-  ISA --> QUEUE
-  QUEUE --> GPU[Xe-LPG engines]
-  GPU --> SYNC[Interrupts, fences, events, fault reporting]
-  SYNC --> API
-  GPU --> DISPLAY[Framebuffer, planes, timing, hotplug]
-  DISPLAY --> COMPOSITOR[Hardware-backed presentation]
-  PM[Reset, firmware, power, clocks, sleep/wake] --> GPU
-  PM --> DISPLAY
+  APP[Metal application / WindowServer]
+  APP --> P4
+
+  subgraph P4["Plane 4 — MellowMTL (user space)"]
+    MTL[Metal 2/3 object model<br/>device, queue, encoders, resources]
+    JIT[MellowJIT<br/>AIR to MIR to backend IR]
+    MTL --> JIT
+  end
+
+  subgraph P3["Plane 3 — MellowRT (user space)"]
+    ROUTE[Workload router<br/>gl / cl / native / cpu]
+    RES[Resource model<br/>storage modes, IOSurface interop]
+    ROUTE --- RES
+  end
+
+  subgraph PROV["Providers"]
+    HOSTGL[Host: OpenGL.framework 4.1<br/>OpenCL.framework]
+    MELGL[Mellow: libMellowGL / libMellowCL<br/>Mesa-derived]
+  end
+
+  subgraph P2["Plane 2 — MGAL + MELLOW-UAPI"]
+    UAPI[MELLOW-UAPI<br/>DRM-shaped IOUserClient]
+    GAL[MGAL interfaces<br/>device, mmio, memory, vm, queue,<br/>fence, firmware, display, compiler]
+    UAPI --> GAL
+  end
+
+  subgraph P1["Plane 1 — Backend modules (kernel)"]
+    KPI[MellowKPI<br/>LinuxKPI for XNU]
+    XE[mellow-xe]
+    AMD[mellow-amdgpu]
+    NOVA[NVIDIA adapter TBD]
+    AC[applecompat]
+    KPI --- XE
+    KPI --- AMD
+    KPI --- NOVA
+  end
+
+  P4 --> P3
+  P3 --> PROV
+  HOSTGL -.-> APPLEDRV[Apple's own GPU driver]
+  MELGL --> P2
+  P2 --> P1
+  P1 --> HW[Physical GPU]
+
+  P0[["Plane 0 — mellow-port<br/>Linux driver source to backend module"]] -.generates.-> P1
 ```
 
-A complete port must preserve Metal's resource, ordering, synchronization, and
-error semantics across every arrow. Capability flags may be exposed only after
-the corresponding path produces correct results.
+The important property is that **pure-logic contracts in each plane are host-testable; end-to-end validation still requires the lower provider**:
+
+- Plane 4 can be tested on a specifically admitted accelerated CL provider and compiler path; no Mellow kext is required for that host subset.
+- Plane 3 can be validated against either provider kind.
+- Plane 2's pure-logic halves already run in host tests today, with emulated MMIO and ownership
+  callbacks ([Tools/run-xe-tests.py](../Tools/run-xe-tests.py)).
+- Plane 0 is validated by regenerating a backend that already exists in hand-written form.
+
+## Plane 4 — MellowMTL
+
+Provides the Metal API surface and compiles shaders for whatever substrate Plane 3 selects.
+
+The first target is an explicit off-screen subset, not a GPU-family claim. `supportsFamily` remains
+false until all mandatory requirements of that family pass, not merely a conformance subset.
+`MTL4*` — the next-generation surface present in Tahoe's `Metal.framework` — is out of scope.
+
+The shader path begins with versioned SDK-generated AIR. Runtime MSL needs a verified compiler
+adapter or a separately implemented frontend; framework symbols alone are insufficient. See [METAL-EMULATION.md](METAL-EMULATION.md),
+[SHADER-JIT.md](SHADER-JIT.md), and [AIR-ABI.md](AIR-ABI.md).
+
+## Plane 3 — MellowRT
+
+Owns resources and validates routes within an admitted device/provider domain. Cross-provider
+sharing requires explicit ownership, visibility and ordering contracts.
+
+Two kinds of provider exist, and they correspond to the two halves of the thesis in
+[CONCEPT.md](CONCEPT.md):
+
+| Provider kind | Backing | Applies to |
+| --- | --- | --- |
+| **Host** | Apple `OpenGL.framework` (4.1 core) and `OpenCL.framework` | GPUs that already have an accelerated Apple driver |
+| **Mellow** | `libMellowGL` / `libMellowCL`, Mesa-derived, running on MGAL | GPUs with no macOS driver at all |
+
+The router's `cpu` path exists only to produce reference values for tests. It is unreachable
+without explicit opt-in, and work completed through it is observably marked. See
+[WORKLOAD-RUNTIME.md](WORKLOAD-RUNTIME.md).
+
+## Plane 2 — MGAL and MELLOW-UAPI
+
+MGAL is the vendor-neutral GPU contract. It is not a new invention: the existing `Xe*` modules
+already separate freestanding C++17 logic from IOKit binding through POD function-pointer ops
+structs, and MGAL is the promotion of those ops structs into named interfaces.
+
+MELLOW-UAPI is the user/kernel boundary, deliberately shaped like DRM's ioctl surface
+(`GEM_CREATE`, `GEM_MMAP`, `VM_BIND`, `EXEC`, `SYNCOBJ_*`) so that Mesa winsys code ports
+mechanically. See [MGAL.md](MGAL.md) and [MELLOW-UAPI.md](MELLOW-UAPI.md).
+
+## Plane 1 — Backend modules and MellowKPI
+
+MellowKPI is a Linux-kernel API compatibility layer for XNU, following the approach FreeBSD's
+`drm-kmod` uses to run Linux i915 and amdgpu with minimal modification. Backend modules are
+compiled Linux driver sources plus a small generated glue layer. See [MELLOWKPI.md](MELLOWKPI.md).
+
+`applecompat` names the retained legacy Apple-compatibility research path. An ICL-focused
+experiment is proposed; the inspected Recovery inventory also contains other Intel framebuffers. See
+[LEGACY-DISPOSITION.md](LEGACY-DISPOSITION.md).
+
+## Plane 0 — mellow-port
+
+The host toolchain that turns a Linux driver tree into a backend module: SPDX license gate,
+machine extraction of register and PCI-ID tables, KPI symbol resolution with a gap report, glue
+emission, cross-compilation, and provenance recording. See
+[BACKPORT-PIPELINE.md](BACKPORT-PIPELINE.md) and [ADDING-A-GPU.md](ADDING-A-GPU.md).
+
+## Current state versus the target
+
+The legacy GPU work contains two disjoint stacks, and neither reaches a GPU. New Runtime/intake
+code is separate and does not close those execution paths.
+
+```mermaid
+flowchart TB
+  LILU[Lilu] --> CORE[MellowCore init / processPatcher]
+  CORE --> LEG[Legacy stack: kern_gen11, kern_genx<br/>~12k LOC of Apple TGL/ICL patching]
+  LEG -.->|TGL absent from inspected Recovery inputs| DEAD[prerequisite unavailable in inspected inputs]
+  CORE -.->|no call path| XE[Xe backend: 20 cpp files]
+  XE -.->|no IOKit owner| NOWHERE[never constructed]
+```
+
+- The `Xe*` modules compile into the kext but have **zero call sites**; `#include "Xe` appears
+  nowhere outside `Mellow/Xe*`. There is no IOKit provider, workloop, or reset epoch that
+  constructs them. This is recorded at
+  [Mellow/RuntimeReadiness.hpp:84](../Mellow/RuntimeReadiness.hpp) and analysed in
+  [NATIVE-XE-BACKEND-AUDIT.md](NATIVE-XE-BACKEND-AUDIT.md).
+- The intended landing site exists but is unfinished: the `IOResources` personality at
+  [Mellow/Info.plist](../Mellow/Info.plist) has no backing class, because the `IOService`
+  subclass at [Mellow/kern_start.cpp:52](../Mellow/kern_start.cpp) is commented out and
+  `LILU_CUSTOM_IOKIT_INIT` is not defined.
+- TGL acceleration binaries targeted by the legacy stack were not found in the inspected
+  Recovery artifacts; full installed-system/optional-component coverage has not been established.
 
 ## Gap analysis
 
-| Boundary | Current approach | Major unknown or gap | Evidence required to close it |
+| Boundary | Current state | Major gap | Evidence required to close it |
 | --- | --- | --- | --- |
-| Hardware identity | Physical CPU/GPU pair gate plus injected TGL identity | Whether all admitted IDs share the assumed register and engine contracts | PCI config and generation-specific register evidence per ID |
-| Probe/BAR | `IOPCIDevice` access and BAR0/BAR2 mapping helpers | Positive map evidence, legal offsets, coherency, and teardown lifetime | Map length/base metadata plus repeated safe read and clean detach |
-| Firmware/reset/power | Apple CSR fallback with TGL/ADL-P compatibility sequences | Xe-LPG firmware expectations, sequencing, timeout behavior, and recovery | Firmware status, force-wake/reset traces, bounded timeout and recovery test |
-| Display | TGL framebuffer patches, compatibility topology, optional target timing writes | PHY/link training, CDCLK, DDI/Type-C topology, hotplug, PSR, and modeset differences | Register/log trace against a reference plus modeset and CRC/capture tests |
-| GPU virtual memory | Apple TGL allocator and inherited GGTT/context patches | PTE format, address widths, PAT/cache policy, IOMMU interaction, invalidation | Mapped-address audit, read/write test, fault decoding, teardown test |
-| Command submission | Apple TGL command path plus experimental ring/context hooks | Context image format, engine registers, doorbells, scheduling, preemption | One NOP/copy with head/tail, batch bytes, IRQ, fence, and output correlation |
-| Interrupt/synchronization | Apple handlers plus stamp/wait workarounds | Correct interrupt routing, acknowledgement, ordering, and fence progression | Before/after counters and timestamps; no forced-success path in proof test |
-| IOAccelerator ABI | Patched IOAcceleratorFamily2 checks and routed methods | Object layouts and feature contracts for the exact macOS build | Versioned symbol/layout audit plus deterministic buffer lifecycle test |
-| Metal device/capabilities | Expected TGL MTL bundle names and load-path diagnostics | Whether a real device is constructed and features are truthful | API probe, logs, capability matrix, negative tests for unsupported features |
-| Shader path | Relies implicitly on Apple's TGL user-space path | Whether emitted code/metadata is valid for Xe-LPG; no Mellow compiler exists | Captured compile diagnostics and a minimal shader with verified GPU output |
-| Presentation | CoreDisplay/WindowServer workarounds | Correct surface ownership, hazard tracking, completion, and scanout | Hardware counters, IOSurface contents, display capture, no CPU fallback |
-| Lifecycle | Scattered guards and inherited power paths | Reset-on-hang, sleep/wake, modeset, memory pressure, multi-process behavior | Repeated test matrix with panic/hang collection and known-good recovery |
+| Metal API surface | None. Info.plist names unverified Apple bundles absent from inspected Recovery inputs | No Mellow-owned `MTLDevice` exists | Device enumerated from Mellow, correlated to a physical PCI device |
+| Shader path | Intel OpenCL C to ZEBIN harness only; unrelated to Metal | No AIR reader, no MIR, no lowering | A Metal function compiled through MellowJIT producing a correct GPU result |
+| Workload routing | None | No resource model, no provider abstraction | Same command buffer producing identical results on two providers |
+| Vendor-neutral abstraction | Ops structs exist per `Xe*` module, Intel-specific | No named interfaces; device identity duplicated in ≥7 places | Two backends implementing the same interfaces with a shared test suite |
+| Composition root | Absent | Nothing constructs MMIO, VM, firmware, IRQ, fence, or context objects as one reset epoch | A provider that owns one epoch and tears it down cleanly |
+| User/kernel ABI | Absent | No IOUserClient, no selector contract | A round-trip allocation and mapping from user space |
+| Linux compatibility layer | Absent | No `linux/*` or `drm/*` headers for XNU | An unmodified upstream driver file compiling against MellowKPI |
+| Backport automation | Source intake/report and bounded extraction exist | Complete semantic translation and XNU binding generation are absent | Reviewed backend regeneration remains a target |
+| Firmware | Fetch-and-verify tooling only, Intel GuC | Per-vendor firmware handling; authentication unproven | Firmware loaded and authenticated by the device |
+| Display | TGL/ICL framebuffer patching; `DisplayMergeNub` personality is live | No Mellow-owned modeset or scanout | A modeset performed through Mellow with captured output |
+| Multi-vendor support | None. No AMD or NVIDIA code exists | Everything above, per vendor | Per-backend matrices in [GPU-SUPPORT-MATRIX.md](GPU-SUPPORT-MATRIX.md) |
 
-## Compatibility strategy versus a deeper port
+## Design invariants
 
-The current TGL-spoof strategy is viable only if measurement shows that the
-Apple TGL stack's command ABI, memory model, and emitted shader code are usable
-on the target Xe-LPG GPU after a bounded set of generation adaptations.
+These hold across all planes and are not negotiable per component.
 
-Two paths remain open:
-
-1. **Compatibility path:** retain Apple TGL framebuffer, accelerator, and Metal
-   components; implement only measured register, topology, VM, submission, and
-   synchronization differences. This is the smallest path but must be rejected
-   if ISA/ABI or resource semantics are incompatible.
-2. **Translation/reimplementation path:** introduce an explicit user/kernel ABI
-   adapter and possibly a shader IR/backend when the Apple component cannot
-   correctly target Xe-LPG. This is much larger and requires clean-room design,
-   source/license tracking, conformance tests, and an explicit fallback policy.
-
-Do not choose between them from device enumeration alone. The decision point is
-a minimal command and shader experiment with captured inputs, output bytes,
-engine progress, and synchronization evidence.
+1. **Hardware-independent logic is separated from platform binding.** Every module splits into a
+   freestanding C++17 core (no IOKit, no allocation, fixed-size arrays) and a thin binding layer
+   that supplies effects through a POD ops struct. This is the existing pattern and it is why the
+   host test suite can exercise production source directly.
+2. **Device identity comes from one table.** The current tree contradicts this — `7D41` appears 39
+   times across 26 files, and admission logic is duplicated in at least four `*IOKit` files while
+   [Mellow/kern_model.hpp](../Mellow/kern_model.hpp) already holds a proper table. Consolidating
+   this is the first task of P1.
+3. **No capability is exposed before its conformance test passes.** Enforced by the readiness
+   ladder, extended per backend.
+4. **No path manufactures success.** See [EVIDENCE-POLICY.md](EVIDENCE-POLICY.md).
+5. **Upstream references are pinned by commit SHA**, and every ingested file's license is
+   recorded. See [LICENSING.md](LICENSING.md).
 
 ## Incremental implementation order
 
-1. Freeze toolchain, macOS build, driver bundle versions, EFI, and recovery.
-2. Prove physical identity, expected driver selection, and BAR mapping (`E0001`).
-3. Add read-only register/status instrumentation with cited Xe-LPG definitions.
-4. Prove reset/force-wake and a single command completion without forced fences.
-5. Validate GPU VM with a bounded copy and fault-aware teardown.
-6. Establish compute correctness before display compositing.
-7. Establish off-screen render correctness before WindowServer integration.
-8. Probe Metal features individually and expose only verified capabilities.
-9. Add lifecycle, fault recovery, regression, and performance testing.
+The order is chosen so that each step is independently verifiable and failures are attributable to
+one boundary. Full detail in [ROADMAP.md](ROADMAP.md).
 
-Each step ends in a small commit and an experiment record. If a step fails, the
-next change must target that failure boundary rather than broadening the patch
-set.
+1. Freeze the concept and the interfaces in documentation (this set).
+2. Extract MGAL from the existing `Xe*` modules; collapse duplicated device identity into one table.
+3. Build the composition root and MELLOW-UAPI; make the Xe backend reachable.
+4. Build MellowKPI and the backport pipeline; regenerate the Xe backend from Linux source.
+5. Build versioned AIR/MIR to OpenCL C lowering; gate a SPIR-V IL route on provider support.
+6. Build MellowMTL interposition; run a Metal compute workload end to end.
+7. Add the graphics path and the OpenGL provider.
+8. Implement reviewed amdgpu and selected NVIDIA adapters; bring up RX 9070 and RTX 3080/3090.
+9. Add native submission, display ownership, and the Metal 3 subset.
+
+Each step ends in a commit and an experiment record. If a step fails, the next change targets that
+failure boundary rather than broadening the patch set.

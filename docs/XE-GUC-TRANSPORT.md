@@ -1,3 +1,9 @@
+> **Historical record — preserved unedited.** Component documentation for the hand-written
+> Intel Xe backend, which compiles into the kext but has no call path
+> ([Mellow/RuntimeReadiness.hpp:84](../Mellow/RuntimeReadiness.hpp)). Scheduled to move to
+> `docs/backends/xe/` in P1. For how these modules map onto the vendor-neutral abstraction
+> see [MGAL.md](MGAL.md); for the current architecture see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 # GuC CTB/HXG transport implementation (0.3 research)
 
 This change implements the GuC wire transport and a real checked IOKit MMIO adapter. It does not claim that the Galaxy Book has executed GuC firmware, an engine batch, or a Metal shader. The shipped default proof callbacks are unavailable. Merely parsing the firmware CSS header cannot authorize a register write.

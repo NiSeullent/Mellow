@@ -1,3 +1,9 @@
+> **Historical record — preserved unedited.** Component documentation for the hand-written
+> Intel Xe backend, which compiles into the kext but has no call path
+> ([Mellow/RuntimeReadiness.hpp:84](../Mellow/RuntimeReadiness.hpp)). Scheduled to move to
+> `docs/backends/xe/` in P1. For how these modules map onto the vendor-neutral abstraction
+> see [MGAL.md](MGAL.md); for the current architecture see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 # Xe memory implementation for the 7D41 research target
 
 This revision contains working C++ memory bookkeeping, page-entry encoders and an

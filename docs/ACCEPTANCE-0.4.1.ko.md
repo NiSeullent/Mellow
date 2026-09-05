@@ -1,3 +1,9 @@
+> **Historical record — preserved unedited.** This document predates the MELLOW
+> re-architecture. It is retained because the record of what was known, and when, is itself
+> evidence. For the current concept and architecture see [CONCEPT.md](CONCEPT.md) and
+> [ARCHITECTURE.md](ARCHITECTURE.md); for what any of it is allowed to claim, see
+> [EVIDENCE-POLICY.md](EVIDENCE-POLICY.md).
+
 # 0.4.1 부팅·GPU 검증 절차
 
 현재 판정은 **7D41 Metal 가속 미완성 / 실기 부팅·설치 미검증**이다.
