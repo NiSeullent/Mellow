@@ -105,6 +105,8 @@ def main():
     ap.add_argument('--iasl',default='iasl'); ap.add_argument('--cache',type=Path,default=ROOT/'build/dependencies')
     args=ap.parse_args(); out=args.out.resolve(); native=args.native.resolve()
     if out.exists(): raise SystemExit('Output directory already exists; choose a new empty output path')
+    if subprocess.check_output(['git','status','--porcelain','--untracked-files=all'],cwd=ROOT,text=True).strip():
+        raise ValueError('Package assembly requires a clean, fully committed source checkout')
     source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
     if (native/'source-commit.txt').read_text().strip()!=source_commit: raise ValueError('Native binary belongs to a different source commit')
     if not json.loads((native/'kernel-simd-audit.json').read_text())['passed']: raise ValueError('Kernel SIMD audit failed')
@@ -179,7 +181,7 @@ def main():
     treecopy(ROOT/'LICENSES',licenses/'Mellow-component-licenses')
     for name in ('sequoia-probe','tahoe-diag-client','metal-probe'):
         shutil.copy2(native/name,tools/name); (tools/name).chmod(0o755)
-    for name in ('personalize-255u.py','validate-255u-package.py','metal-run.py','metal-probe.swift','collect-mellow-logs.sh'):
+    for name in ('personalize-255u.py','validate-255u-package.py','metal-run.py','metal-probe.swift','collect-255u-logs.sh'):
         shutil.copy2(ROOT/'Tools'/name,tools/name)
     for name in ('macho-validation.json','kernel-simd-audit.json','source-commit.txt','xcode-version.txt','build-host-version.txt','cgl-attempt-exit-code.txt','VALIDATION-SCOPE.txt'):
         if (native/name).exists(): shutil.copy2(native/name,verification/name)

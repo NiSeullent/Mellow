@@ -38,6 +38,7 @@ jobs:
           PY
       - name: Host boundary tests on the native compiler
         run: |
+          python3 tests/sanitizer_policy_tests.py
           python3 Tools/run-255u-tests.py --cxx clang++ --out build/255u-native/host-tests
           python3 Tools/run-render-shader-tests.py --cxx clang++ --sanitize --out build/255u-native/render-shader
           python3 tests/opengl_provider_report_tests.py
@@ -80,6 +81,7 @@ jobs:
           path: build/native-artifact
       - name: Independent Linux host controls
         run: |
+          python3 tests/sanitizer_policy_tests.py
           python3 Tools/run-255u-tests.py --cxx clang++ --out build/255u-linux
           python3 Tools/generate-255u-acpi.py --check
           python3 Tools/run-xe-ggtt-tests.py

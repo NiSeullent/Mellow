@@ -7,6 +7,8 @@ from pathlib import Path
 import shutil
 import subprocess
 import tempfile
+import json
+from sanitizer_policy import sanitizer_environment
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -28,8 +30,8 @@ def main():
                    str(ROOT / 'tests/xe_ggtt_tests.cpp'), '-o', str(binary)]
         print(' '.join(command), flush=True)
         subprocess.run(command, check=True, timeout=120)
-        env = dict(os.environ, ASAN_OPTIONS='detect_leaks=1:halt_on_error=1',
-                   UBSAN_OPTIONS='halt_on_error=1:print_stacktrace=1')
+        env, scope = sanitizer_environment()
+        print(json.dumps({'sanitizer_runtime_policy': scope}), flush=True)
         subprocess.run([str(binary)], check=True, env=env, timeout=60)
     return 0
 

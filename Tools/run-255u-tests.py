@@ -2,6 +2,7 @@
 """Compile and run physical-probe/GGTT/CGL boundary tests; never claims target hardware execution."""
 import argparse, hashlib, json, os, shlex, subprocess
 from pathlib import Path
+from sanitizer_policy import sanitizer_environment
 ROOT=Path(__file__).resolve().parents[1]
 def main():
     p=argparse.ArgumentParser(description=__doc__)
@@ -30,7 +31,7 @@ def main():
             item['compile']={'returncode':build.returncode,'stdout':build.stdout,'stderr':build.stderr}
             if build.returncode:
                 success=False; print(build.stderr); continue
-            env=os.environ.copy(); env['UBSAN_OPTIONS']='halt_on_error=1:print_stacktrace=1'
+            env, item['sanitizer_runtime_policy'] = sanitizer_environment()
             run=subprocess.run([str(binary)],capture_output=True,text=True,timeout=90,env=env)
             item['execution']={'returncode':run.returncode,'stdout':run.stdout,'stderr':run.stderr}
             item['passed']=run.returncode==0

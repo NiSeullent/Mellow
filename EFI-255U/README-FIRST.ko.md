@@ -72,7 +72,7 @@ macOS 진입 후 실제 Mellow 진단 조회:
 
 ```sh
 sudo ./Tools/sequoia-probe
-sudo sh ./Tools/collect-mellow-logs.sh ./PRIVATE-MELLOW-EVIDENCE
+sudo sh ./Tools/collect-255u-logs.sh ./PRIVATE-MELLOW-EVIDENCE
 ```
 
 수집 폴더는 자동 공개하지 않습니다. 로그에 개인 정보가 있는지 확인한 뒤 공유하십시오. 물리 진단 서비스가 없거나 상태 변화·D0·BAR 검사가 실패하면 도구가 실패 코드로 종료합니다.

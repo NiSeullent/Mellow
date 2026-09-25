@@ -57,3 +57,18 @@ The CI retains the real compiler output, disassembly audit, host-test evidence a
 ## Public-data boundary
 
 Original SysReport, DSDT/SSDT dumps, MSDM, licensing keys, personal Bluetooth names, access tokens, and private agent logs are not release inputs. Own source/SSDTs, sanitized hardware identity, dependency hashes, binaries and actual bounded validation reports are public. This is not a macOS installer and contains no Apple GPU-driver binaries or recovery image.
+
+## Continuation build corrections
+
+The first native EFI workflow built the actual kext but stopped because Apple's Xcode
+AddressSanitizer runtime rejected `detect_leaks=1`. The shared sanitizer policy now keeps
+ASan and UBSan fatal on both macOS and Linux, enables leak detection on Linux, and explicitly
+records macOS leak checking as not performed. No failed workload is retried without
+instrumentation. Platform-policy regressions run before the native and Linux suites.
+
+Release validation additionally checks every referenced UEFI driver/tool, bounded PE32+
+and Mach-O headers, kext dependency order, the exact Mellow binary digest from the native
+build receipt, and complete/unique manifest coverage. Negative controls corrupt filenames,
+binary bytes, readiness claims and the checksum manifest. Assembly refuses a dirty source
+checkout or a native artifact from a different commit. The original general log collector
+is preserved; the scoped target collector is separately named `collect-255u-logs.sh`.

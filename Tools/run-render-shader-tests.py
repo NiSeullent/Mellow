@@ -9,10 +9,12 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+from sanitizer_policy import sanitizer_environment
 
 ROOT = Path(__file__).resolve().parents[1]
 INPUTS = ['Runtime/RenderShaderJit.hpp', 'Runtime/RenderShaderJit.cpp',
-          'tests/render_fixture.hpp', 'tests/render_shader_tests.cpp', 'Tools/run-render-shader-tests.py']
+          'tests/render_fixture.hpp', 'tests/render_shader_tests.cpp', 'Tools/run-render-shader-tests.py',
+          'Tools/sanitizer_policy.py']
 
 
 def digest(path):
@@ -37,7 +39,7 @@ def main():
     env = os.environ.copy()
     env['PATH'] = str(Path(compiler).resolve().parent) + os.pathsep + env.get('PATH', '')
     if args.sanitize:
-        env.update(ASAN_OPTIONS='detect_leaks=1:halt_on_error=1', UBSAN_OPTIONS='halt_on_error=1')
+        env, report['sanitizer_runtime_policy'] = sanitizer_environment(env)
     passed = False
     try:
         binary = output / ('render-shader-tests.exe' if os.name == 'nt' else 'render-shader-tests')
@@ -55,6 +57,8 @@ def main():
         command = [str(binary), str(output / 'triangle.vert'), str(output / 'gradient.frag')]
         process = subprocess.run(command, capture_output=True, text=True, env=env, timeout=60)
         report['test'] = {'exit_code': process.returncode, 'stdout': process.stdout, 'stderr': process.stderr}
+        if process.returncode:
+            raise ValueError('Frontend test process failed; inspect the recorded runtime stderr')
         result = json.loads(process.stdout)
         if process.returncode or result.get('failures') != 0 or type(result.get('checks')) is not int or result['checks'] < 900:
             raise ValueError('Frontend runtime checks failed')

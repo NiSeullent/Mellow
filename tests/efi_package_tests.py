@@ -63,6 +63,29 @@ class PackageControls(unittest.TestCase):
                     self.assertNotIn(name.name.lower(),('sysreport.zip','msdm.aml','dsdt.aml','task-cgl.txt','task-ggtt.txt'))
                     self.assertNotIn(name.suffix.lower(),('.ttf','.otf','.woff','.woff2','.pf2','.fon','.fnt'))
 
+    def test_exact_manifest_rejects_unlisted_files_and_duplicate_entries(self):
+        with tempfile.TemporaryDirectory(prefix='mellow-manifest-controls-') as temp:
+            root=Path(temp)/'package';shutil.copytree(PACKAGE,root)
+            extra=root/'unexpected.txt';extra.write_text('not in the source release')
+            with self.assertRaises(ValueError): V.validate(root,True)
+            extra.unlink()
+            manifest=root/'SHA256SUMS';original=manifest.read_text()
+            manifest.write_text(original+original.splitlines()[0]+'\n')
+            with self.assertRaises(ValueError): V.validate(root,True)
+
+    def test_uefi_traversal_and_wrong_executable_rejected(self):
+        with tempfile.TemporaryDirectory(prefix='mellow-path-controls-') as temp:
+            root=Path(temp)/'package';shutil.copytree(PACKAGE,root)
+            config=root/'EFI/OC/config.plist';original=config.read_bytes()
+            cfg=plistlib.loads(original)
+            cfg['UEFI']['Drivers'][0]['Path']='../OpenCore.efi'
+            config.write_bytes(plistlib.dumps(cfg))
+            with self.assertRaises(ValueError): V.validate(root)
+            config.write_bytes(original)
+            binary=root/'EFI/OC/Kexts/Mellow.kext/Contents/MacOS/Mellow'
+            data=bytearray(binary.read_bytes());data[-1]^=1;binary.write_bytes(data)
+            with self.assertRaises(ValueError): V.validate(root)
+
     def test_corruptions_rejected(self):
         with tempfile.TemporaryDirectory(prefix='mellow-negative-package-') as temp:
             root=Path(temp)/'package';shutil.copytree(PACKAGE,root)
