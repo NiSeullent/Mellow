@@ -1,0 +1,34 @@
+name: Sequoia 255U reproducible host tools
+on:
+  push:
+    branches: [sequoia-255u-20260925]
+    paths: [.github/workflows/sequoia-host-tools.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-tools:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ACPICA disassembler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends acpica-tools
+      - name: Package build inputs and tool provenance
+        run: |
+          mkdir -p build/host-tools
+          cp /usr/bin/iasl build/host-tools/
+          iasl -v > build/host-tools/iasl-version.txt
+          dpkg-query -W acpica-tools > build/host-tools/package-version.txt
+          ldd /usr/bin/iasl > build/host-tools/iasl-libraries.txt
+          git rev-parse HEAD > build/host-tools/source-commit.txt
+          git archive --format=tar.gz HEAD > build/host-tools/Mellow-source.tar.gz
+          sha256sum build/host-tools/iasl build/host-tools/Mellow-source.tar.gz > build/host-tools/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sequoia-255u-host-tools
+          path: build/host-tools/
+          retention-days: 7
+          if-no-files-found: error
