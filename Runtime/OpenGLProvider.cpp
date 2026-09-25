@@ -260,7 +260,7 @@ struct OpenGLProvider::Impl {
 #elif defined(__APPLE__)
         require(!visible, "CGL provider supports offscreen FBO rendering only; visible presentation is unsupported");
         const CGLPixelFormatAttribute attributes[] = {
-            kCGLPFAOpenGLProfile, static_cast<CGLPixelFormatAttribute>(kCGLOGLPVersion_4_1_Core),
+            kCGLPFAOpenGLProfile, static_cast<CGLPixelFormatAttribute>(kCGLOGLPVersion_GL4_Core),
             kCGLPFAAccelerated, kCGLPFANoRecovery,
             kCGLPFAColorSize, static_cast<CGLPixelFormatAttribute>(24),
             kCGLPFAAlphaSize, static_cast<CGLPixelFormatAttribute>(8),

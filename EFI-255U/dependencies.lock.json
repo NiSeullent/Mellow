@@ -70,7 +70,13 @@
       "sha256": "d5483298736ba4b3b82c7203d9a46968c668fb7af732b8b22c2096deb0acf83f",
       "github_digest": null,
       "license_source": "https://github.com/acidanthera/VoodooPS2/blob/bdbf80639936701337f4574bae8c3ea25bb8dd3d/LICENSE.md",
-      "license_sha256": "a39052e57440a9ed957bf57b2f5690853e283db8b211267422e2e81f39ea5c94"
+      "license_sha256": "a39052e57440a9ed957bf57b2f5690853e283db8b211267422e2e81f39ea5c94",
+      "corresponding_source": {
+        "url": "https://api.github.com/repos/acidanthera/VoodooPS2/tarball/bdbf80639936701337f4574bae8c3ea25bb8dd3d",
+        "asset": "VoodooPS2-bdbf80639936701337f4574bae8c3ea25bb8dd3d.tar.gz",
+        "sha256": "018906860e1fd7898565547391db6f45ab000e40f16686c133eaf441bc39c78f",
+        "bytes": 1010042
+      }
     },
     {
       "name": "RealtekRTL8111",
@@ -83,7 +89,25 @@
       "bytes": 180409,
       "sha256": "a0f2e64ac3c76e2d416ff88f35a197ce229e74ea78e968631a736a43b4d8231c",
       "github_digest": "sha256:a0f2e64ac3c76e2d416ff88f35a197ce229e74ea78e968631a736a43b4d8231c",
-      "license_source": "See bundled release license; maintainer must verify before packaging"
+      "license_source": "https://github.com/Mieze/RTL8111_driver_for_OS_X/blob/a3dad34ed4f1e72805ce42f6d506f6917fdf79a0/RealtekRTL8111/gpl.txt",
+      "license_sources": [
+        {
+          "path": "RealtekRTL8111-gpl.txt",
+          "url": "https://github.com/Mieze/RTL8111_driver_for_OS_X/blob/a3dad34ed4f1e72805ce42f6d506f6917fdf79a0/RealtekRTL8111/gpl.txt",
+          "sha256": "b6babac7d1a5ba50e2896fe989ee2f8f83823909bee8a010a4ca0ff76a316501"
+        },
+        {
+          "path": "RealtekRTL8111-APPLE_LICENSE",
+          "url": "https://github.com/Mieze/RTL8111_driver_for_OS_X/blob/a3dad34ed4f1e72805ce42f6d506f6917fdf79a0/RealtekRTL8111/APPLE_LICENSE",
+          "sha256": "212846e0145aa50fb3a5aef254a370311a93acf6c1e792e47e0068d64c8c3885"
+        }
+      ],
+      "corresponding_source": {
+        "url": "https://api.github.com/repos/Mieze/RTL8111_driver_for_OS_X/tarball/a3dad34ed4f1e72805ce42f6d506f6917fdf79a0",
+        "asset": "RealtekRTL8111-a3dad34ed4f1e72805ce42f6d506f6917fdf79a0.tar.gz",
+        "sha256": "057d50991162a87684b0cdd045f093d14adfd840fc79c260987ef20c8f7abe55",
+        "bytes": 321394
+      }
     }
   ]
 }

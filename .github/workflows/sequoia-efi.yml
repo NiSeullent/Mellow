@@ -64,3 +64,44 @@ jobs:
             build/native-Release/*.json
           if-no-files-found: error
           retention-days: 14
+  package:
+    needs: native
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ACPI compiler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends acpica-tools
+      - uses: actions/download-artifact@v4
+        with:
+          name: Sequoia-255U-native
+          path: build/native-artifact
+      - name: Independent Linux host controls
+        run: |
+          python3 Tools/run-255u-tests.py --cxx clang++ --out build/255u-linux
+          python3 Tools/generate-255u-acpi.py --check
+          python3 Tools/run-xe-ggtt-tests.py
+          python3 Tools/run-tahoe-diagnostic-tests.py --cxx clang++ --sanitize --out build/255u-diagnostic
+      - name: Assemble pinned EFI and inspect every configured path
+        run: |
+          python3 Tools/build-255u-efi.py --native build/native-artifact/255u-native --out build/efi-release
+          python3 Tools/validate-255u-package.py build/efi-release/package --verify-sha
+          python3 tests/efi_package_tests.py build/efi-release/package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EFI-sequoia-255u
+          path: build/efi-release/EFI.zip
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sequoia-255U-assembly-evidence
+          path: |
+            build/255u-linux/report.json
+            build/255u-diagnostic/report.json
+            build/efi-release/package/Verification/
+            build/efi-release/EFI.zip.sha256
+          retention-days: 14
