@@ -14,6 +14,11 @@ int main(int argc, char **argv) {
     auto f = compileMsl(MellowRenderFixture, "gradientFragment", Stage::Fragment);
     check(v.success && v.usesParameters && !v.usesFragmentPosition, "vertex fixture");
     check(f.success && f.usesParameters && f.usesFragmentPosition, "fragment fixture");
+#if defined(__APPLE__)
+    check(v.glslSource.find("#version 410 core\n") == 0 && f.glslSource.find("#version 410 core\n") == 0, "macOS GLSL dialect");
+#else
+    check(v.glslSource.find("#version 330 core\n") == 0 && f.glslSource.find("#version 330 core\n") == 0, "portable GLSL dialect");
+#endif
     check(v.glslSource.find("2.0 * mellow_value.z - mellow_value.w") != std::string::npos, "depth conversion");
     check(f.glslSource.find("mellow_viewport.y - gl_FragCoord.y") != std::string::npos, "top-left position");
     for (const auto &expr : {"float4(1.0)", "float4(float2(1.0, 0.0), 0.5, 1.0)", "float4(1, 0, 1, 1)", "float4(-1.0, +0.5, 1e-2, 1.0)", "float4(float(2u) / 4.0)", "float4((float2(1.0, 0.0)).yx, 0.5, 1.0)"})

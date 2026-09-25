@@ -17,7 +17,7 @@ struct CompileResult {
     std::vector<std::string> diagnostics;
 };
 constexpr size_t MaxSourceBytes = 65536;
-// Original typed MSL vertex/fragment subset -> GLSL 330, not AIR/render support
+// Original typed MSL vertex/fragment subset -> GLSL 330 (410 on macOS), not AIR/render support
 // or an Apple compiler. Unknown semantics are rejected before driver compilation.
 CompileResult compileMsl(const std::string &, const std::string &entry, Stage);
 } }

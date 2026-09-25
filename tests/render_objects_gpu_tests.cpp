@@ -203,7 +203,12 @@ int main(int argc, char **argv) {
            << ",\"visible_requested\":" << visible << ",\"checks\":" << checks << ",\"negative_checks\":[";
     for (size_t i = 0; i < negatives.size(); ++i) { if (i) report << ','; report << quote(negatives[i]); }
     report << "],\"raw_stream_sha256\":" << quote(rawHash.hex()) << ",\"width\":64,\"height\":48,\"row_origin\":\"top-left\","
-              "\"portable_mellow_object_api\":true,\"apple_metal_abi_registered\":false,\"native_macos_execution\":false,"
+              "\"portable_mellow_object_api\":true,\"apple_metal_abi_registered\":false,\"native_macos_execution\":"
+#if defined(__APPLE__)
+              "true,"
+#else
+              "false,"
+#endif
               "\"windowserver_acceleration_verified\":false,\"display_scanout_verified\":false"
            << evidence.str() << "}\n";
     report.close();

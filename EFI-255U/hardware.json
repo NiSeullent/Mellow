@@ -1,0 +1,186 @@
+{
+  "schema": "mellow.hardware-profile/1",
+  "board": "SAMSUNG NT751XHD-KR735",
+  "platform": "laptop",
+  "cpu": {
+    "name": "Intel Core Ultra 7 255U",
+    "family": "Arrow Lake-U",
+    "physical_cores_reported": 12,
+    "logical_processors_from_madt": 14,
+    "three_tier_topology": true,
+    "bsp_not_identified_by_madt": true
+  },
+  "firmware": {
+    "version": "P02RHJ.999.250612.XY",
+    "date": "2025-06-12",
+    "boot_mode": "UEFI",
+    "secure_boot_reported": false
+  },
+  "gpu": {
+    "vendor": "8086",
+    "device": "7D41",
+    "subsystem": "C906144D",
+    "pci_path": "PciRoot(0x0)/Pci(0x2,0x0)",
+    "acpi_path": "\\_SB.PC00.GFX0",
+    "bar_resize_reported": false,
+    "expected_graphics_ip": "12.70",
+    "ip_must_be_read_from_hardware": true,
+    "marketing_name": "Intel Graphics",
+    "xe_cores_from_intel_specification": 4
+  },
+  "panel": {
+    "id": "KDC0327",
+    "width": 1920,
+    "height": 1080
+  },
+  "ethernet": {
+    "id": "10EC:8168",
+    "subsystem": "C906144D",
+    "pci_path": "PciRoot(0x0)/Pci(0x1C,0x0)/Pci(0x0,0x0)",
+    "acpi_path": "\\_SB.PC00.RP05.PXSX"
+  },
+  "wifi": {
+    "id": "8086:7740",
+    "report_label": "AX201",
+    "label_not_used_as_driver_support_evidence": true,
+    "acpi_path": "\\_SB.PC00.CNVW"
+  },
+  "audio": {
+    "controller": "8086:7728",
+    "codec": "10EC:0256",
+    "transport": "Intel Smart Sound Technology",
+    "acpi_path": "\\_SB.PC00.HDAS",
+    "ordinary_hda_path_not_assumed": true
+  },
+  "nvme": {
+    "id": "1E0F:002A",
+    "name": "KIOXIA EXCERIA PLUS G3",
+    "acpi_path": "\\_SB.PC00.RP10.PXSX"
+  },
+  "keyboard": {
+    "hid": "MSF0001",
+    "cid_verified_in_dsdt": "PNP0303",
+    "acpi_path": "\\_SB.PC00.LPCB.PS2K",
+    "transport": "PS/2"
+  },
+  "touchpad": {
+    "hid": "ELAN0B00",
+    "cid": "PNP0C50",
+    "controller": "8086:7778",
+    "gpio": "INTC105E",
+    "acpi_path": "\\_SB.PC00.I2C0.SPTP",
+    "transport": "I2C HID"
+  },
+  "usb": {
+    "controllers": [
+      {
+        "id": "8086:777D",
+        "path": "\\_SB.PC00.XHCI"
+      },
+      {
+        "id": "8086:7EC0",
+        "path": "\\_SB.PC00.TXHC"
+      }
+    ],
+    "physical_port_map_available": false
+  },
+  "bluetooth": {
+    "usb_id": "8087:0026"
+  },
+  "card_reader": {
+    "usb_id": "0BDA:0129"
+  },
+  "acpi": {
+    "pci_root": "\\_SB.PC00",
+    "lpc": "\\_SB.PC00.LPCB",
+    "real_ec": "\\_SB.PC00.LPCB.H_EC",
+    "real_ec_preserved": true,
+    "rtc": "\\_SB.PC00.LPCB.RTC",
+    "awac": "\\_SB.PC00.AWAC",
+    "rtc_selector": "\\STAS",
+    "processor_form": "Device (PRxx), ACPI0007",
+    "existing_processor_objects": 48,
+    "existing_plugin_type": false,
+    "existing_fake_ec": false,
+    "existing_usbx": false
+  },
+  "enabled_madt": [
+    {
+      "uid": 8,
+      "x2apic_id": 16
+    },
+    {
+      "uid": 9,
+      "x2apic_id": 17
+    },
+    {
+      "uid": 10,
+      "x2apic_id": 24
+    },
+    {
+      "uid": 11,
+      "x2apic_id": 25
+    },
+    {
+      "uid": 0,
+      "x2apic_id": 0
+    },
+    {
+      "uid": 1,
+      "x2apic_id": 2
+    },
+    {
+      "uid": 2,
+      "x2apic_id": 4
+    },
+    {
+      "uid": 3,
+      "x2apic_id": 6
+    },
+    {
+      "uid": 4,
+      "x2apic_id": 8
+    },
+    {
+      "uid": 5,
+      "x2apic_id": 10
+    },
+    {
+      "uid": 6,
+      "x2apic_id": 12
+    },
+    {
+      "uid": 7,
+      "x2apic_id": 14
+    },
+    {
+      "uid": 12,
+      "x2apic_id": 64
+    },
+    {
+      "uid": 13,
+      "x2apic_id": 66
+    }
+  ],
+  "privacy": {
+    "raw_report_published": false,
+    "raw_firmware_tables_published": false,
+    "msdm_excluded": true,
+    "personal_device_names_excluded": true
+  },
+  "runtime": {
+    "target_boot_verified": false,
+    "kernel_load_verified": false,
+    "native_gpu_submission_implemented": false,
+    "system_metal_implemented": false
+  },
+  "input_evidence": {
+    "archive_sha256": "a3f0a42d9beb410132847fdaeacbd7684f57137784a86f5748584867259c38eb",
+    "dsdt_sha256": "b2a2754c6be8bfa9ffc068a4129fdc6eaf9f921e113a970e60f1455780df7a11",
+    "madt_sha256": "8dd0066cdb606cd9e1546979c46fb16170575d09cc21f82cc1d129278e4239b7",
+    "madt_checksum_valid": true,
+    "madt_bytes": 856,
+    "madt_processor_entries": 48,
+    "method": "Reviewed OEM DSDT namespace and enabled MADT flags, not firmware execution"
+  }
+}

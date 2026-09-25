@@ -40,6 +40,7 @@
 		1612B9BD160818EF65265682 /* XeGuCTransportIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A5EC69B7701AB508DBC0A7F2 /* XeGuCTransportIOKit.cpp */; };
 		958942B747C41BD313B134F0 /* XeZebin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FEA06EFB6A1FA4C706E7AEED /* XeZebin.cpp */; };
 		F0EDFC58B1C04818A187BD4D /* XeGuCFirmware.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8C08783D431EFF2D805D7E02 /* XeGuCFirmware.cpp */; };
+		044255000000000000000001 /* XeGgtt.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 044255000000000000000002 /* XeGgtt.cpp */; };
 		F15AC567811442834E48303E /* XeGuCFirmwareIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 08C80C1179A55FA889D654C2 /* XeGuCFirmwareIOKit.cpp */; };
 		07105C39D3A806F8F8C3B7ED /* XeContext.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3663BEC9A333E8DC291412A5 /* XeContext.cpp */; };
 		4482DE84BBE2324C2704B8E2 /* XeDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CFF5ECDCFAF198ED4CA8FFE2 /* XeDispatch.cpp */; };
@@ -123,6 +124,7 @@
 		FEA06EFB6A1FA4C706E7AEED /* XeZebin.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeZebin.cpp; sourceTree = "<group>"; };
 		E6D80DFA1E4BA5DE2289DD93 /* XeZebin.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeZebin.hpp; sourceTree = "<group>"; };
 		8C08783D431EFF2D805D7E02 /* XeGuCFirmware.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGuCFirmware.cpp; sourceTree = "<group>"; };
+		044255000000000000000002 /* XeGgtt.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGgtt.cpp; sourceTree = "<group>"; };
 		AA9EBAD50983BE81A8D4C209 /* XeGuCFirmware.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeGuCFirmware.hpp; sourceTree = "<group>"; };
 		08C80C1179A55FA889D654C2 /* XeGuCFirmwareIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGuCFirmwareIOKit.cpp; sourceTree = "<group>"; };
 		39F8A57FECCF0553393B6EE3 /* XeGuCFirmwareIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeGuCFirmwareIOKit.hpp; sourceTree = "<group>"; };
@@ -181,6 +183,7 @@
 				C42F5B82067D421096F10002 /* PortedXeBindings.cpp */,
 				1C748C2E1C21952C0024EED2 /* Info.plist */,
 				8C08783D431EFF2D805D7E02 /* XeGuCFirmware.cpp */,
+				044255000000000000000002 /* XeGgtt.cpp */,
 				AA9EBAD50983BE81A8D4C209 /* XeGuCFirmware.hpp */,
 				08C80C1179A55FA889D654C2 /* XeGuCFirmwareIOKit.cpp */,
 				39F8A57FECCF0553393B6EE3 /* XeGuCFirmwareIOKit.hpp */,
@@ -406,6 +409,7 @@
 				D1A625064D41470000000002 /* TahoeDiagnosticProtocol.cpp in Sources */,
 				C42F5B82067D421096F10001 /* PortedXeBindings.cpp in Sources */,
 				F0EDFC58B1C04818A187BD4D /* XeGuCFirmware.cpp in Sources */,
+				044255000000000000000001 /* XeGgtt.cpp in Sources */,
 				F15AC567811442834E48303E /* XeGuCFirmwareIOKit.cpp in Sources */,
 				07105C39D3A806F8F8C3B7ED /* XeContext.cpp in Sources */,
 				4482DE84BBE2324C2704B8E2 /* XeDispatch.cpp in Sources */,
@@ -576,7 +580,7 @@
 				DEAD_CODE_STRIPPING = NO;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				GCC_ENABLE_FLOATING_POINT_LIBRARY_CALLS = NO;
-				GCC_ENABLE_KERNEL_DEVELOPMENT = NO;
+				GCC_ENABLE_KERNEL_DEVELOPMENT = YES;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"MODULE_VERSION=$(MODULE_VERSION)",
@@ -594,15 +598,15 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.3;
+				MODULE_VERSION = 0.4.4;
 				OTHER_CFLAGS = (
-					"-mmmx",
-					"-msse",
-					"-msse2",
-					"-msse3",
-					"-mfpmath=sse",
-					"-mssse3",
-					"-ftree-vectorize",
+					"-mno-mmx",
+					"-mno-sse",
+					"-mno-sse2",
+					"-mno-sse3",
+					"-mno-red-zone",
+					"-fno-slp-vectorize",
+					"-fno-vectorize",
 					"-fno-non-call-exceptions",
 					"-fno-builtin",
 					"-fno-asynchronous-unwind-tables",
@@ -632,7 +636,7 @@
 				DEAD_CODE_STRIPPING = NO;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				GCC_ENABLE_FLOATING_POINT_LIBRARY_CALLS = NO;
-				GCC_ENABLE_KERNEL_DEVELOPMENT = NO;
+				GCC_ENABLE_KERNEL_DEVELOPMENT = YES;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"MODULE_VERSION=$(MODULE_VERSION)",
@@ -649,15 +653,15 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.3;
+				MODULE_VERSION = 0.4.4;
 				OTHER_CFLAGS = (
-					"-mmmx",
-					"-msse",
-					"-msse2",
-					"-msse3",
-					"-mfpmath=sse",
-					"-mssse3",
-					"-ftree-vectorize",
+					"-mno-mmx",
+					"-mno-sse",
+					"-mno-sse2",
+					"-mno-sse3",
+					"-mno-red-zone",
+					"-fno-slp-vectorize",
+					"-fno-vectorize",
 					"-fno-non-call-exceptions",
 					"-fno-builtin",
 					"-fno-asynchronous-unwind-tables",
@@ -745,7 +749,7 @@
 				DEAD_CODE_STRIPPING = NO;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				GCC_ENABLE_FLOATING_POINT_LIBRARY_CALLS = NO;
-				GCC_ENABLE_KERNEL_DEVELOPMENT = NO;
+				GCC_ENABLE_KERNEL_DEVELOPMENT = YES;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"MODULE_VERSION=$(MODULE_VERSION)",
@@ -763,15 +767,15 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.3;
+				MODULE_VERSION = 0.4.4;
 				OTHER_CFLAGS = (
-					"-mmmx",
-					"-msse",
-					"-msse2",
-					"-msse3",
-					"-mfpmath=sse",
-					"-mssse3",
-					"-ftree-vectorize",
+					"-mno-mmx",
+					"-mno-sse",
+					"-mno-sse2",
+					"-mno-sse3",
+					"-mno-red-zone",
+					"-fno-slp-vectorize",
+					"-fno-vectorize",
 					"-fno-non-call-exceptions",
 					"-fno-builtin",
 					"-fno-asynchronous-unwind-tables",

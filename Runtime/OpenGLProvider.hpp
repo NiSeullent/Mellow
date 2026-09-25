@@ -12,7 +12,7 @@ struct OpenGLDeviceInfo {
     int major {}, minor {}, pixelFormat {};
     bool acceleratedPixelFormat {}, softwareRendererRejected {}, coreProfile {};
     bool visibleWindow {};
-    // WGL driver strings do not establish physical PCI ownership.
+    // WGL/CGL driver strings do not establish physical PCI ownership.
     bool physicalPciIdentityVerified {};
 };
 struct OpenGLRenderOptions {
@@ -47,9 +47,9 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-// Actual Windows WGL render substrate, not an Apple Metal/WindowServer driver.
-// A private thread owns the isolated window/context and serializes all GL calls.
-// No ambient GL context is changed. Other operating systems fail explicitly.
+// Actual Windows WGL / macOS CGL substrate, not a Metal/WindowServer driver.
+// A private thread owns the context and serializes all GL calls. CGL is offscreen-only.
+// No ambient GL context is changed. Linux/other operating systems fail explicitly.
 // Driver calls may block; applications must use an externally timed worker.
 class OpenGLProvider {
 public:

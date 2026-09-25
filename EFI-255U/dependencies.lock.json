@@ -1,0 +1,89 @@
+{
+  "schema": "mellow.efi-dependencies/1",
+  "as_of": "2026-09-25",
+  "assets": [
+    {
+      "name": "OpenCore",
+      "repository": "acidanthera/OpenCorePkg",
+      "tag": "1.0.7",
+      "commit": "6651fc36a8c3dca36a3231ba00679611100dbe85",
+      "asset": "OpenCore-1.0.7-RELEASE.zip",
+      "url": "https://github.com/acidanthera/OpenCorePkg/releases/download/1.0.7/OpenCore-1.0.7-RELEASE.zip",
+      "asset_id": 377974014,
+      "bytes": 10437696,
+      "sha256": "2ffab6ebf58c7aefb0bcb3a1a385d207746823d6dd87d44bd666e1286939943e",
+      "github_digest": "sha256:2ffab6ebf58c7aefb0bcb3a1a385d207746823d6dd87d44bd666e1286939943e",
+      "license_source": "https://github.com/acidanthera/OpenCorePkg/blob/6651fc36a8c3dca36a3231ba00679611100dbe85/LICENSE.txt",
+      "license_sha256": "4ca709aac88e7b297e794f464d6557203b23a4e92e792b579bb968fef2bce4c4"
+    },
+    {
+      "name": "Lilu",
+      "repository": "acidanthera/Lilu",
+      "tag": "1.7.2",
+      "commit": "e4748cc081bf060302c7d3c44a643ce1d11b7e1d",
+      "asset": "Lilu-1.7.2-RELEASE.zip",
+      "url": "https://github.com/acidanthera/Lilu/releases/download/1.7.2/Lilu-1.7.2-RELEASE.zip",
+      "asset_id": 377952879,
+      "bytes": 781360,
+      "sha256": "53967d7dcfaab01023a33df2e969a89522f13d6654a6a56ac4711b62dabf3ab8",
+      "github_digest": "sha256:53967d7dcfaab01023a33df2e969a89522f13d6654a6a56ac4711b62dabf3ab8",
+      "license_source": "https://github.com/acidanthera/Lilu/blob/e4748cc081bf060302c7d3c44a643ce1d11b7e1d/LICENSE.txt",
+      "license_sha256": "74c3ca48189b796b0d262866e67de8efba77a71516667ce68dc3a8f13c2a3c57"
+    },
+    {
+      "name": "VirtualSMC",
+      "repository": "acidanthera/VirtualSMC",
+      "tag": "1.3.7",
+      "commit": "dbd1ae1ee5adc7f2debd9311bf28ca2902d1bfcc",
+      "asset": "VirtualSMC-1.3.7-RELEASE.zip",
+      "url": "https://github.com/acidanthera/VirtualSMC/releases/download/1.3.7/VirtualSMC-1.3.7-RELEASE.zip",
+      "asset_id": 270701476,
+      "bytes": 1377786,
+      "sha256": "12f1d379969f926306fa92d94ddbf33b32b31176589dc42089d864a26b31b700",
+      "github_digest": "sha256:12f1d379969f926306fa92d94ddbf33b32b31176589dc42089d864a26b31b700",
+      "license_source": "https://github.com/acidanthera/VirtualSMC/blob/dbd1ae1ee5adc7f2debd9311bf28ca2902d1bfcc/LICENSE.txt",
+      "license_sha256": "5bceff635b9952d36af4e784ee02158cdddb6001584439cbd8a3520eb46a28e8"
+    },
+    {
+      "name": "NVMeFix",
+      "repository": "acidanthera/NVMeFix",
+      "tag": "1.1.3",
+      "commit": "6358326a01a051f888fc38ab80efea86d64574a5",
+      "asset": "NVMeFix-1.1.3-RELEASE.zip",
+      "url": "https://github.com/acidanthera/NVMeFix/releases/download/1.1.3/NVMeFix-1.1.3-RELEASE.zip",
+      "asset_id": 270693919,
+      "bytes": 108136,
+      "sha256": "e1d5657ab7ac31f69771708f7b80bf218ab9aa0b8e4c4fe6ff943983037e3dfb",
+      "github_digest": "sha256:e1d5657ab7ac31f69771708f7b80bf218ab9aa0b8e4c4fe6ff943983037e3dfb",
+      "license_source": "https://github.com/acidanthera/NVMeFix/blob/6358326a01a051f888fc38ab80efea86d64574a5/LICENSE.txt",
+      "license_sha256": "128310a94b293ed30e4f20124ac0e3e45020f00570f18272bd874a419e172d54"
+    },
+    {
+      "name": "VoodooPS2",
+      "repository": "acidanthera/VoodooPS2",
+      "tag": "2.3.7",
+      "commit": "bdbf80639936701337f4574bae8c3ea25bb8dd3d",
+      "asset": "VoodooPS2Controller-2.3.7-RELEASE.zip",
+      "url": "https://github.com/acidanthera/VoodooPS2/releases/download/2.3.7/VoodooPS2Controller-2.3.7-RELEASE.zip",
+      "asset_id": 210762366,
+      "bytes": 632757,
+      "sha256": "d5483298736ba4b3b82c7203d9a46968c668fb7af732b8b22c2096deb0acf83f",
+      "github_digest": null,
+      "license_source": "https://github.com/acidanthera/VoodooPS2/blob/bdbf80639936701337f4574bae8c3ea25bb8dd3d/LICENSE.md",
+      "license_sha256": "a39052e57440a9ed957bf57b2f5690853e283db8b211267422e2e81f39ea5c94"
+    },
+    {
+      "name": "RealtekRTL8111",
+      "repository": "Mieze/RTL8111_driver_for_OS_X",
+      "tag": "v3.0.0",
+      "commit": "a3dad34ed4f1e72805ce42f6d506f6917fdf79a0",
+      "asset": "RealtekRTL8111-V3.0.0.zip",
+      "url": "https://github.com/Mieze/RTL8111_driver_for_OS_X/releases/download/v3.0.0/RealtekRTL8111-V3.0.0.zip",
+      "asset_id": 332518014,
+      "bytes": 180409,
+      "sha256": "a0f2e64ac3c76e2d416ff88f35a197ce229e74ea78e968631a736a43b4d8231c",
+      "github_digest": "sha256:a0f2e64ac3c76e2d416ff88f35a197ce229e74ea78e968631a736a43b4d8231c",
+      "license_source": "See bundled release license; maintainer must verify before packaging"
+    }
+  ]
+}

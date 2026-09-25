@@ -1,10 +1,13 @@
 # Native OpenGL render provider
 
-OpenGLProvider is an actual Windows WGL user-space render substrate. It owns an
+OpenGLProvider is an actual Windows WGL / macOS CGL user-space render substrate.
+The WGL path below retains visible presentation. The CGL path uses a private
+OpenGL 4.1 core context and offscreen FBOs only; see [Sequoia CGL](../docs/SEQUOIA-CGL.md).
+On Windows, it owns an
 isolated window, device context and OpenGL 3.3 core context on a private worker
 thread. Public calls synchronously marshal to that thread; it also pumps the
 owned window's messages. It does not adopt, change or destroy an application's
-ambient GL context. Other operating systems fail explicitly.
+ambient GL context. Linux and other unsupported operating systems fail explicitly.
 
 Initialization selects a double-buffered RGBA pixel format and rejects generic
 software/MCD pixel-format flags and known software renderer strings. It verifies

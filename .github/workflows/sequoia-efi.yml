@@ -1,0 +1,66 @@
+name: Sequoia 255U EFI
+on:
+  push:
+    branches: [sequoia-255u-20260925]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: macos-15-intel
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Native kernel target and physical-probe client
+        run: |
+          bash Tools/cross-build-native.sh Release
+          mkdir -p build/255u-native
+          bundle=$(python3 -c 'import json,pathlib; a=json.load(open("build/native-Release/build-settings.json")); s=next(x["buildSettings"] for x in a if x.get("target")=="Mellow"); print(pathlib.Path(s["TARGET_BUILD_DIR"])/s["FULL_PRODUCT_NAME"])')
+          cp -R "$bundle" build/255u-native/Mellow.kext
+          cp build/native-Release/macho-validation.json build/255u-native/
+          xcrun clang -std=c11 -Wall -Wextra -Werror Userspace/sequoia_probe.c -framework IOKit -framework CoreFoundation -o build/255u-native/sequoia-probe
+          xcrun clang -std=c11 -Wall -Wextra -Werror Userspace/tahoe_diag_client.c -framework IOKit -framework CoreFoundation -o build/255u-native/tahoe-diag-client
+          xcrun swiftc -swift-version 5 -O -target x86_64-apple-macos13.0 Tools/metal-probe.swift -o build/255u-native/metal-probe -framework Metal -framework IOKit -framework CryptoKit
+          git rev-parse HEAD > build/255u-native/source-commit.txt
+          xcodebuild -version > build/255u-native/xcode-version.txt
+          sw_vers > build/255u-native/build-host-version.txt
+      - name: Reject generated SIMD instructions in the kernel executable
+        run: |
+          xcrun llvm-objdump --disassemble build/255u-native/Mellow.kext/Contents/MacOS/Mellow > build/255u-native/kernel-disassembly.txt
+          python3 - <<'PY'
+          import json,re,pathlib
+          p=pathlib.Path('build/255u-native/kernel-disassembly.txt')
+          text=p.read_text()
+          hits=[line for line in text.splitlines() if re.search(r'%(?:xmm|ymm|zmm|mm)[0-9]+\b',line)]
+          result={'scope':'static x86_64 disassembly; not kernel execution','passed':not hits,'forbidden_simd_register_lines':hits}
+          pathlib.Path('build/255u-native/kernel-simd-audit.json').write_text(json.dumps(result,indent=2))
+          if hits: raise SystemExit('Kernel executable contains unexpected SIMD register use')
+          PY
+      - name: Host boundary tests on the native compiler
+        run: |
+          python3 Tools/run-255u-tests.py --cxx clang++ --out build/255u-native/host-tests
+          python3 Tools/run-render-shader-tests.py --cxx clang++ --sanitize --out build/255u-native/render-shader
+          python3 tests/opengl_provider_report_tests.py
+          python3 tests/render_objects_report_tests.py
+      - name: Compile the real CGL provider and bounded MSL renderer
+        run: |
+          python3 Tools/run-opengl-provider.py --cxx clang++ --out build/255u-native/cgl-build
+          python3 Tools/run-render-objects.py --cxx clang++ --out build/255u-native/msl-render-build
+      - name: Attempt offscreen rendering without substituting a software GPU
+        run: |
+          set +e
+          python3 Tools/run-render-objects.py --cxx clang++ --out build/255u-native/cgl-attempt --render --frames 16 --timeout 60
+          rc=$?
+          set -e
+          echo "$rc" > build/255u-native/cgl-attempt-exit-code.txt
+          printf '%s\n' 'Cloud-host CGL attempt only. Failure or missing accelerated context is not converted to a pass. Never evidence of 8086:7D41 Metal acceleration.' > build/255u-native/VALIDATION-SCOPE.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Sequoia-255U-native
+          path: |
+            build/255u-native/
+            build/native-Release/*.log
+            build/native-Release/*.json
+          if-no-files-found: error
+          retention-days: 14

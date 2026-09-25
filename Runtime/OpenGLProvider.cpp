@@ -25,6 +25,10 @@
 #include <GL/gl.h>
 #include <GL/glext.h>
 #include <GL/wglext.h>
+#elif defined(__APPLE__)
+#define GL_SILENCE_DEPRECATION
+#include <OpenGL/OpenGL.h>
+#include <OpenGL/gl3.h>
 #endif
 
 namespace MellowRT {
@@ -49,6 +53,8 @@ template<typename T> T symbol(const char *name) {
     std::memcpy(&result, &procedure, sizeof(result));
     return result;
 }
+#endif
+#if defined(_WIN32) || defined(__APPLE__)
 void glCheck(const char *operation) {
     const auto error = glGetError();
     require(error == GL_NO_ERROR, std::string(operation) + " OpenGL error " + std::to_string(error));
@@ -76,21 +82,35 @@ std::string glText(GLenum key) {
     X(BlitFramebuffer, PFNGLBLITFRAMEBUFFERPROC) X(GetUniformLocation, PFNGLGETUNIFORMLOCATIONPROC) \
     X(Uniform4fv, PFNGLUNIFORM4FVPROC) X(Uniform2f, PFNGLUNIFORM2FPROC)
 struct Api {
+#if defined(__APPLE__)
+#define DECLARE_GL(name, type) decltype(&gl##name) name {};
+#else
 #define DECLARE_GL(name, type) type name {};
+#endif
     GL_PROCS(DECLARE_GL)
 #undef DECLARE_GL
+#if defined(_WIN32)
     PFNWGLGETSWAPINTERVALEXTPROC GetSwapInterval {};
+#endif
     void load() {
+#if defined(__APPLE__)
+#define LOAD_GL(name, type) name = &gl##name;
+#else
 #define LOAD_GL(name, type) name = symbol<type>("gl" #name);
+#endif
         GL_PROCS(LOAD_GL)
 #undef LOAD_GL
+#if defined(_WIN32)
         try { GetSwapInterval = symbol<PFNWGLGETSWAPINTERVALEXTPROC>("wglGetSwapIntervalEXT"); }
         catch (const std::exception &) { GetSwapInterval = nullptr; }
+#endif
     }
 };
+#if defined(_WIN32)
 LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
     return DefWindowProcW(window, message, wparam, lparam);
 }
+#endif
 #endif
 }
 
@@ -109,6 +129,11 @@ struct OpenGLProvider::Impl {
     HINSTANCE instance {};
     std::wstring className;
     ATOM windowClass {};
+#elif defined(__APPLE__)
+    CGLContextObj context {};
+    CGLPixelFormatObj pixelFormat {};
+#endif
+#if defined(_WIN32) || defined(__APPLE__)
     Api gl;
 #endif
     Impl() { worker = std::thread([this] { loop(); }); }
@@ -161,6 +186,15 @@ struct OpenGLProvider::Impl {
         if (dc && window) { ReleaseDC(window, dc); dc = nullptr; }
         if (window) { if (IsWindow(window)) DestroyWindow(window); window = nullptr; }
         if (windowClass) { UnregisterClassW(className.c_str(), instance); windowClass = 0; }
+#elif defined(__APPLE__)
+        if (context) {
+            CGLSetCurrentContext(nullptr);
+            CGLDestroyContext(context);
+            context = nullptr;
+        }
+        if (pixelFormat) { CGLDestroyPixelFormat(pixelFormat); pixelFormat = nullptr; }
+#endif
+#if defined(_WIN32) || defined(__APPLE__)
         gl = {};
 #endif
     }
@@ -223,34 +257,70 @@ struct OpenGLProvider::Impl {
         wglDeleteContext(context);
         context = core;
         require(wglMakeCurrent(dc, context) != FALSE, "Cannot activate owned core context");
+#elif defined(__APPLE__)
+        require(!visible, "CGL provider supports offscreen FBO rendering only; visible presentation is unsupported");
+        const CGLPixelFormatAttribute attributes[] = {
+            kCGLPFAOpenGLProfile, static_cast<CGLPixelFormatAttribute>(kCGLOGLPVersion_4_1_Core),
+            kCGLPFAAccelerated, kCGLPFANoRecovery,
+            kCGLPFAColorSize, static_cast<CGLPixelFormatAttribute>(24),
+            kCGLPFAAlphaSize, static_cast<CGLPixelFormatAttribute>(8),
+            static_cast<CGLPixelFormatAttribute>(0)
+        };
+        auto checkCgl = [](CGLError code, const char *operation) {
+            require(code == kCGLNoError, std::string(operation) + ": " + CGLErrorString(code));
+        };
+        GLint screens {};
+        checkCgl(CGLChoosePixelFormat(attributes, &pixelFormat, &screens), "CGLChoosePixelFormat");
+        require(pixelFormat && screens > 0, "No accelerated CGL 4.1 pixel format available");
+        checkCgl(CGLCreateContext(pixelFormat, nullptr, &context), "CGLCreateContext");
+        require(context != nullptr, "CGL returned no context");
+        checkCgl(CGLSetCurrentContext(context), "CGLSetCurrentContext");
+        GLint screen {}, accelerated {}, noRecovery {};
+        checkCgl(CGLGetVirtualScreen(context, &screen), "CGLGetVirtualScreen");
+        checkCgl(CGLDescribePixelFormat(pixelFormat, screen, kCGLPFAAccelerated, &accelerated), "CGL accelerated query");
+        checkCgl(CGLDescribePixelFormat(pixelFormat, screen, kCGLPFANoRecovery, &noRecovery), "CGL no-recovery query");
+        require(accelerated != 0 && noRecovery != 0, "Non-accelerated or fallback CGL renderer rejected");
+        const int format = screen; // CGL virtual-screen index, not a WGL format ID.
+#else
+        (void) visible;
+        throw std::runtime_error("OpenGL native provider unsupported on this platform (requires Windows WGL or macOS CGL)");
+#endif
+#if defined(_WIN32) || defined(__APPLE__)
         gl.load();
         info.vendor = glText(GL_VENDOR); info.renderer = glText(GL_RENDERER);
         info.version = glText(GL_VERSION); info.shadingLanguageVersion = glText(GL_SHADING_LANGUAGE_VERSION);
         glGetIntegerv(GL_MAJOR_VERSION, &info.major); glGetIntegerv(GL_MINOR_VERSION, &info.minor);
         GLint profile {};
         glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &profile);
+#if defined(__APPLE__)
+        require(info.major > 4 || (info.major == 4 && info.minor >= 1), "CGL OpenGL 4.1 core is required");
+#endif
         require(info.major > 3 || (info.major == 3 && info.minor >= 3), "OpenGL 3.3 core is required");
         require((profile & GL_CONTEXT_CORE_PROFILE_BIT) != 0, "Driver did not create requested core profile");
         std::string lower = info.vendor + " " + info.renderer;
         std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        for (const char *software : {"microsoft", "gdi generic", "llvmpipe", "softpipe", "swrast", "software rasterizer", "swiftshader", "lavapipe"})
+        for (const char *software : {"microsoft", "gdi generic", "llvmpipe", "softpipe", "swrast", "software rasterizer", "swiftshader", "lavapipe", "apple software", "generic float"})
             require(lower.find(software) == std::string::npos, "Software OpenGL renderer rejected");
         // A hardware ICD pixel format plus driver identity is driver-reported evidence,
         // not independent PCI attestation or proof that future submitted pixels are correct.
         info.pixelFormat = format; info.acceleratedPixelFormat = true;
         info.softwareRendererRejected = true; info.coreProfile = true; info.visibleWindow = visible;
         glCheck("Context initialization");
+#if defined(_WIN32)
         if (visible) { ShowWindow(window, SW_SHOWNORMAL); UpdateWindow(window); }
+#endif
         ready = true;
-#else
-        (void) visible;
-        throw std::runtime_error("OpenGL native provider is implemented only for Windows WGL");
 #endif
     }
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__APPLE__)
     void current() {
+#if defined(__APPLE__)
+        require(ready && context, "OpenGL provider has no live owned CGL context");
+        require(CGLGetCurrentContext() == context, "Owned worker CGL context mismatch");
+#else
         require(ready && context && window && IsWindow(window), "OpenGL provider has no live owned context/window");
         require(wglGetCurrentContext() == context && wglGetCurrentDC() == dc, "Owned worker GL context mismatch");
+#endif
     }
     std::string shaderLog(GLuint shader) {
         GLint length {}; gl.GetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
@@ -382,6 +452,7 @@ struct OpenGLProvider::Impl {
         current();
         frame.readbackCompleted = true;
         if (options.present) {
+#if defined(_WIN32)
             RECT client {};
             require(GetClientRect(window, &client) != FALSE && client.right > 0 && client.bottom > 0, "Visible client area unavailable");
             gl.BindFramebuffer(GL_READ_FRAMEBUFFER, resources.framebuffer);
@@ -393,6 +464,9 @@ struct OpenGLProvider::Impl {
             require(SwapBuffers(dc) != FALSE, "Window SwapBuffers failed");
             frame.swapCompleted = true; // Swap acceptance is not physical scanout evidence.
             if (gl.GetSwapInterval) { frame.swapInterval = gl.GetSwapInterval(); frame.swapIntervalKnown = true; }
+#else
+            throw std::runtime_error("CGL presentation is unsupported");
+#endif
         }
         resources.clean();
         glCheck("Per-frame resource cleanup");
@@ -409,7 +483,8 @@ struct OpenGLPipeline::Impl {
     ~Impl() {
         if (!owner || !program) return;
         owner->invoke([this] {
-#if defined(_WIN32)
+            (void)this; // Unsupported platforms still dispatch cleanup to the owned worker.
+#if defined(_WIN32) || defined(__APPLE__)
             // Context deletion already freed all objects from a stale epoch.
             if (owner->ready && owner->epoch == epoch && owner->context) owner->gl.DeleteProgram(program);
 #endif
@@ -436,12 +511,12 @@ std::shared_ptr<OpenGLPipeline> OpenGLProvider::compile(const std::string &verte
         auto pipeline = std::shared_ptr<OpenGLPipeline>(new OpenGLPipeline());
         pipeline->impl_->owner = impl_;
         impl_->invoke([&] {
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__APPLE__)
             pipeline->impl_->program = impl_->compileProgram(vertex, fragment, pipeline->impl_->log);
             pipeline->impl_->epoch = impl_->epoch; pipeline->impl_->serial = impl_->compilations;
 #else
             (void) vertex; (void) fragment;
-            throw std::runtime_error("OpenGL native provider is implemented only for Windows WGL");
+            throw std::runtime_error("OpenGL native provider unsupported on this platform (requires Windows WGL or macOS CGL)");
 #endif
         });
         return pipeline;
@@ -453,13 +528,13 @@ bool OpenGLProvider::render(const std::shared_ptr<OpenGLPipeline> &pipeline, con
         try {
             require(pipeline && pipeline->impl_->owner == impl_, "Render pipeline belongs to another provider");
             require(pipeline->impl_->epoch == impl_->epoch && pipeline->impl_->program != 0, "Render pipeline epoch is stale");
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__APPLE__)
             impl_->render(pipeline->impl_->program, options, frame);
             return frame.fenceSignaled && frame.readbackCompleted && frame.resourcesReleased &&
                    (!options.present || frame.swapCompleted);
 #else
             (void) options;
-            throw std::runtime_error("OpenGL native provider is implemented only for Windows WGL");
+            throw std::runtime_error("OpenGL native provider unsupported on this platform (requires Windows WGL or macOS CGL)");
 #endif
         } catch (const std::exception &failure) {
             frame.error = failure.what();

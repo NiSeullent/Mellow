@@ -1,6 +1,7 @@
 // Local IOKit diagnostic owner, 2026. See repository LICENSE and NOTICE.
 #pragma once
 #include "TahoeDiagnosticProtocol.hpp"
+#include "XeProbeABI.h"
 #include "XeMemoryIOKit.hpp"
 #include "XeMmioIOKit.hpp"
 #include <IOKit/IOUserClient.h>
@@ -18,6 +19,8 @@ public:
     IOReturn callDiagnostic(MellowTahoeDiagnosticClient *, uint64_t, uint32_t,
                            const MellowDiagRequest &, MellowDiagReply &);
     IOReturn closeDiagnostic(MellowTahoeDiagnosticClient *, uint64_t);
+    IOReturn callProbe(MellowTahoeDiagnosticClient *, uint64_t,
+                      const MellowXeProbeRequest &, MellowXeProbeReply &);
 private:
     IOLock *lock_ {};
     IOPCIDevice *pci_ {};

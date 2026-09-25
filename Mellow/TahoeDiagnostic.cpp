@@ -2,6 +2,8 @@
 // Public SDK/source contracts and retained header hashes: docs/TAHOE-DRIVER-IMPLEMENTATION.md.
 #include "TahoeDiagnostic.hpp"
 #include "RuntimeReadiness.hpp"
+#include "SequoiaTarget.hpp"
+#include "XeProbe.hpp"
 #include <Headers/kern_util.hpp>
 #include <IOKit/IOLib.h>
 #include <libkern/libkern.h>
@@ -10,9 +12,13 @@ OSDefineMetaClassAndStructors(MellowTahoeDiagnostic, IOService)
 OSDefineMetaClassAndStructors(MellowTahoeDiagnosticClient, IOUserClient)
 
 static bool admitted(IOPCIDevice *pci) {
-    return pci && static_cast<unsigned>(getKernelVersion()) == 25 && checkKernelArgument("-mellowdiag") &&
-        pci->getBusNumber() == 0 && pci->getDeviceNumber() == 2 && pci->getFunctionNumber() == 0 &&
-        pci->configRead16(kIOPCIConfigVendorID) == 0x8086 && pci->configRead16(kIOPCIConfigDeviceID) == 0x7d41;
+    const MellowTarget::BootPolicy policy {static_cast<unsigned>(getKernelVersion()),
+        checkKernelArgument("-mellowdiag"), checkKernelArgument("-mellowoff"),
+        checkKernelArgument("-mellowtglwithgfx"), checkKernelArgument("-mellownativexe")};
+    return pci && MellowTarget::admitDiagnostic(policy) &&
+        MellowTarget::physicalTarget(pci->configRead16(kIOPCIConfigVendorID),
+            pci->configRead16(kIOPCIConfigDeviceID), pci->getBusNumber(),
+            pci->getDeviceNumber(), pci->getFunctionNumber());
 }
 IOService *MellowTahoeDiagnostic::probe(IOService *provider, SInt32 *score) {
     if (!admitted(OSDynamicCast(IOPCIDevice, provider))) return nullptr;
@@ -52,6 +58,14 @@ bool MellowTahoeDiagnostic::start(IOService *provider) {
         return failStart(provider);
     }
     setProperty("MellowDiagnosticOnly", true);
+    setProperty("MellowDiagnosticDarwinMajor", static_cast<uint64_t>(getKernelVersion()), 32);
+    setProperty("MellowReadOnlyProbeABI", static_cast<uint64_t>(MELLOW_XE_PROBE_VERSION), 32);
+    setProperty("MellowPhysicalPCIRegistryID", pci_->getRegistryEntryID(), 64);
+    // These properties describe this diagnostic service, not an accelerator.
+    setProperty("MellowPhysicalVendorID", static_cast<uint64_t>(0x8086), 32);
+    setProperty("MellowPhysicalDeviceID", static_cast<uint64_t>(0x7d41), 32);
+    setProperty("MellowPhysicalBDF", static_cast<uint64_t>(0x1000), 32);
+    setProperty("MellowPhysicalIdentitySource", "pci-config-before-spoof");
     setProperty("MellowDiagnosticABI", static_cast<uint64_t>(MELLOW_DIAG_ABI_VERSION), 32);
     setProperty("MellowPreparedDmaAvailable", dma_.mapper != nullptr);
     setProperty("MellowGpuSubmissionSupported", false);
@@ -120,6 +134,51 @@ IOReturn MellowTahoeDiagnostic::callDiagnostic(MellowTahoeDiagnosticClient *clie
     IOLockUnlock(lock_);
     return active ? kIOReturnSuccess : kIOReturnNotReady;
 }
+namespace {
+struct ProbeContext { IOPCIDevice *pci; MellowXe::MmioAccess mmio; };
+bool probePci(void *opaque, uint16_t offset, uint32_t &value) {
+    auto &context = *static_cast<ProbeContext *>(opaque);
+    if (offset > 0xfc || (offset & 3U)) return false;
+    value = context.pci->configRead32(static_cast<UInt8>(offset));
+    return value != UINT32_MAX;
+}
+bool probeMmio(void *opaque, uint32_t offset, uint32_t &value) {
+    auto &context = *static_cast<ProbeContext *>(opaque);
+    return offset == MellowProbe::GmdRegister && context.mmio.read32 &&
+        context.mmio.read32(context.mmio.opaque, offset, value);
+}
+}
+IOReturn MellowTahoeDiagnostic::callProbe(MellowTahoeDiagnosticClient *client, uint64_t token,
+        const MellowXeProbeRequest &request, MellowXeProbeReply &reply) {
+    if (!lock_ || request.version != MELLOW_XE_PROBE_VERSION || request.size != sizeof(request) ||
+        !request.nonce || request.reserved[0] || request.reserved[1]) return kIOReturnBadArgument;
+    IOLockLock(lock_);
+    if (stopping_ || client_ != client || !session_.owns(token) || !attached_ || !pci_) {
+        IOLockUnlock(lock_); return kIOReturnNotReady;
+    }
+    reply = {};
+    reply.version = MELLOW_XE_PROBE_VERSION; reply.size = sizeof(reply); reply.nonce = request.nonce;
+    reply.darwinMajor = static_cast<uint32_t>(getKernelVersion());
+    UInt8 pmOffset = 0;
+    const UInt32 capability = pci_->findPCICapability(kIOPCIPowerManagementCapability, &pmOffset);
+    if (!capability || capability == UINT32_MAX) pmOffset = 0;
+    ProbeContext context {pci_, mmio_.access()};
+    MellowProbe::Access access {&context, probePci, probeMmio, mmio_.mappedLength(),
+        pci_->getBusNumber(), pci_->getDeviceNumber(), pci_->getFunctionNumber(), pmOffset};
+    MellowProbe::Snapshot sample {};
+    reply.status = static_cast<uint32_t>(MellowProbe::capture(access, sample));
+    if (reply.status == static_cast<uint32_t>(MellowProbe::Status::Ok)) {
+        reply.sampledMicros = context.mmio.nowMicros(context.mmio.opaque);
+        reply.pciRegistryId = pci_->getRegistryEntryID(); reply.barBytes = sample.barBytes;
+        reply.pciId = sample.pciId; reply.subsystemId = sample.subsystemId;
+        reply.classRevision = sample.classRevision; reply.command = sample.command;
+        reply.pmcsr = sample.pmcsr; reply.gmd = sample.gmd;
+        reply.bus = sample.bus; reply.slot = sample.slot; reply.function = sample.function;
+    }
+    // The reply is zero initialized; neither capability is derived from presence.
+    IOLockUnlock(lock_);
+    return kIOReturnSuccess;
+}
 IOReturn MellowTahoeDiagnostic::newUserClient(task_t task, void *security, UInt32 type,
         OSDictionary *properties, IOUserClient **handler) {
     if (!handler) return kIOReturnBadArgument;
@@ -161,12 +220,24 @@ IOReturn MellowTahoeDiagnosticClient::externalMethod(uint32_t selector, IOExtern
         IOExternalMethodDispatch *, OSObject *, void *) {
     if (clientHasPrivilege(current_task(), kIOClientPrivilegeAdministrator) != kIOReturnSuccess)
         return kIOReturnNotPrivileged;
-    if (!args || selector > MellowDiagRelease || args->scalarInputCount || args->scalarOutputCount ||
+    if (!args || selector > MELLOW_XE_PROBE_SELECTOR || args->scalarInputCount || args->scalarOutputCount ||
         args->asyncWakePort || args->asyncReferenceCount || args->structureInputDescriptor ||
         args->structureOutputDescriptor || args->structureVariableOutputData ||
-        args->structureInputSize != sizeof(MellowDiagRequest) || args->structureOutputSize != sizeof(MellowDiagReply) ||
         !args->structureInput || !args->structureOutput) return kIOReturnBadArgument;
     if (!owner_) return kIOReturnNotReady;
+    if (selector == MELLOW_XE_PROBE_SELECTOR) {
+        if (args->structureInputSize != sizeof(MellowXeProbeRequest) ||
+            args->structureOutputSize != sizeof(MellowXeProbeReply)) return kIOReturnBadArgument;
+        MellowXeProbeRequest request {}; MellowXeProbeReply reply {};
+        memcpy(&request, args->structureInput, sizeof(request));
+        const IOReturn result = owner_->callProbe(this, token_, request, reply);
+        if (result == kIOReturnSuccess) {
+            memcpy(args->structureOutput, &reply, sizeof(reply)); args->structureOutputSize = sizeof(reply);
+        }
+        return result;
+    }
+    if (args->structureInputSize != sizeof(MellowDiagRequest) ||
+        args->structureOutputSize != sizeof(MellowDiagReply)) return kIOReturnBadArgument;
     MellowDiagRequest request {}; MellowDiagReply reply {};
     memcpy(&request, args->structureInput, sizeof(request));
     const IOReturn result = owner_->callDiagnostic(this, token_, selector, request, reply);

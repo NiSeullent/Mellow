@@ -10,14 +10,15 @@
 static MellowCore mellowPlugin;
 
 static const char *bootargDebug = "-MellowDebug";
+static const char *bootargDisable = "-mellowoff";
 
 
 PluginConfiguration ADDPR(config) {
     xStringify(PRODUCT_NAME),
     parseModuleVersion(xStringify(MODULE_VERSION)),
     LiluAPI::AllowNormal | LiluAPI::AllowInstallerRecovery | LiluAPI::AllowSafeMode,
-	nullptr,
-	0,
+	&bootargDisable,
+	1,
 	&bootargDebug,
 	1,
 	nullptr,

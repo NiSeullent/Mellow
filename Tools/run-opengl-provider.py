@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Actual Windows WGL driver render acceptance; no macOS/WindowServer claim."""
+"""Actual WGL/CGL driver render acceptance; no WindowServer claim."""
 import argparse
 from datetime import datetime, timezone
 import hashlib
@@ -37,13 +37,15 @@ def pixels(seed, iteration):
                   255 * ((bits >> (2 if y < 24 else 3)) & 1), 0, 255))
 
 
-def validate_native(native, seed, count, visible):
+def validate_native(native, seed, count, visible, *, macos=False):
     errors = []
     def need(condition, message):
         if not condition:
             errors.append(message)
     if type(native) is not dict:
         return ["Native report must be a JSON object"]
+    need(native.get("native_macos_execution") is macos, "Native OS execution mismatch")
+    need(not (macos and visible), "CGL visible presentation unsupported")
     need("error" not in native, "Successful frame report contains an error")
     for key, expected in (("schema_version", 1), ("requested_frames", count), ("frames_completed", count),
                           ("seed", seed), ("width", 64), ("height", 48), ("pipeline_build_count", 1),
@@ -51,7 +53,7 @@ def validate_native(native, seed, count, visible):
         need(type(native.get(key)) is int and native[key] == expected, key + " mismatch")
     for key in ("passed", "all_frames_correlated", "all_rgba_patterns_verified"):
         need(native.get(key) is True, key + " must be true")
-    for key in ("native_macos_execution", "windowserver_acceleration_verified", "display_scanout_verified",
+    for key in ("windowserver_acceleration_verified", "display_scanout_verified",
                 "physical_pci_identity_verified"):
         need(native.get(key) is False, key + " must be false")
     need(native.get("visible_window_requested") is visible, "Visible request mismatch")
@@ -66,6 +68,9 @@ def validate_native(native, seed, count, visible):
         for key in ("vendor", "renderer", "version", "glsl_version"):
             need(type(device.get(key)) is str and 0 < len(device[key]) < 16384, "Invalid device " + key)
         major, minor = device.get("major"), device.get("minor")
+        if macos:
+            need(type(major) is int and type(minor) is int and (major > 4 or major == 4 and minor >= 1),
+                 "CGL GL4.1 core required")
         need(type(major) is int and type(minor) is int and (major > 3 or major == 3 and minor >= 3),
              "Core OpenGL3.3 requirement failed")
     patterns = {i: pixels(seed, i) for i in range(16)}
@@ -109,12 +114,15 @@ def main():
         parser.error("Frames must be 1-10000; timeout 1-180 seconds")
     if args.visible and not args.render:
         parser.error("--visible requires --render")
+    macos = platform.system() == "Darwin"
+    if macos and args.visible:
+        parser.error("macOS CGL is offscreen-only; --visible is unsupported")
     root = Path(__file__).resolve().parents[1]
     args.out = args.out.resolve(); args.out.mkdir(parents=True, exist_ok=True)
     sources = ["Runtime/OpenGLProvider.hpp", "Runtime/OpenGLProvider.cpp", "tests/opengl_provider_tests.cpp",
                "tests/opencl_runtime_sha256.hpp", "Tools/run-opengl-provider.py"]
     report = dict(schema_version=1, created_utc=datetime.now(timezone.utc).isoformat(),
-                  scope="native-Windows-WGL-GLSL-driver-offscreen-render-and-optional-swap",
+                  scope="native-macOS-CGL-GLSL-driver-offscreen-render" if macos else "native-Windows-WGL-GLSL-driver-offscreen-render-and-optional-swap",
                   os=dict(system=platform.system(), release=platform.release(), version=platform.version()),
                   source_sha256={name: digest(root / name) for name in sources},
                   native_macos_execution=False, windowserver_acceleration_verified=False,
@@ -137,8 +145,10 @@ def main():
             command += ["-lopengl32", "-lgdi32", "-luser32", "-static-libgcc", "-static-libstdc++"]
         else:
             command += ["-pthread"]
+        if macos:
+            command += ["-framework", "OpenGL"]
         build = subprocess.run(command, capture_output=True, text=True, timeout=120, **options)
-        report["build"] = dict(exit_code=build.returncode, stdout=build.stdout, stderr=build.stderr)
+        report["build"] = dict(command=command, exit_code=build.returncode, stdout=build.stdout, stderr=build.stderr)
         if build.returncode:
             print(build.stdout + build.stderr, file=sys.stderr)
             return 1
@@ -146,9 +156,9 @@ def main():
         if not args.render:
             report["status"] = "BUILT_ONLY"
             return 0
-        if os.name != "nt":
+        if os.name != "nt" and not macos:
             report["status"] = "NOT_AVAILABLE"
-            report["error"] = "Actual native OpenGL provider is Windows WGL only"
+            report["error"] = "Native OpenGL provider unsupported: requires Windows WGL or macOS CGL"
             return 1
         result_path = args.out / ("native-" + secrets.token_hex(8) + ".json")
         seed = secrets.randbits(32)
@@ -166,8 +176,9 @@ def main():
             raise ValueError("Worker report must be an object")
         result_path.replace(args.out / "opengl-provider-native.json")
         report["native"] = native
+        report["native_macos_execution"] = macos and native.get("native_macos_execution") is True
         report["gpu_work_executed"] = True if type(native.get("frames_completed")) is int and native["frames_completed"] > 0 else None
-        report["validation_errors"] = validate_native(native, seed, args.frames, args.visible)
+        report["validation_errors"] = validate_native(native, seed, args.frames, args.visible, macos=macos)
         report["source_changed_during_run"] = [name for name in sources if digest(root / name) != report["source_sha256"][name]]
         passed = worker.returncode == 0 and not report["validation_errors"] and not report["source_changed_during_run"]
         report["passed"] = passed
