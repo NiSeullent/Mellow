@@ -46,11 +46,19 @@ Xcode 대상의 기존 31개 unit에 위 2개를 추가한다. personality는 `I
 
 ## Device mapper admission
 
-Apple의 `IOMapper::copyMapperForDevice()`는 간접 `iommu-parent` 식별자에 대해 mapper 서비스를
-기다릴 수 있다. 진단 부팅에서 무기한 대기하지 않도록, 이 구현은 `iommu-parent`가 이미 연결된
-`IOMapper` 객체인 경우에만 이 API를 호출한다. 간접 식별자나 누락된 mapper는 **query-only**이며
-DMA capability가 0이다. 글로벌 mapper, 물리 주소 identity mapping, 다른 장치의 mapper를
-대신 사용하지 않는다. 이 제한은 실제 장비 로그에 따라 별도 비동기 mapper admission으로 확장할 수 있다.
+The diagnostic takes one retained `iommu-parent` property snapshot. If that exact
+object is an `IOMapper`, it transfers the owned reference to its DMA context;
+cleanup releases it once. Other property types are released and leave the service
+in **query-only** mode, with DMA capability zero. There is no global, identity, or
+other-device mapper fallback.
+
+`IOMapper::copyMapperForDevice()` performs another property lookup and may wait
+indefinitely for an indirect identifier. The earlier check followed by this helper
+had a race: a property replacement could enter that wait during diagnostic boot.
+The service now uses the captured object directly and never calls the helper.
+This skips the helper's optional allocation-name bookkeeping. It proves owned
+reference lifetime, not mapper availability across reset/removal; physical DMA
+acceptance and full power-management integration remain outstanding.
 [Apple IOMapper implementation](https://github.com/apple-oss-distributions/xnu/blob/f6217f891ac0bb64f3d375211650a4c1ff8ca1ea/iokit/Kernel/IOMapper.cpp#L158)
 
 ## UAPI and lifecycle contracts

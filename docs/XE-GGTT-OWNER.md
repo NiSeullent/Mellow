@@ -25,4 +25,4 @@ python3 Tools/run-xe-ggtt-tests.py
 python3 Tools/run-255u-tests.py --cxx clang++ --out build/255u-tests
 ```
 
-Tests execute the real manager with simulated PCI-memory boundaries, including valid allocation/publication/retirement, stale owner/epoch/generation, overlapping reservations, unauthorized initial entries, malformed backing, write/read/invalidation failures and quarantine. Sanitizers exercise host memory behavior. They do not prove actual device execution, IOKit attachment, firmware authentication or Metal acceleration.
+The regression source exercises the real manager against simulated PCI-memory boundaries. It covers the normal allocation/publication/retirement lifecycle and negative cases for stale owner/epoch/generation, an occupied initial PTE, read/write/readback/invalidation failures, retirement refusal, and resource quarantine/retry. The runner compiles and executes these cases with sanitizers; passing results must be recorded separately from this source description. These checks do not prove actual device execution, IOKit attachment, firmware authentication or Metal acceleration.

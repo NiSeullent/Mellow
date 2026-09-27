@@ -37,6 +37,8 @@ CPU CPUID EAX만 0x000906EA로 실험적으로 에뮬레이션합니다. GPU dev
 
 ## 처음 시험할 때
 
+For a controlled first boot from an independent USB EFI, back up `EFI/OC/config.plist` and replace it with `Profiles/config-boot-baseline.plist`. This profile changes only two settings: it disables `Mellow.kext` and replaces `-mellowdiag` with `-mellowoff`. It keeps the default CPU count and all other boot settings. Compare its boot result with the default profile before trying the separate `config-rescue.plist` (`cpus=1`) or `config-legacy-memory-map.plist`. Preserve the last on-screen message and OpenCore log for each attempt. A boot result from any profile does not establish GPU or Metal support.
+
 **내장 디스크의 기존 EFI를 덮어쓰지 마십시오.** 기존 EFI·데이터를 별도로 백업하고, 독립 USB EFI 파티션으로 시험합니다. 복사할 것은 ZIP의 `EFI/` 폴더이며 `Sources`, `Tools`, 문서까지 ESP에 복사할 필요는 없습니다. 펌웨어 부팅 순서 자동 등록은 비활성화했습니다.
 
 UEFI 모드, 펌웨어 Secure Boot 비활성 상태를 확인하십시오. ReBAR는 보고서와 동일하게 비활성 상태를 전제로 했습니다. 저장장치 모드·TPM·보안 설정을 무작정 초기화하지 마십시오. 기존 Windows의 복구 키가 필요한 변경은 별도 확인 후 진행해야 합니다.

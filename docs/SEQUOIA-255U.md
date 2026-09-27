@@ -54,6 +54,10 @@ bash Tools/cross-build-native.sh Release # requires macOS + full Xcode
 
 The CI retains the real compiler output, disassembly audit, host-test evidence and optional CGL attempt. A failed CGL context request is recorded as failure/unavailable, never substituted by a CPU result. The official full-Metal acceptance probe is included as a future hardware acceptance tool, not as a certificate that it currently succeeds.
 
+## First-boot isolation profile
+
+The package includes `Profiles/config-boot-baseline.plist` for a controlled first boot on an independent USB EFI. It is identical to `EFI/OC/config.plist` except that `Mellow.kext` is disabled and the `-mellowdiag` boot argument is replaced with `-mellowoff`. In particular, it keeps the same CPU count, CPUID emulation, ACPI tables, memory-map quirks, and other kexts. Compare a boot with this profile against the default profile before changing any other boot setting. Keep the existing `config-rescue.plist` with `cpus=1` for a separate fallback, and `config-legacy-memory-map.plist` for a separate memory-map comparison. A successful baseline boot alone does not prove Mellow caused a default-profile failure, and none of these profiles demonstrates GPU acceleration.
+
 ## Public-data boundary
 
 Original SysReport, DSDT/SSDT dumps, MSDM, licensing keys, personal Bluetooth names, access tokens, and private agent logs are not release inputs. Own source/SSDTs, sanitized hardware identity, dependency hashes, binaries and actual bounded validation reports are public. This is not a macOS installer and contains no Apple GPU-driver binaries or recovery image.

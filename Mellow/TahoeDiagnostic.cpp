@@ -42,12 +42,13 @@ bool MellowTahoeDiagnostic::start(IOService *provider) {
     if (pmcsr == UINT16_MAX || (pmcsr & kPCIPMCSPowerStateMask) != kPCIPMCSPowerStateD0) return failStart(provider);
     if (mmio_.attach(pci_) != MellowXe::MmioStatus::Ok) return failStart(provider);
     attached_ = true;
-    // Apple's copyMapperForDevice waits indefinitely for indirect iommu-parent
-    // identifiers. This diagnostic only admits an already attached mapper object.
-    // No global/identity mapper fallback and no boot-time wait for a missing one.
+    // Transfer the owned reference from this single property snapshot. A second
+    // copyMapperForDevice lookup could observe a changed indirect identifier and
+    // wait indefinitely for its service during boot. Missing/indirect properties
+    // remain query-only; no system or identity mapper fallback is permitted.
     auto *mapperProperty = pci_->copyProperty("iommu-parent");
-    if (OSDynamicCast(IOMapper, mapperProperty)) dma_.mapper = IOMapper::copyMapperForDevice(pci_);
-    if (mapperProperty) mapperProperty->release();
+    dma_.mapper = OSDynamicCast(IOMapper, mapperProperty);
+    if (!dma_.mapper && mapperProperty) mapperProperty->release();
     dma_.maxAllocationBytes = dma_.maxPinnedBytes = MELLOW_DIAG_MAX_BYTES;
     const auto ip = mmio_.forceWake().ip();
     XeMemory::Backend backend {};

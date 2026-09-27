@@ -2,6 +2,7 @@
 """Assemble a pinned experimental Sequoia EFI. Does not install, flash, or claim Metal support."""
 import argparse, copy, hashlib, json, os, plistlib, re, shutil, stat, struct, subprocess, tarfile, tempfile, urllib.request, zipfile
 from pathlib import Path, PurePosixPath
+from efi_boot_profiles import build_profiles
 ROOT=Path(__file__).resolve().parents[1]
 FONT_SUFFIXES={'.ttf','.otf','.woff','.woff2','.pfb','.pfm','.fon','.fnt'}
 def sha(path): return hashlib.sha256(Path(path).read_bytes()).hexdigest()
@@ -159,14 +160,8 @@ def main():
         config=configuration(plistlib.loads((base/'Docs/Sample.plist').read_bytes()),oc)
         (oc/'config.plist').write_bytes(plistlib.dumps(config,sort_keys=False))
         profiles=stage/'Profiles'; profiles.mkdir()
-        rescue=copy.deepcopy(config)
-        rescue['NVRAM']['Add']['7C436110-AB2A-4BBB-A880-FE41995C9F82']['boot-args']='-v keepsyms=1 debug=0x100 -mellowoff cpus=1'
-        next(k for k in rescue['Kernel']['Add'] if k['BundlePath']=='Mellow.kext')['Enabled']=False
-        (profiles/'config-rescue.plist').write_bytes(plistlib.dumps(rescue,sort_keys=False))
-        legacy=copy.deepcopy(config)
-        legacy['Booter']['Quirks'].update(DevirtualiseMmio=False,EnableWriteUnprotector=True,
-            RebuildAppleMemoryMap=False,SyncRuntimePermissions=False)
-        (profiles/'config-legacy-memory-map.plist').write_bytes(plistlib.dumps(legacy,sort_keys=False))
+        for name, profile in build_profiles(config).items():
+            (profiles/name).write_bytes(plistlib.dumps(profile,sort_keys=False))
         tests=[]
         validator=tools/'ocvalidate/ocvalidate.linux'
         import platform
@@ -204,7 +199,9 @@ def main():
     status={'schema':'mellow.efi-delivery/1','status':'PARTIAL_EXPERIMENTAL_NOT_FULL_METAL',
       'target':'SAMSUNG NT751XHD-KR735 / Core Ultra 7 255U / physical 8086:7D41',
       'os_target':'macOS Sequoia / Darwin 24','source_repository':'https://github.com/NiSeullent/Mellow',
-      'source_branch':'sequoia-255u-20260925','source_commit':source_commit,
+      'source_branch':os.environ.get('GITHUB_REF_NAME') or subprocess.check_output(
+          ['git','branch','--show-current'],cwd=ROOT,text=True).strip() or 'detached',
+      'source_commit':source_commit,
       'ci_url':os.environ.get('GITHUB_SERVER_URL','https://github.com')+'/'+os.environ.get('GITHUB_REPOSITORY','NiSeullent/Mellow')+'/actions/runs/'+os.environ.get('GITHUB_RUN_ID','local'),
       'mellow_version':'0.4.4','opencore_version':'1.0.7',
       'target_boot_verified':False,'target_kernel_load_verified':False,'native_gpu_submission_implemented':False,
