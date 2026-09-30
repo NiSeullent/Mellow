@@ -80,6 +80,21 @@ jobs:
           output.write_text(json.dumps(report, indent=2) + '\n')
           print(json.dumps(report))
           PY
+      - name: Show failed native build diagnostics
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'mellow-apple-userspace-${{ matrix.deployment }}' / 'apple-userspace-build.json'
+          if path.is_file():
+              report = json.loads(path.read_text())
+              print(report.get('status'), report.get('reason', ''))
+              for command in report.get('commands', []):
+                  if command.get('exit_code') != 0:
+                      print(command['name'])
+                      print(command.get('stdout', ''))
+                      print(command.get('stderr', ''))
+          PY
       - name: Retain SDK build evidence
         uses: actions/upload-artifact@v4
         if: always()

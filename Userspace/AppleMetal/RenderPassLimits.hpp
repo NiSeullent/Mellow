@@ -4,8 +4,8 @@
 #include <cstddef>
 
 namespace MellowAppleRender {
-// The public descriptor array has no exported capacity symbol. Keep its four
-// counter attachments independent of the eight color attachments. Native CI
+// The public descriptor array has no exported capacity symbol. This adapter
+// expects four counter attachments, separate from eight color attachments. CI
 // checks the public descriptor's index boundary on its recorded macOS host.
 constexpr std::size_t CounterAttachmentCount = 4;
 }

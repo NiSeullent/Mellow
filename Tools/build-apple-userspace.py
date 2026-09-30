@@ -197,6 +197,7 @@ def binary_identity(path, deployment, sdk_version, role):
 def build(report, out, compiler, sdk, env, deployment):
     headers = sorted(path.relative_to(ROOT).as_posix() for path in (ROOT / "Runtime").glob("*.hpp"))
     headers += ["Userspace/AppleMetal/MellowAppleMetal.h", "Userspace/AppleMetal/MellowAppleRenderMetal.h",
+                "Userspace/AppleMetal/RenderPassLimits.hpp",
                 "Userspace/WindowServer/SurfacePresenter.h",
                 "Userspace/WindowServer/SurfaceSnapshot.hpp", "Userspace/WindowServer/RenderFixtureOracle.hpp", "tests/render_fixture.hpp",
                 "tests/opencl_runtime_sha256.hpp", "Tools/build-apple-userspace.py"]
