@@ -2,7 +2,13 @@
 
 The native sources now have an explicit build entry point at `Tools/build-apple-userspace.py`. It builds the actual compute and render Metal-selector adapters, CGL/IOSurface rendering runtime, app presentation bridge and acceptance clients as x86_64 code. It does not install a driver or register a system Metal device.
 
-Native macOS SDK compilation and physical execution are **NOT_RUN** in the development Linux environment. The new runner was authored and its Python syntax checked without executing the runner. The commands below require separate approval before execution because the existing execution approval did not cover this new script.
+Native macOS SDK compilation and physical execution are **NOT_RUN** in the development Linux environment. The runner was authored and its Python syntax checked without executing it locally. The authorized GitHub publication adds a build-only CI job on a real macOS Intel runner; its reports, rather than source syntax checks, determine native SDK build status. The workflow supplies no execution options and does not run the acceptance clients or install a driver.
+
+## Native SDK CI
+
+`.github/workflows/apple-userspace.yml` compiles and links the production library, acceptance clients and read-only inventory for minimum macOS 15.0 and 26.0. It uses already installed Xcode 16.4 and 26.3 respectively and sets `DEVELOPER_DIR` only in that CI job. It checks the exact installed directory and records Xcode/SDK identity; there is no installation or global developer-tool selection. These toolchains are listed in the [official macOS 15 Intel runner inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md). Missing tools, compile failures and Mach-O identity failures remain job failures with reports retained.
+
+Successful build-only reports prove the recorded source compiled and linked against the selected public frameworks. They do not establish execution on macOS 15 or 26, unsupported-GPU acceleration, native Metal registration or WindowServer adoption. Kext CI builds a different target and does not cover these Objective-C++ units.
 
 ## Existing native prerequisites
 

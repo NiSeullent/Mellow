@@ -1,0 +1,54 @@
+name: Apple userspace SDK builds
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apple-userspace.yml'
+      - 'Tools/build-apple-userspace.py'
+      - 'Runtime/**'
+      - 'Userspace/**'
+  pull_request:
+    paths:
+      - '.github/workflows/apple-userspace.yml'
+      - 'Tools/build-apple-userspace.py'
+      - 'Runtime/**'
+      - 'Userspace/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: x86_64 Apple SDK target ${{ matrix.deployment }}
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/${{ matrix.xcode }}.app/Contents/Developer
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - deployment: '15.0'
+            xcode: Xcode_16.4
+          - deployment: '26.0'
+            xcode: Xcode_26.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record exact source and installed developer tools
+        run: |
+          test -d "$DEVELOPER_DIR"
+          git rev-parse HEAD
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+      - name: Compile and link Apple adapters and acceptance clients
+        run: |
+          python3 Tools/build-apple-userspace.py --out "$RUNNER_TEMP/mellow-apple-userspace-${{ matrix.deployment }}" --deployment-target '${{ matrix.deployment }}'
+      - name: Retain SDK build evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Mellow-Apple-userspace-${{ matrix.deployment }}
+          path: ${{ runner.temp }}/mellow-apple-userspace-${{ matrix.deployment }}/
+          if-no-files-found: error
+          retention-days: 30
