@@ -7,12 +7,14 @@ on:
       - 'Tools/build-apple-userspace.py'
       - 'Runtime/**'
       - 'Userspace/**'
+      - 'tests/apple_render_descriptor_bounds.mm'
   pull_request:
     paths:
       - '.github/workflows/apple-userspace.yml'
       - 'Tools/build-apple-userspace.py'
       - 'Runtime/**'
       - 'Userspace/**'
+      - 'tests/apple_render_descriptor_bounds.mm'
   workflow_dispatch:
 
 permissions:
@@ -57,6 +59,27 @@ jobs:
       - name: Compile and link Apple adapters and acceptance clients
         run: |
           python3 Tools/build-apple-userspace.py --out "$RUNNER_TEMP/mellow-apple-userspace-${{ matrix.deployment }}" --deployment-target '${{ matrix.deployment }}'
+      - name: Check public CPU descriptor index boundary
+        run: |
+          xcrun --sdk macosx clang++ -std=c++17 -fobjc-arc -arch x86_64 -mmacosx-version-min=15.0 tests/apple_render_descriptor_bounds.mm -framework Foundation -framework Metal -o "$RUNNER_TEMP/metal-descriptor-bounds"
+          python3 - <<'PY'
+          import json, os, pathlib, platform, subprocess
+          probe = pathlib.Path(os.environ['RUNNER_TEMP']) / 'metal-descriptor-bounds'
+          first = json.loads(subprocess.check_output([probe, '0'], text=True, timeout=10))
+          capacity = first['expected_capacity']
+          assert 0 < capacity <= 32
+          observations = [first]
+          for index in range(1, capacity + 1):
+              observations.append(json.loads(subprocess.check_output([probe, str(index)], text=True, timeout=10)))
+          for index, value in enumerate(observations):
+              assert value['index'] == index and value['expected_capacity'] == capacity
+              assert value['descriptor_available'] == (index < capacity)
+              assert value['gpu_submission'] is False
+          report = {'host_macos': platform.mac_ver()[0], 'scope': 'Public CPU descriptor array on this host; no device, GPU submission or macOS 26 runtime claim', 'observations': observations, 'passed': True}
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'mellow-apple-userspace-${{ matrix.deployment }}' / 'public-descriptor-bounds.json'
+          output.write_text(json.dumps(report, indent=2) + '\n')
+          print(json.dumps(report))
+          PY
       - name: Retain SDK build evidence
         uses: actions/upload-artifact@v4
         if: always()
