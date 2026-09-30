@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-09-30T10:41:03.412930+00:00",
+  "source_worktree": "/root/mellow-vendor-port-2f70",
+  "source_base_commit": "9fe59bbce2ef11e9a08f69a61f274bafce7a98e0",
+  "source_path": "Mellow/NvidiaCopyEncoder.hpp",
+  "source_dirty_snapshot": true,
+  "destination_path": "Drivers/PortedNvidiaCopy/NvidiaCopyEncoder.hpp",
+  "sha256": "9604685780e973ffec8757e5b71ffa5e3dc62fa7dcfb777b7629e602da6f89f8",
+  "method": "local-copy-unchanged",
+  "licence": "MIT; notices preserved in header",
+  "physical_gpu_execution": false
+}

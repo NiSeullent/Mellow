@@ -18,6 +18,8 @@ struct OpenCLDeviceInfo {
     bool deviceIdFromIntelExtension {};
     bool available {};
     bool compilerAvailable {};
+    IdentityScope identityScope {IdentityScope::ReportedPci};
+    bool apiObjectIdentityVerified {}; // Live queue/device/event ownership plus bootstrap; no PCI correlation.
 };
 
 struct OpenCLExecution {
@@ -40,6 +42,13 @@ struct OpenCLExecution {
     std::vector<uint32_t> output;
 };
 
+enum class OpenCLInitializationStatus : uint8_t { Ready, Unavailable, Failure };
+struct OpenCLInitialization {
+    OpenCLInitializationStatus status {OpenCLInitializationStatus::Failure};
+    bool bootstrapSubmissionAttempted {};
+    std::string error;
+};
+
 class OpenCLPipeline {
 public:
     ~OpenCLPipeline();
@@ -60,7 +69,9 @@ private:
 //
 // Input is explicitly OpenCL C, NOT MSL/AIR/Metal. This first adapter deliberately
 // supports one in-place uint buffer argument, bounded source and element counts.
-// Device IDs must come from an advertised driver extension, never friendly names.
+// PCI device IDs come only from an advertised extension. Without one, the
+// explicitly scoped Host/OpenCL API device identity requires a GPU-type query
+// and successful event/profiling/readback bootstrap; it makes no PCI correlation.
 // No kernel driver, firmware, interop, CPU fallback or display path is installed.
 class OpenCLProvider {
 public:
@@ -73,6 +84,7 @@ public:
     OpenCLProvider(const OpenCLProvider &) = delete;
     OpenCLProvider &operator=(const OpenCLProvider &) = delete;
     bool initialize(size_t gpuIndex, std::string &error);
+    OpenCLInitialization initializeDetailed(size_t gpuIndex);
     bool executeOpenClC(const std::string &source, const std::string &entry,
                        const std::vector<uint32_t> &input,
                        const std::vector<uint32_t> &expected, OpenCLExecution &result);

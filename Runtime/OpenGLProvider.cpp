@@ -29,6 +29,7 @@
 #define GL_SILENCE_DEPRECATION
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl3.h>
+#include <OpenGL/CGLIOSurface.h>
 #endif
 
 namespace MellowRT {
@@ -395,24 +396,67 @@ struct OpenGLProvider::Impl {
         }
         ~RenderResources() { if (!cleaned) clean(); }
     };
-    void render(GLuint program, const OpenGLRenderOptions &options, OpenGLFrame &frame) {
+    void render(GLuint program, const OpenGLRenderOptions &options, OpenGLFrame &frame
+#if defined(__APPLE__)
+                , IOSurfaceRef surface = nullptr
+#endif
+    ) {
         current();
         require(dimensions(options.width, options.height), "Render dimensions outside 1..2048");
         for (auto value : options.params) require(std::isfinite(value), "Non-finite render uniform rejected");
         for (auto value : options.clearColor) require(std::isfinite(value) && value >= 0 && value <= 1, "Clear color outside 0..1");
         require(!options.present || info.visibleWindow, "Presentation requires an explicitly visible owned window");
+#if defined(__APPLE__)
+        if (surface) {
+            // Public IOSurface query APIs describe allocation, not physical PCI
+            // ownership. Only the exact bounded non-planar BGRA8 contract is
+            // admitted; no format cast or CPU upload supplies rendered pixels.
+            require(CFGetTypeID(surface) == IOSurfaceGetTypeID(), "Render target is not an IOSurface");
+            require(IOSurfaceGetPlaneCount(surface) == 0, "Only non-planar IOSurface render targets are supported");
+            require(IOSurfaceGetPixelFormat(surface) == 0x42475241U, "IOSurface render target must be BGRA8");
+            require(IOSurfaceGetWidth(surface) == options.width && IOSurfaceGetHeight(surface) == options.height,
+                    "IOSurface dimensions differ from render dimensions");
+            require(IOSurfaceGetBytesPerElement(surface) == 4 && IOSurfaceGetElementWidth(surface) == 1 &&
+                    IOSurfaceGetElementHeight(surface) == 1, "IOSurface must have four-byte, one-pixel elements");
+            const auto rowBytes = IOSurfaceGetBytesPerRow(surface);
+            const auto allocation = IOSurfaceGetAllocSize(surface);
+            require(rowBytes >= static_cast<size_t>(options.width) * 4 &&
+                    rowBytes <= allocation / options.height, "IOSurface row/allocation bounds invalid");
+            require(!options.present, "IOSurface presentation belongs to the explicit consumer bridge");
+        }
+#endif
         require(sequence != std::numeric_limits<uint64_t>::max(), "Frame sequence exhausted");
         frame.width = options.width; frame.height = options.height; frame.epoch = epoch; frame.sequence = ++sequence;
         RenderResources resources {*this, 0, 0, 0, nullptr, false};
         glGenTextures(1, &resources.texture);
-        glBindTexture(GL_TEXTURE_2D, resources.texture);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, static_cast<GLsizei>(options.width), static_cast<GLsizei>(options.height),
-                     0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        GLenum textureTarget = GL_TEXTURE_2D;
+#if defined(__APPLE__)
+        if (surface) textureTarget = GL_TEXTURE_RECTANGLE;
+#endif
+        glBindTexture(textureTarget, resources.texture);
+        glTexParameteri(textureTarget, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(textureTarget, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+#if defined(__APPLE__)
+        if (surface) {
+            // Apple's MultiGPUIOSurface sample documents binding an IOSurface
+            // as a GL texture and rendering into it through an FBO. The public
+            // CGLIOSurface.h API uses the bound rectangle texture, plane zero,
+            // and BGRA/reversed-8888 for native four-byte BGRA storage.
+            // https://developer.apple.com/library/archive/samplecode/MultiGPUIOSurface/Introduction/Intro.html
+            const auto result = CGLTexImageIOSurface2D(context, textureTarget, GL_RGBA,
+                static_cast<GLsizei>(options.width), static_cast<GLsizei>(options.height),
+                GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, surface, 0);
+            require(result == kCGLNoError,
+                    std::string("CGLTexImageIOSurface2D: ") + CGLErrorString(result));
+        } else
+#endif
+        {
+            glTexImage2D(textureTarget, 0, GL_RGBA8, static_cast<GLsizei>(options.width), static_cast<GLsizei>(options.height),
+                         0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        }
         gl.GenFramebuffers(1, &resources.framebuffer);
         gl.BindFramebuffer(GL_FRAMEBUFFER, resources.framebuffer);
-        gl.FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, resources.texture, 0);
+        gl.FramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, textureTarget, resources.texture, 0);
         require(resources.texture && resources.framebuffer &&
                 gl.CheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "RGBA8 offscreen framebuffer incomplete");
         gl.GenVertexArrays(1, &resources.vao); gl.BindVertexArray(resources.vao);
@@ -471,6 +515,12 @@ struct OpenGLProvider::Impl {
         resources.clean();
         glCheck("Per-frame resource cleanup");
         frame.resourcesReleased = true;
+#if defined(__APPLE__)
+        if (surface) {
+            frame.ioSurfaceID = IOSurfaceGetID(surface);
+            frame.ioSurfaceWritten = true;
+        }
+#endif
     }
 #endif
 };
@@ -543,6 +593,36 @@ bool OpenGLProvider::render(const std::shared_ptr<OpenGLPipeline> &pipeline, con
         }
     });
 }
+#if defined(__APPLE__)
+bool OpenGLProvider::renderToIOSurface(const std::shared_ptr<OpenGLPipeline> &pipeline,
+                                     const OpenGLRenderOptions &options, IOSurfaceRef surface, OpenGLFrame &frame) {
+    frame = {};
+    if (!surface) { frame.error = "IOSurface render target is null"; return false; }
+    // The caller keeps the surface alive through entry. This reference then
+    // spans queued worker execution, GL object cleanup and any failure teardown.
+    CFRetain(surface);
+    struct SurfaceReference {
+        IOSurfaceRef surface;
+        ~SurfaceReference() { CFRelease(surface); }
+    } retained {surface};
+    return impl_->invoke([&] {
+        try {
+            require(pipeline && pipeline->impl_->owner == impl_, "Render pipeline belongs to another provider");
+            require(pipeline->impl_->epoch == impl_->epoch && pipeline->impl_->program != 0, "Render pipeline epoch is stale");
+            impl_->render(pipeline->impl_->program, options, frame, surface);
+            return frame.renderSubmitted && frame.fenceSignaled && frame.readbackCompleted &&
+                   frame.resourcesReleased && frame.ioSurfaceWritten;
+        } catch (const std::exception &failure) {
+            frame.error = failure.what();
+            // A failed IOSurface binding/setup can leave GL error state before
+            // draw submission. Validation failures precede sequence assignment;
+            // any later failure tears down that context rather than reusing it.
+            if (frame.sequence) impl_->invalidate();
+            return false;
+        }
+    });
+}
+#endif
 OpenGLDeviceInfo OpenGLProvider::deviceInfo() const { return impl_->invoke([this] { return impl_->info; }); }
 uint64_t OpenGLProvider::pipelineBuildCount() const { return impl_->invoke([this] { return impl_->compilations; }); }
 void OpenGLProvider::invalidateSession() { impl_->invoke([this] { impl_->invalidate(); }); }

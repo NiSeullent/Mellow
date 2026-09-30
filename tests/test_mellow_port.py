@@ -1,16 +1,20 @@
 """Artifact and rejection tests; no compiler/GPU success is inferred."""
 import hashlib
+import importlib.util
+import io
 import json
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+from contextlib import redirect_stderr, redirect_stdout
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "Tools"))
-from mellow_port import PortError, load_recipes, prepare
-from mellow_port.core import inventory, lexical
+from mellow_port import PortError, load_recipes, recipe_choices, available_targets, prepare
+from mellow_port.core import FAMILIES_PATH, RECIPES_PATH, inventory, lexical, recipe_registry
 
 REVISION = "4d7d9486c04d917265f64c55bd23b2cc4fe7749c"
 FILE = "drivers/gpu/drm/xe/regs/test_regs.h"
@@ -117,7 +121,8 @@ class PortTests(unittest.TestCase):
             self.assertEqual(json.loads((self.root / target / "backend.json").read_text())["pci_device_ids"], [])
 
     def test_linux_family_recipes_enforce_allowlists_and_admission(self):
-        shared = ["include/drm/fixture.h", "include/linux/fixture.h"]
+        shared = ["include/drm/fixture.h", "include/linux/fixture.h",
+                  "include/uapi/drm/fixture.h", "include/uapi/linux/fixture.h"]
         cases = (
             ("i915", "drivers/gpu/drm/i915/gem/fixture.h", "drivers/gpu/drm/i915-extra/fixture.h"),
             ("nouveau", "drivers/gpu/drm/nouveau/nvkm/fixture.h", "drivers/gpu/drm/nouveau-extra/fixture.h"),
@@ -160,6 +165,239 @@ class PortTests(unittest.TestCase):
             self.run_port("modeset-rejected", target="nvidia-open", files=[sibling])
         self.assertFalse((self.root / "modeset-rejected").exists())
 
+    def make_source(self, relative):
+        path = self.source / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(SOURCE, encoding="utf-8")
+        return relative
+
+    def test_target_choices_follow_recipe_registry(self):
+        recipes = json.loads(RECIPES_PATH.read_bytes())["recipes"]
+        self.assertEqual(set(available_targets()), set(recipes))
+        self.assertTrue({"xe", "amdgpu", "nvidia-open", "i915", "nouveau"} <= set(recipes))
+
+    def test_recipe_api_preserves_exact_registry_bytes_and_manifest_pin(self):
+        raw = b"\n" + RECIPES_PATH.read_bytes() + b"\n"
+        registry_file = self.root / "spaced-recipes.json"
+        registry_file.write_bytes(raw)
+        with patch("mellow_port.core.RECIPES_PATH", registry_file):
+            data, recipes = load_recipes()
+            self.assertEqual(data, raw)
+            self.assertEqual(recipe_registry(), (data, recipes))
+            self.assertEqual(recipe_choices(), tuple(sorted(recipes)))
+            self.assertEqual(available_targets(), recipe_choices())
+            self.run_port("exact-registry")
+        manifest = json.loads((self.root / "exact-registry/source-manifest.json").read_bytes())
+        self.assertEqual(manifest["recipe_sha256"], hashlib.sha256(raw).hexdigest())
+        self.assertFalse(manifest["revision_membership_verified"])
+
+    def test_recipe_api_compatibility_entries_do_not_bypass_validation(self):
+        raw = RECIPES_PATH.read_text(encoding="utf-8").replace(
+            '"schema_version": 1', '"schema_version": 1, "schema_version": 1', 1)
+        registry_file = self.root / "duplicate-api-recipes.json"
+        registry_file.write_text(raw, encoding="utf-8")
+        with patch("mellow_port.core.RECIPES_PATH", registry_file):
+            for entry_point in (load_recipes, recipe_registry, recipe_choices, available_targets):
+                with self.subTest(entry_point=entry_point.__name__), self.assertRaisesRegex(PortError, "Duplicate JSON"):
+                    entry_point()
+
+    def test_all_family_source_pairs_keep_hardware_admission_closed(self):
+        profiles = json.loads(FAMILIES_PATH.read_bytes())["families"]
+        source_paths = {
+            "i915": "drivers/gpu/drm/i915/fixture.h",
+            "xe": FILE,
+            "nouveau": "drivers/gpu/drm/nouveau/fixture.h",
+            "nvidia-open": "kernel-open/nvidia/fixture.h",
+        }
+        for family, profile in profiles.items():
+            for target in profile["source_targets"]:
+                with self.subTest(family=family, target=target):
+                    relative = self.make_source(source_paths[target])
+                    output = family + "-" + target
+                    result = self.run_port(output, target=target, files=[relative], gpu_family=family, require_ready=True)
+                    self.assertEqual(result["exit_code"], 2)
+                    self.assertFalse(result["driver_ready"])
+                    self.assertFalse(result["hardware_test_performed"])
+                    manifest = json.loads((self.root / output / "source-manifest.json").read_bytes())
+                    contract = manifest["adapter_contract"]
+                    self.assertEqual(contract["gpu_family"], family)
+                    self.assertEqual(contract["registry_sha256"], hashlib.sha256(FAMILIES_PATH.read_bytes()).hexdigest())
+                    self.assertTrue(contract["source_profile_compatible"])
+                    self.assertFalse(contract["runtime_device_admitted"])
+                    self.assertFalse(contract["physical_gpu_verified"])
+                    backend = json.loads((self.root / output / "backend.json").read_bytes())
+                    self.assertEqual(backend["adapter_contract"], contract)
+                    self.assertEqual(backend["implemented_entry_points"], [])
+                    self.assertEqual(backend["pci_device_ids"], [])
+                    gaps = json.loads((self.root / output / "gap-report.json").read_bytes())["gaps"]
+                    self.assertTrue({"adapter-firmware", "adapter-userspace", "adapter-source-provenance", "family-admission"} <= {gap["id"] for gap in gaps})
+
+    def test_wrong_vendor_and_pre_turing_rm_rejected_before_output(self):
+        pairs = [("nvidia-open", family) for family in ("nvidia-maxwell", "nvidia-pascal", "nvidia-volta")]
+        pairs += [("xe", "nvidia-ampere"), ("nouveau", "intel-tgl"), ("xe", "intel-icl"), ("i915", "intel-lnl"), ("xe", "invented-family")]
+        for target, family in pairs:
+            with self.subTest(target=target, family=family):
+                destination = self.root / (target + "-" + family)
+                with self.assertRaises(PortError):
+                    self.run_port(destination, target=target, gpu_family=family)
+                self.assertFalse(destination.exists())
+
+    def test_rm_and_nouveau_sources_cannot_be_mixed(self):
+        rm = self.make_source("kernel-open/nvidia/fixture.h")
+        nouveau = self.make_source("drivers/gpu/drm/nouveau/fixture.h")
+        for target in ("nvidia-open", "nouveau"):
+            with self.subTest(target=target), self.assertRaises(PortError):
+                self.run_port(target, target=target, files=[rm, nouveau], gpu_family="nvidia-ampere")
+            self.assertFalse((self.root / target).exists())
+
+    def test_family_plans_are_deterministic_and_do_not_manufacture_verification(self):
+        relative = self.make_source("drivers/gpu/drm/nouveau/fixture.h")
+        for output in ("family-one", "family-two"):
+            self.run_port(output, target="nouveau", files=[relative], gpu_family="nvidia-maxwell")
+        files = lambda folder: {p.relative_to(folder).as_posix(): p.read_bytes() for p in folder.rglob("*") if p.is_file()}
+        self.assertEqual(files(self.root / "family-one"), files(self.root / "family-two"))
+        manifest = json.loads((self.root / "family-one/source-manifest.json").read_bytes())
+        self.assertFalse(manifest["revision_membership_verified"])
+        self.assertFalse(manifest["adapter_contract"]["physical_gpu_verified"])
+
+    def test_unspecified_family_is_not_inferred_from_filename_or_source(self):
+        relative = self.make_source("kernel-open/nvidia/maxwell.h")
+        self.run_port("unspecified", target="nvidia-open", files=[relative])
+        contract = json.loads((self.root / "unspecified/plan.json").read_bytes())["adapter_contract"]
+        self.assertIsNone(contract["gpu_family"])
+        self.assertIsNone(contract["source_profile_compatible"])
+        self.assertFalse(contract["runtime_device_admitted"])
+
+    def test_cli_accepts_new_target_and_preserves_not_ready_exit(self):
+        relative = self.make_source("drivers/gpu/drm/nouveau/fixture.h")
+        result = subprocess.run([sys.executable, str(REPO / "Tools/mellow-port.py"), "plan", "--source-root", str(self.source), "--target", "nouveau", "--gpu-family", "nvidia-maxwell", "--revision", REVISION, "--file", relative, "--output", str(self.root / "nouveau-cli"), "--require-ready"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse(json.loads(result.stdout)["driver_ready"])
+
+    def test_malformed_family_registry_never_emits_compatible_output(self):
+        mutations = [
+            ("schema_version", True),
+            ("source_targets", "nouveau-extra"),
+            ("source_targets", None),
+            ("source_targets", [None]),
+            ("runtime_device_admission", True),
+            ("physical_gpu_verified", True),
+            ("vendor", "Intel"),
+        ]
+        relative = self.make_source("drivers/gpu/drm/nouveau/fixture.h")
+        for index, (field, value) in enumerate(mutations):
+            with self.subTest(field=field, value=value):
+                document = json.loads(FAMILIES_PATH.read_bytes())
+                (document if field == "schema_version" else document["families"]["nvidia-maxwell"])[field] = value
+                registry_file = self.root / "family-registry.json"
+                registry_file.write_text(json.dumps(document), encoding="utf-8")
+                output = self.root / ("malformed-family-" + str(index))
+                with patch("mellow_port.core.FAMILIES_PATH", registry_file), self.assertRaises(PortError):
+                    self.run_port(output, target="nouveau", files=[relative], gpu_family="nvidia-maxwell")
+                self.assertFalse(output.exists())
+
+    def test_invalid_recipe_registries_reject_without_cli_traceback(self):
+        spec = importlib.util.spec_from_file_location("mellow_port_cli_tests", REPO / "Tools/mellow-port.py")
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        valid = json.loads(RECIPES_PATH.read_bytes())
+        documents = [None, {"schema_version": True, "recipes": valid["recipes"]}, {"schema_version": 1, "recipes": None}]
+        invalid_requirements = json.loads(RECIPES_PATH.read_bytes())
+        invalid_requirements["recipes"]["xe"]["requirements"]["firmware"] = "not a list"
+        documents.append(invalid_requirements)
+        for index, content in enumerate(["{invalid-json", *[json.dumps(document) for document in documents], None]):
+            with self.subTest(index=index):
+                registry_file = self.root / ("recipes-" + str(index) + ".json")
+                if content is not None:
+                    registry_file.write_text(content, encoding="utf-8")
+                stderr = io.StringIO()
+                with patch("mellow_port.core.RECIPES_PATH", registry_file), redirect_stderr(stderr):
+                    self.assertEqual(cli.main(["--help"]), 1)
+                rejection = json.loads(stderr.getvalue())
+                self.assertFalse(rejection["artifacts_generated"])
+                self.assertFalse(rejection["driver_ready"])
+                self.assertIn("error", rejection)
+
+    def test_duplicate_registry_keys_rejected_before_output(self):
+        recipes = RECIPES_PATH.read_text(encoding="utf-8")
+        families = FAMILIES_PATH.read_text(encoding="utf-8")
+        cases = [
+            ("RECIPES_PATH", recipes.replace('"schema_version": 1', '"schema_version": 1, "schema_version": 1', 1)),
+            ("RECIPES_PATH", recipes.replace('"vendor": "Intel"', '"vendor": "Intel", "vendor": "Intel"', 1)),
+            ("FAMILIES_PATH", families.replace('"physical_gpu_verified": false',
+                '"physical_gpu_verified": true, "physical_gpu_verified": false', 1)),
+        ]
+        for index, (field, raw) in enumerate(cases):
+            with self.subTest(field=field, index=index):
+                registry_file = self.root / ("duplicate-" + str(index) + ".json")
+                registry_file.write_text(raw, encoding="utf-8")
+                output = self.root / ("duplicate-output-" + str(index))
+                with patch("mellow_port.core." + field, registry_file), self.assertRaisesRegex(PortError, "Duplicate JSON"):
+                    self.run_port(output, gpu_family="intel-tgl")
+                self.assertFalse(output.exists())
+
+    def test_nonfinite_registry_metadata_rejected_before_output(self):
+        for field, original, collection, entry in (
+                ("RECIPES_PATH", RECIPES_PATH, "recipes", "xe"),
+                ("FAMILIES_PATH", FAMILIES_PATH, "families", "intel-tgl")):
+            document = json.loads(original.read_bytes())
+            document[collection][entry]["unreviewed_metadata"] = 0
+            valid = json.dumps(document)
+            for index, literal in enumerate(("NaN", "Infinity", "-Infinity", "1e999", "-1e999")):
+                with self.subTest(field=field, literal=literal):
+                    registry_file = self.root / (field + "-nonfinite-" + str(index) + ".json")
+                    registry_file.write_text(valid.replace('"unreviewed_metadata": 0',
+                        '"unreviewed_metadata": ' + literal, 1), encoding="utf-8")
+                    output = self.root / (field + "-nonfinite-output-" + str(index))
+                    with patch("mellow_port.core." + field, registry_file), self.assertRaisesRegex(PortError, "Nonfinite JSON"):
+                        self.run_port(output, gpu_family="intel-tgl")
+                    self.assertFalse(output.exists())
+            # Ordinary finite numbers and these words inside strings remain
+            # valid JSON metadata; rejecting numeric tokens is not text filtering.
+            document[collection][entry]["unreviewed_metadata"] = {"finite": 0.125, "text": "NaN Infinity"}
+            registry_file = self.root / (field + "-finite.json")
+            registry_file.write_text(json.dumps(document), encoding="utf-8")
+            with patch("mellow_port.core." + field, registry_file):
+                self.assertFalse(self.run_port(field + "-finite-output", gpu_family="intel-tgl")["driver_ready"])
+
+    def test_recipe_prefixes_require_canonical_relative_directories(self):
+        malformed = ("", "drivers/gpu/drm/xe", "/drivers/gpu/drm/xe/", "C:/drivers/",
+                     "../drivers/", "drivers/../xe/", "drivers/./xe/", "drivers//xe/",
+                     "drivers\\gpu\\xe\\", "./drivers/", "drivers/gpu/drm/xe//")
+        for field in ("source_prefixes", "admission_prefixes"):
+            for index, prefix in enumerate(malformed):
+                with self.subTest(field=field, prefix=prefix):
+                    document = json.loads(RECIPES_PATH.read_bytes())
+                    document["recipes"]["xe"][field] = [prefix]
+                    registry_file = self.root / (field + "-prefix-" + str(index) + ".json")
+                    registry_file.write_text(json.dumps(document), encoding="utf-8")
+                    output = self.root / (field + "-prefix-output-" + str(index))
+                    with patch("mellow_port.core.RECIPES_PATH", registry_file), self.assertRaises(PortError):
+                        self.run_port(output)
+                    self.assertFalse(output.exists())
+
+    def test_admission_prefixes_must_stay_in_source_directories(self):
+        for index, prefix in enumerate(("drivers/gpu/drm/xe-evil/", "drivers/gpu/drm/", "kernel-open/", "include/drm-evil/")):
+            with self.subTest(prefix=prefix):
+                document = json.loads(RECIPES_PATH.read_bytes())
+                document["recipes"]["xe"]["admission_prefixes"] = [prefix]
+                registry_file = self.root / ("outside-admission-" + str(index) + ".json")
+                registry_file.write_text(json.dumps(document), encoding="utf-8")
+                output = self.root / ("outside-admission-output-" + str(index))
+                with patch("mellow_port.core.RECIPES_PATH", registry_file), self.assertRaisesRegex(PortError, "Admission prefix"):
+                    self.run_port(output)
+                self.assertFalse(output.exists())
+        document = json.loads(RECIPES_PATH.read_bytes())
+        document["recipes"]["xe"]["admission_prefixes"] = ["drivers/gpu/drm/xe/regs/"]
+        registry_file = self.root / "nested-admission.json"
+        registry_file.write_text(json.dumps(document), encoding="utf-8")
+        with patch("mellow_port.core.RECIPES_PATH", registry_file):
+            self.assertFalse(self.run_port("nested-admission-output")["driver_ready"])
+        sibling = self.make_source("drivers/gpu/drm/xe-evil/fixture.h")
+        with self.assertRaises(PortError):
+            self.run_port("sibling-source-output", files=[sibling])
+        self.assertFalse((self.root / "sibling-source-output").exists())
+
     def test_output_never_overwrites_or_modifies_source(self):
         before = (self.source / FILE).read_bytes()
         with self.assertRaises(PortError):
@@ -197,11 +435,36 @@ class PortTests(unittest.TestCase):
 
     def test_cli_target_choices_match_shared_recipe_registry(self):
         recipe_bytes, recipes = load_recipes()
+        self.assertEqual(recipe_bytes, RECIPES_PATH.read_bytes())
         self.assertEqual(json.loads(recipe_bytes)["recipes"], recipes)
+        self.assertEqual(recipe_choices(), tuple(sorted(recipes)))
+        self.assertEqual(available_targets(), recipe_choices())
         result = subprocess.run([sys.executable, str(REPO / "Tools/mellow-port.py"), "--help"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--target {" + ",".join(sorted(recipes)) + "}", " ".join(result.stdout.split()))
         self.assertTrue({"xe", "i915", "amdgpu", "nouveau", "nvidia-open"}.issubset(recipes))
+
+    def test_cli_admits_a_new_validated_registry_target_without_hardcoded_choices(self):
+        document = json.loads(RECIPES_PATH.read_bytes())
+        document["recipes"]["xe-review"] = document["recipes"]["xe"]
+        registry_file = self.root / "extended-recipes.json"
+        registry_file.write_text(json.dumps(document), encoding="utf-8")
+        spec = importlib.util.spec_from_file_location("mellow_port_cli_extended_tests", REPO / "Tools/mellow-port.py")
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        stdout = io.StringIO()
+        output = self.root / "registry-target-cli"
+        with patch("mellow_port.core.RECIPES_PATH", registry_file), redirect_stdout(stdout):
+            result = cli.main(["plan", "--source-root", str(self.source), "--target", "xe-review",
+                               "--revision", REVISION, "--file", FILE, "--output", str(output),
+                               "--require-ready"])
+        self.assertEqual(result, 2)
+        receipt = json.loads(stdout.getvalue())
+        self.assertEqual(receipt["target"], "xe-review")
+        self.assertTrue(receipt["artifacts_generated"])
+        self.assertFalse(receipt["driver_ready"])
+        self.assertFalse(receipt["compile_performed"])
+        self.assertFalse(receipt["hardware_test_performed"])
 
     def test_cli_new_targets_emit_review_artifacts_with_readiness_false(self):
         for target, relative in (("i915", "drivers/gpu/drm/i915/fixture.h"),

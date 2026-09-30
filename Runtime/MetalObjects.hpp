@@ -21,6 +21,8 @@ class CommandQueue; class CommandBuffer; class ComputeEncoder;
 class Device : public std::enable_shared_from_this<Device> {
 public:
     static std::shared_ptr<Device> createOpenCL(size_t gpuIndex, Error &error);
+    static std::shared_ptr<Device> createOpenCL(size_t gpuIndex, Error &error,
+                                               MellowRT::OpenCLInitialization *initialization);
     std::shared_ptr<Buffer> newBuffer(const std::vector<uint32_t> &words, Error &error);
     std::shared_ptr<Library> newLibraryWithSource(const std::string &msl, Error &error);
     std::shared_ptr<Library> newLibraryWithAirText(const std::string &decodedAir, Error &error);

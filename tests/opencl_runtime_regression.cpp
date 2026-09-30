@@ -12,7 +12,9 @@ using namespace MellowRT;
 using namespace MellowRT::OpenCLAbi;
 static unsigned checks {};
 #define CHECK(x) do { ++checks; if (!(x)) { std::fprintf(stderr, "FAIL %d: %s\n", __LINE__, #x); std::exit(1); } } while (false)
-enum class Mode { Intel, MissingIdentity, IdentityQueryFails, NoPlatforms, ContextFails, WrongBootstrap };
+enum class Mode { Intel, MissingIdentity, ApiWideVendor, CpuMasquerade, UnavailableCompiler,
+    IdentityQueryFails, NoPlatforms, NoDevices, PlatformQueryFails, ContextFails,
+    WrongBootstrap, ApiWrongBootstrap, EnqueueFails };
 static Mode mode = Mode::Intel;
 static bool failFinish {}, failEventRelease {}, failBuild {}, failKernel {};
 static unsigned enqueues {}, releases {}, eventReleases {}, identityQueries {};
@@ -36,6 +38,7 @@ static Int putText(const std::string &value, size_t size, void *output, size_t *
 static Int MELLOW_CL_CALL platforms(UInt, Handle *output, UInt *count) {
     if (count) *count = mode == Mode::NoPlatforms ? 0 : 1;
     if (mode == Mode::NoPlatforms) return PlatformNotFound;
+    if (mode == Mode::PlatformQueryFails) return -5;
     if (output) output[0] = &platformTag;
     return Success;
 }
@@ -43,22 +46,27 @@ static Int MELLOW_CL_CALL platformInfo(Handle, UInt, size_t size, void *output, 
     return putText("SYNTHETIC ICD: NO GPU", size, output, actual);
 }
 static Int MELLOW_CL_CALL devices(Handle, Bits type, UInt, Handle *output, UInt *count) {
-    if (type != Gpu) return DeviceNotFound;
+    if (type != Gpu || mode == Mode::NoDevices) return DeviceNotFound;
     if (count) *count = 1;
     if (output) output[0] = &deviceTag;
     return Success;
 }
 static Int MELLOW_CL_CALL deviceInfo(Handle, UInt parameter, size_t size, void *output, size_t *actual) {
     switch (parameter) {
-        case DeviceType: return put<Bits>(Gpu, size, output, actual);
-        case VendorId: return put<UInt>(mode == Mode::MissingIdentity ? 0x10DE : 0x8086, size, output, actual);
-        case DeviceAvailable: case CompilerAvailable: return put<UInt>(1, size, output, actual);
+        case DeviceType: return put<Bits>(mode == Mode::CpuMasquerade ? Cpu : Gpu, size, output, actual);
+        case VendorId: return put<UInt>(mode == Mode::ApiWideVendor ? 0x10001 :
+            (mode == Mode::MissingIdentity || mode == Mode::ApiWrongBootstrap || mode == Mode::EnqueueFails)
+                ? 0x10DE : 0x8086, size, output, actual);
+        case DeviceAvailable: return put<UInt>(1, size, output, actual);
+        case CompilerAvailable: return put<UInt>(mode == Mode::UnavailableCompiler ? 0 : 1, size, output, actual);
         case IntelDeviceId:
             ++identityQueries;
             if (mode == Mode::IdentityQueryFails) return -30;
             return put<UInt>(0x7D41, size, output, actual);
         case DeviceExtensions:
-            return putText(mode == Mode::MissingIdentity ? "" : "cl_intel_device_attribute_query", size, output, actual);
+            return putText(mode == Mode::MissingIdentity || mode == Mode::ApiWideVendor ||
+                mode == Mode::CpuMasquerade || mode == Mode::ApiWrongBootstrap || mode == Mode::EnqueueFails
+                ? "" : "cl_intel_device_attribute_query", size, output, actual);
         default: return putText("Synthetic fixture", size, output, actual);
     }
 }
@@ -86,7 +94,9 @@ static Handle MELLOW_CL_CALL createBuffer(Handle, Bits, size_t size, void *input
 static Int MELLOW_CL_CALL setArg(Handle, UInt, size_t, const void *) { return Success; }
 static Int MELLOW_CL_CALL enqueue(Handle, Handle, UInt, const size_t *, const size_t *, const size_t *, UInt, const Handle *, Handle *event) {
     ++enqueues;
-    for (auto &word : memory) word = word * 7 + (mode == Mode::WrongBootstrap ? 4 : 3);
+    if (mode == Mode::EnqueueFails) return -5;
+    for (auto &word : memory) word = word * 7 +
+        (mode == Mode::WrongBootstrap || mode == Mode::ApiWrongBootstrap ? 4 : 3);
     *event = &eventTag;
     return Success;
 }
@@ -137,35 +147,83 @@ int main() {
     const auto firstSequence = provider.bootstrapEvidence().sequence;
     CHECK(!provider.initialize(0, error)); // Redundant initialize preserves live session.
     CHECK(provider.descriptor().verified != 0);
+    const auto duplicate = provider.initializeDetailed(0);
+    CHECK(duplicate.status == OpenCLInitializationStatus::Failure && !duplicate.bootstrapSubmissionAttempted);
+    CHECK(provider.descriptor().verified != 0);
     provider.invalidateSession();
     mode = Mode::MissingIdentity;
     const auto queries = identityQueries;
-    CHECK(!provider.initialize(0, error));
+    CHECK(provider.initialize(0, error));
     CHECK(identityQueries == queries); // Must not query an unadvertised extension.
     CHECK(provider.device().reportedVendorId == 0x10DE);
     CHECK(provider.device().reportedDeviceId == 0);
     CHECK(!provider.device().deviceIdFromIntelExtension);
-    CHECK(!provider.bootstrapEvidence().submitted);
-    CHECK(provider.bootstrapEvidence().output.empty());
-    CHECK(provider.descriptor().device.deviceId == 0 && provider.descriptor().verified == 0);
+    CHECK(provider.bootstrapEvidence().submitted && provider.bootstrapEvidence().resultsVerified);
+    CHECK(provider.device().apiObjectIdentityVerified);
+    CHECK(provider.device().identityScope == IdentityScope::OpenClDeviceObject);
+    CHECK(provider.descriptor().device.deviceId == 0 && provider.descriptor().verified != 0);
+    CHECK(provider.descriptor().device.scope == IdentityScope::OpenClDeviceObject);
+    CHECK(provider.descriptor().device.apiVendorId == 0x10DE);
+    OpenCLExecution apiExecution;
+    CHECK(provider.executeOpenClC(OpenCLProvider::witnessSource(), "mellow_witness", {1, 2}, {10, 17}, apiExecution));
+    CHECK(apiExecution.runtimePlanned && apiExecution.runtimeCompletionAccepted && apiExecution.resourcesReleased);
     CHECK(provider.descriptor().resetEpoch > firstEpoch);
+    provider.invalidateSession();
+    CHECK(!provider.device().apiObjectIdentityVerified);
+    mode = Mode::ApiWideVendor;
+    const auto wide = provider.initializeDetailed(0);
+    CHECK(wide.status == OpenCLInitializationStatus::Ready && wide.error.empty() && wide.bootstrapSubmissionAttempted);
+    CHECK(provider.device().reportedVendorId == 0x10001 && provider.device().reportedDeviceId == 0);
+    CHECK(provider.descriptor().device.vendorId == 0 && provider.descriptor().device.apiVendorId == 0x10001);
+    provider.invalidateSession();
+    mode = Mode::CpuMasquerade;
+    const auto cpu = provider.initializeDetailed(0);
+    CHECK(cpu.status == OpenCLInitializationStatus::Failure && !cpu.bootstrapSubmissionAttempted);
+    CHECK(!provider.device().apiObjectIdentityVerified && !provider.descriptor().verified);
+    mode = Mode::UnavailableCompiler;
+    const auto noCompiler = provider.initializeDetailed(0);
+    CHECK(noCompiler.status == OpenCLInitializationStatus::Unavailable && !noCompiler.bootstrapSubmissionAttempted);
     mode = Mode::IdentityQueryFails;
     CHECK(!provider.initialize(0, error));
     CHECK(provider.device().reportedDeviceId == 0);
     CHECK(!provider.device().deviceIdFromIntelExtension);
     CHECK(!provider.bootstrapEvidence().submitted);
     mode = Mode::NoPlatforms;
-    CHECK(!provider.initialize(0, error));
+    const auto noPlatforms = provider.initializeDetailed(0);
+    CHECK(noPlatforms.status == OpenCLInitializationStatus::Unavailable && !noPlatforms.bootstrapSubmissionAttempted);
     CHECK(provider.device().reportedVendorId == 0 && provider.device().name.empty());
     CHECK(!provider.bootstrapEvidence().submitted);
+    mode = Mode::NoDevices;
+    const auto noDevices = provider.initializeDetailed(0);
+    CHECK(noDevices.status == OpenCLInitializationStatus::Unavailable && !noDevices.bootstrapSubmissionAttempted);
+    mode = Mode::PlatformQueryFails;
+    const auto platformFailure = provider.initializeDetailed(0);
+    CHECK(platformFailure.status == OpenCLInitializationStatus::Failure && !platformFailure.bootstrapSubmissionAttempted);
     mode = Mode::ContextFails;
-    CHECK(!provider.initialize(0, error));
+    const auto contextFailure = provider.initializeDetailed(0);
+    CHECK(contextFailure.status == OpenCLInitializationStatus::Failure && !contextFailure.bootstrapSubmissionAttempted);
     CHECK(!provider.bootstrapEvidence().submitted);
     CHECK(provider.descriptor().verified == 0);
     mode = Mode::WrongBootstrap;
-    CHECK(!provider.initialize(0, error));
+    const auto wrongBootstrap = provider.initializeDetailed(0);
+    CHECK(wrongBootstrap.status == OpenCLInitializationStatus::Failure && wrongBootstrap.bootstrapSubmissionAttempted);
     CHECK(provider.bootstrapEvidence().submitted && !provider.bootstrapEvidence().resultsVerified);
     CHECK(provider.descriptor().verified == 0);
+    mode = Mode::ApiWrongBootstrap;
+    const auto wrongApiBootstrap = provider.initializeDetailed(0);
+    CHECK(wrongApiBootstrap.status == OpenCLInitializationStatus::Failure && wrongApiBootstrap.bootstrapSubmissionAttempted);
+    CHECK(!provider.device().apiObjectIdentityVerified && provider.descriptor().verified == 0);
+    mode = Mode::EnqueueFails;
+    const auto ambiguous = provider.initializeDetailed(0);
+    CHECK(ambiguous.status == OpenCLInitializationStatus::Failure && ambiguous.bootstrapSubmissionAttempted);
+    CHECK(!provider.bootstrapEvidence().submitted && !provider.device().apiObjectIdentityVerified);
+    mode = Mode::MissingIdentity;
+    failBuild = true;
+    const auto bootstrapBuildFailure = provider.initializeDetailed(0);
+    CHECK(bootstrapBuildFailure.status == OpenCLInitializationStatus::Failure &&
+          !bootstrapBuildFailure.bootstrapSubmissionAttempted && !bootstrapBuildFailure.error.empty());
+    CHECK(!provider.device().apiObjectIdentityVerified && provider.descriptor().verified == 0);
+    failBuild = false;
     mode = Mode::Intel;
     CHECK(provider.initialize(0, error));
     CHECK(error.empty());

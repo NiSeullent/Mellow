@@ -5,14 +5,20 @@ import json
 from pathlib import Path
 import sys
 
-from mellow_port import PortError, load_recipes, prepare
+from mellow_port import PortError, recipe_choices, prepare
 
 
 def main(argv=None):
+    try:
+        targets = recipe_choices()
+    except (PortError, OSError) as error:
+        print(json.dumps({"artifacts_generated": False, "driver_ready": False, "error": str(error)}), file=sys.stderr)
+        return 1
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("inspect", "plan", "generate"))
     parser.add_argument("--source-root", required=True, type=Path)
-    parser.add_argument("--target", required=True, choices=sorted(load_recipes()[1]))
+    parser.add_argument("--target", required=True, choices=targets)
+    parser.add_argument("--gpu-family", help="Explicit source family profile, such as nvidia-maxwell or intel-tgl; never grants runtime admission")
     parser.add_argument("--revision", required=True, help="Full 40/64 hex immutable source revision claim; actual file SHA256 is measured")
     parser.add_argument("--source-url", help="Optional upstream provenance URL claim")
     parser.add_argument("--file", action="append", required=True, dest="files", help="Explicit source-relative POSIX allowlist path; repeat as needed")
@@ -20,7 +26,7 @@ def main(argv=None):
     parser.add_argument("--require-ready", action="store_true", help="Exit 2 after emitting gaps because functional driver readiness is not implemented")
     args = parser.parse_args(argv)
     try:
-        result = prepare(args.operation, args.source_root, args.target, args.revision, args.files, args.output, args.source_url, args.require_ready)
+        result = prepare(args.operation, args.source_root, args.target, args.revision, args.files, args.output, args.source_url, args.require_ready, args.gpu_family)
     except (PortError, OSError) as error:
         print(json.dumps({"artifacts_generated": False, "driver_ready": False, "error": str(error)}), file=sys.stderr)
         return 1

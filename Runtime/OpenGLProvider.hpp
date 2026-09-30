@@ -5,6 +5,9 @@
 #include <memory>
 #include <string>
 #include <vector>
+#if defined(__APPLE__)
+#include <IOSurface/IOSurfaceRef.h>
+#endif
 
 namespace MellowRT {
 struct OpenGLDeviceInfo {
@@ -27,6 +30,9 @@ struct OpenGLFrame {
     uint64_t epoch {}, sequence {};
     bool renderSubmitted {}, fenceSignaled {}, readbackCompleted {}, resourcesReleased {};
     bool swapCompleted {}, displayScanoutVerified {};
+    // IOSurface backing was rendered by GL and fenced, not merely CPU-filled.
+    bool ioSurfaceWritten {};
+    uint32_t ioSurfaceID {};
     bool swapIntervalKnown {};
     int swapInterval {};
     std::vector<uint8_t> rgba; // RGBA8, tightly packed; row zero is bottom-left.
@@ -62,6 +68,16 @@ public:
     std::shared_ptr<OpenGLPipeline> compile(const std::string &vertexGlsl,
                                            const std::string &fragmentGlsl, std::string &error);
     bool render(const std::shared_ptr<OpenGLPipeline> &, const OpenGLRenderOptions &, OpenGLFrame &);
+#if defined(__APPLE__)
+    // Synchronous GPU rendering into an existing non-planar BGRA8 IOSurface.
+    // Caller owns a valid reference and exclusive access until return. The
+    // provider retains it for this call; no CPU initializer or fallback is used.
+    // A successful frame includes actual RGBA8 GL readback. Surface row zero,
+    // like frame.rgba, has the GL bottom-left convention; a top-left consumer
+    // must invert rows. Presentation and scanout remain the consumer's concern.
+    bool renderToIOSurface(const std::shared_ptr<OpenGLPipeline> &,
+                           const OpenGLRenderOptions &, IOSurfaceRef, OpenGLFrame &);
+#endif
     OpenGLDeviceInfo deviceInfo() const;
     uint64_t pipelineBuildCount() const;
     void invalidateSession(); // Context lifetime invalidation, not a physical GPU reset.

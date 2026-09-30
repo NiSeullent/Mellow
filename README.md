@@ -24,9 +24,9 @@ Metal 2/3, WindowServer·디스플레이 통합과 안정성 검증까지 완성
 | Intel `8086:7D51` — Intel Graphics (Arrow Lake-H) | **식별 테이블 단계** | 기기 ID 인식 코드가 있음. 해당 실물의 실행·display 기록 없음 | **모두 미검증** |
 | Intel `8086:7D67` — Intel Graphics (Arrow Lake-S) | **식별 테이블 단계** | 기기 ID 인식 코드가 있음. 해당 실물의 실행·display 기록 없음 | **모두 미검증** |
 | 기타 Intel — `i915` / `xe` 검토 대상 | **소스 검토 도구 단계** | 계열·PCI ID별 backend 구현과 실기 수용이 필요. `7D41` 구현을 다른 기기에 그대로 적용할 수 없음 | **기기별 지원 근거 없음** |
-| **NVIDIA GeForce RTX 3080** — Ampere / GA102 | **커맨드 패킷 부분 구현** | AmpereA 형식의 GPFIFO·메서드 패킷 인코더가 있음. 실물 채널 연결·GPUVM·firmware·제출·display는 미구현 | **실기 기록 없음 · 지원 미완료** |
-| **NVIDIA GeForce RTX 3090** — Ampere / GA102 | **커맨드 패킷 부분 구현** | AmpereA 형식의 패킷 인코더가 있음. 해당 실물의 GPU 소유권·사용자 공간 driver 연결은 미구현 | **실기 기록 없음 · 지원 미완료** |
-| **NVIDIA GeForce RTX 4080** — Ada / AD103 | **공통 패킷 부분 구현·외부 소스 참고** | Ada의 Ampere 상속을 조사함. 실제 채널 클래스 선택과 Mellow driver·Metal plugin 통합은 미구현 | **Mellow 실기 기록 없음 · 지원 미완료** |
+| **NVIDIA GeForce RTX 3080** — Ampere / GA102 | **DMA·복사 큐·GSP 형식 부분 구현** | 공통 DMA 소유권·PCI/BAR 관찰, C56F 일반 채널용 GPFIFO 큐·복사/fence 처리와 GSP ELF·Radix3 코드가 있음. 실제 기기의 firmware 부팅·GPUVM·채널 생성·장치 callback 연결·display는 미완성 | **실기 기록 없음 · 지원 미완료** |
+| **NVIDIA GeForce RTX 3090** — Ampere / GA102 | **DMA·복사 큐·GSP 형식 부분 구현** | RTX 3080과 같은 공통 소스가 있음. 해당 실물의 장치 소유권·채널 협상·GPU 실행·사용자 공간 driver 연결은 미검증 | **실기 기록 없음 · 지원 미완료** |
+| **NVIDIA GeForce RTX 4080** — Ada / AD103 | **공통 큐·GSP 형식 부분 구현 · 외부 소스 참고** | 공통 NVIDIA 소스와 upstream의 Ampere 상속을 조사함. 큐는 실제로 협상된 C56F 일반 채널만 허용하며, 해당 실물의 클래스·firmware·GPUVM·Metal plugin 통합은 미검증 | **Mellow 실기 기록 없음 · 지원 미완료** |
 
 `7D41`의 새 native 커널 소스 4개와 기존 XeContextExecution은 Darwin24/25용
 총 10개 Mach-O 객체로 컴파일됐습니다. [native GPU 소스 검증 기록](validation/native-gpu/source-checkpoint.json)에는
@@ -44,26 +44,37 @@ Ice Lake 호환성 연구 경로는 실기 미검증이고 Tiger Lake 경로는 
 함께 제공합니다. 실제 소유권·context 전환 증거를 제공하는 통합 드라이버는 아직 미완성이며,
 이 변경으로 기기별 실기 지원 상태를 완료로 올리지 않습니다.
 
+최신 main과의 통합에서는 호스트 회귀 24개, 포팅 도구 테스트 31개와 Darwin24/25용 객체 컴파일
+40개를 통과했습니다. 원본 자료가 필요한 선택 테스트 1개는 건너뛰었습니다.
+[통합 소스·검증 기록](validation/native-gpu/main-integration-checkpoint.json)은 두 부모 커밋,
+실제 컴파일 의존 파일의 hash와 검사 범위를 기록합니다. GPU·Metal·WindowServer 실기 실행은 포함하지 않습니다.
+
 ### NVIDIA 계열별 포팅 범위
 
-다음은 **패킷 인코더의 구현 범위와 소스 검토 경로**입니다.
-인코더는 명령 데이터를 구성하며 GPU에 제출하지 않습니다.
+다음은 **구현된 소스 범위와 계열별 검토 경로**입니다.
+패킷 인코더는 명령 데이터를 구성합니다. 추가한 공통 DMA·복사 큐·GSP 형식 코드는
+장치 소유자가 제공하는 실제 매핑·채널·동기화 증거를 요구합니다.
+현재 이를 연결하는 NVIDIA 통합 드라이버와 기기별 실기 검증은 없습니다.
 
-| NVIDIA 계열 | 구현된 패킷 소스 | 현재 소스 검토 경로 | native GPU driver·Metal·WindowServer |
+| NVIDIA 계열 | 구현된 소스 범위 | 현재 소스 검토 경로 | native GPU driver·Metal·WindowServer |
 | --- | --- | --- | --- |
 | Maxwell | MaxwellA 형식 GPFIFO·메서드 인코더 | `nouveau` 검토; `nvidia-open` 실행 대상 아님 | **통합 드라이버 미구현 · 실기 미검증** |
 | Pascal | PascalA 형식 GPFIFO·메서드 인코더 | `nouveau` 검토; `nvidia-open` 실행 대상 아님 | **통합 드라이버 미구현 · 실기 미검증** |
 | Volta | VoltaA 형식 GPFIFO·메서드 인코더 | `nouveau` 등 별도 경로; `nvidia-open` 실행 대상 아님 | **통합 드라이버 미구현 · 실기 미검증** |
-| Turing | TuringA 형식 GPFIFO·메서드 인코더 | `nvidia-open` / `nouveau` 검토 도구 | **통합 드라이버 미구현 · 실기 미검증** |
-| Ampere | AmpereA 형식 GPFIFO·메서드 인코더 | `nvidia-open` / `nouveau`; RTX 3080/3090 연구 대상 | **통합 드라이버 미구현 · 실기 미검증** |
-| Ada | upstream의 Ampere 상속 조사; Ada 전용 클래스 별칭 없음 | `nvidia-open` / `nouveau`; RTX 4080 외부 소스 참고 | **실물 채널 연결·통합 드라이버 미구현 · 실기 미검증** |
-| Hopper | HopperA 형식·extended-base/fetch 쌍·메서드 인코더 | `nvidia-open` 검토 도구 | **통합 드라이버 미구현 · 실기 미검증** |
-| Blackwell | BlackwellA/B 두 형식·extended-base/fetch 쌍·메서드 인코더 | `nvidia-open` 검토 도구 | **통합 드라이버 미구현 · 실기 미검증** |
+| Turing | TuringA 패킷 인코더와 공통 GSP ELF·Radix3 형식. Turing 채널용 실행 큐는 없음 | `nvidia-open` / `nouveau` 검토 도구 | **통합 드라이버 미구현 · 실기 미검증** |
+| Ampere | AmpereA 패킷·C56F 일반 coherent-system 채널용 큐·C6B5 복사/fence 처리·공통 GSP 형식 | `nvidia-open` / `nouveau`; RTX 3080/3090 연구 대상 | **통합 드라이버 미구현 · 실기 미검증** |
+| Ada | 공통 GSP 형식과 upstream의 Ampere 상속 조사. C56F 큐 적용에는 실제 채널 클래스 협상이 필요 | `nvidia-open` / `nouveau`; RTX 4080 외부 소스 참고 | **실물 채널 연결·통합 드라이버 미구현 · 실기 미검증** |
+| Hopper | HopperA 패킷·extended-base/fetch 형식. Hopper 채널용 실행 큐·부팅 경로는 미구현 | `nvidia-open` 검토 도구 | **통합 드라이버 미구현 · 실기 미검증** |
+| Blackwell | BlackwellA/B 패킷·extended-base/fetch 형식. 해당 채널 실행 큐와 FSP/GSP 부팅 연결은 미구현 | `nvidia-open` 검토 도구 | **통합 드라이버 미구현 · 실기 미검증** |
 
 [PortedNvidia](Drivers/PortedNvidia/PORTING-NOTES.md)는 위 8개 채널 형식의 패킷 구성 코드입니다.
 [호스트 sanitizer 검사 **131,616회**](validation/native-gpu/source-checkpoint.json)를 통과했으며,
 범위는 패킷 값·경계·오류 처리입니다.
-실제 GPUVM·firmware·채널 소유권·ring 제출·GPU 완료·reset·display 구현과 실기 실행은 아직 없습니다.
+공통 메모리 소유권과 C56F 큐는 ring 기록, GP_PUT·현재 work token 순서, GPU semaphore 관측과
+자원 수명을 처리합니다. `CopyPushbuffer`는 검증된 복사 명령에 WFI·system barrier·GPU semaphore
+release를 붙입니다. GSP 파서는 일치하는 release의 이미지·서명 섹션을 추출하고 Radix3 주소표를
+구성합니다. [native GPU 소유권 코드](docs/NATIVE-GPU-OWNER.md)의 실제 firmware 인증·부팅,
+GPUVM·채널 생성, MMIO·완료 관측 callback, native 서비스·Metal·display 연결과 실기 실행은 아직 없습니다.
 형식 이름은 기기를 탐지하거나 해당 GPU의 지원을 승인하는 값이 아닙니다.
 
 [NVIDIA 공개 모듈의 대상은 Turing 이상](https://github.com/NVIDIA/open-gpu-kernel-modules#compatible-gpus)이며,

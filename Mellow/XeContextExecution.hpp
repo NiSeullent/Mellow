@@ -56,7 +56,7 @@ public:
     ExecutionStatus poll(uint64_t now);
     // Never invents completion. May release after confirmed quiescence even if
     // command acceptance was unknown. Pending GuC response ownership keeps
-    // close Busy and unretired cookies/remaining handles available to retry.
+    // close Busy and all unretired cookies/remaining handles available to retry.
     // A timeout alone cannot make close pass.
     ExecutionStatus close();
     ExecutionState state() const { return state_; }

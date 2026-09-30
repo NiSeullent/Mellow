@@ -1,6 +1,7 @@
 """Deterministic source manifests, lexical dependency inventories and review output."""
 import hashlib
 import json
+import math
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
@@ -12,14 +13,9 @@ class PortError(ValueError):
 
 
 RECIPES_PATH = Path(__file__).resolve().parents[2] / "porting/backend-recipes.json"
+FAMILIES_PATH = Path(__file__).resolve().parents[2] / "porting/gpu-families.json"
 SUPPORTED = {".c", ".h", ".cc", ".cpp", ".hpp", ".inc"}
 SKIP_CALLS = {"if", "for", "while", "switch", "return", "sizeof", "typeof", "__typeof__", "alignof", "_Static_assert"}
-
-
-def load_recipes():
-    """Return exact registry bytes and the shared source-intake target mapping."""
-    recipe_bytes = RECIPES_PATH.read_bytes()
-    return recipe_bytes, json.loads(recipe_bytes)["recipes"]
 
 
 def digest(data):
@@ -27,7 +23,123 @@ def digest(data):
 
 
 def canonical(value):
-    return json.dumps(value, sort_keys=True, indent=2, ensure_ascii=True) + "\n"
+    return json.dumps(value, sort_keys=True, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
+
+
+def unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise PortError("Duplicate JSON registry key: " + key)
+        result[key] = value
+    return result
+
+
+def reject_json_constant(value):
+    raise PortError("Nonfinite JSON registry constant: " + value)
+
+
+def finite_json_float(text):
+    value = float(text)
+    if not math.isfinite(value):
+        raise PortError("Nonfinite JSON registry number: " + text)
+    return value
+
+
+def registry(path, collection):
+    try:
+        data = path.read_bytes()
+        document = json.loads(data, object_pairs_hook=unique_json_object,
+                              parse_constant=reject_json_constant, parse_float=finite_json_float)
+    except (OSError, UnicodeError, ValueError) as error:
+        raise PortError("Cannot read " + collection + " registry: " + str(error)) from error
+    if not isinstance(document, dict) or type(document.get("schema_version")) is not int or document["schema_version"] != 1:
+        raise PortError("Unsupported " + collection + " registry schema")
+    entries = document.get(collection)
+    if not isinstance(entries, dict) or not entries or any(not isinstance(key, str) or not key or not isinstance(value, dict) for key, value in entries.items()):
+        raise PortError("Invalid " + collection + " registry entries")
+    return data, entries
+
+
+def string_list(value, label, nonempty=False):
+    if not isinstance(value, list) or (nonempty and not value) or any(not isinstance(item, str) or not item for item in value):
+        raise PortError("Invalid string list: " + label)
+
+
+def directory_prefixes(value, label):
+    string_list(value, label, True)
+    for prefix in value:
+        # Match the source-path alphabet, with an explicit trailing separator.
+        # Do not normalize traversal, repeated separators or sibling prefixes.
+        if (not re.fullmatch(r"(?:[A-Za-z0-9_.+-]+/)+", prefix) or
+                any(part in (".", "..") for part in prefix[:-1].split("/"))):
+            raise PortError("Noncanonical relative directory prefix: " + label)
+
+
+def load_recipes():
+    """Return exact registry bytes and the shared, validated source-intake mapping."""
+    data, recipes = registry(RECIPES_PATH, "recipes")
+    for target, recipe in recipes.items():
+        for field in ("vendor", "adapter_contract", "hardware_admission"):
+            if not isinstance(recipe.get(field), str) or not recipe[field]:
+                raise PortError("Invalid recipe field: " + target + "." + field)
+        for field in ("architectures", "excluded_architectures", "focus"):
+            string_list(recipe.get(field), target + "." + field, field == "focus")
+        for field in ("source_prefixes", "admission_prefixes"):
+            directory_prefixes(recipe.get(field), target + "." + field)
+        if any(not any(prefix.startswith(source) for source in recipe["source_prefixes"])
+               for prefix in recipe["admission_prefixes"]):
+            raise PortError("Admission prefix is outside allowed source directories: " + target)
+        if recipe.get("pci_device_ids") != []:
+            raise PortError("Source recipes cannot grant PCI device admission")
+        requirements = recipe.get("requirements")
+        if not isinstance(requirements, dict):
+            raise PortError("Invalid adapter requirements: " + target)
+        for field in ("architecture", "firmware", "userspace", "source_provenance"):
+            string_list(requirements.get(field), target + ".requirements." + field, True)
+    return data, recipes
+
+
+def recipe_choices():
+    """Use the same validated recipe registry for CLI admission and planning."""
+    return tuple(sorted(load_recipes()[1]))
+
+
+def recipe_registry():
+    """Compatibility entry point for the shared recipe loader."""
+    return load_recipes()
+
+
+def available_targets():
+    """Compatibility entry point for registry-derived target choices."""
+    return recipe_choices()
+
+
+def family_contract(target, recipe, gpu_family):
+    """Admit a source recipe/profile pair, never a physical GPU."""
+    contract = {"adapter": recipe["adapter_contract"], "gpu_family": gpu_family,
+                "source_profile_compatible": None, "runtime_device_admitted": False,
+                "physical_gpu_verified": False, "registry_sha256": None, "profile": None,
+                "scope": "Source planning only; no PCI matching, firmware loading or GPU execution."}
+    if gpu_family is None:
+        return contract
+    registry_bytes, families = registry(FAMILIES_PATH, "families")
+    profile = families.get(gpu_family)
+    if not isinstance(profile, dict):
+        raise PortError("Unknown GPU family: " + str(gpu_family))
+    for field in ("vendor", "architecture"):
+        if not isinstance(profile.get(field), str) or not profile[field]:
+            raise PortError("Invalid GPU family field: " + gpu_family + "." + field)
+    string_list(profile.get("source_targets"), gpu_family + ".source_targets", True)
+    string_list(profile.get("source_references"), gpu_family + ".source_references", True)
+    if profile.get("vendor") != recipe["vendor"] or target not in profile.get("source_targets", []):
+        raise PortError("GPU family is incompatible with the selected source adapter: " + gpu_family)
+    if profile.get("runtime_device_admission") is not False or profile.get("physical_gpu_verified") is not False:
+        raise PortError("Source profiles cannot grant runtime or physical GPU admission")
+    if gpu_family not in recipe["architectures"] or gpu_family in recipe.get("excluded_architectures", []):
+        raise PortError("GPU architecture is outside the selected source adapter: " + gpu_family)
+    contract.update(source_profile_compatible=True, registry_sha256=digest(registry_bytes), profile=profile)
+    return contract
 
 
 def no_links(path):
@@ -120,12 +232,14 @@ def inventory(relative, text):
             "limitations": "Lexical inventory only; includes in comments/disabled blocks and macro calls may appear. No preprocessing, type analysis, dependency resolution or function porting."}
 
 
-def prepare(command, source_root, target, revision, files, output, source_url=None, require_ready=False):
+def prepare(command, source_root, target, revision, files, output, source_url=None, require_ready=False, gpu_family=None):
     if command not in ("inspect", "plan", "generate"):
         raise PortError("Unknown operation")
     recipe_bytes, recipes = load_recipes()
     if target not in recipes:
         raise PortError("An explicit supported target recipe is required")
+    recipe = recipes[target]
+    adapter = family_contract(target, recipe, gpu_family)
     if not re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", revision):
         raise PortError("Revision must be a full 40/64 hexadecimal immutable source identifier")
     if not files:
@@ -138,7 +252,6 @@ def prepare(command, source_root, target, revision, files, output, source_url=No
         raise PortError("Output and source trees must not overlap")
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
         raise PortError("Output must be a new or empty directory; existing files are never overwritten")
-    recipe = recipes[target]
     manifest_files, inventories = [], []
     for relative in sorted(set(files)):
         name, data, text = source_file(root, relative)
@@ -153,13 +266,19 @@ def prepare(command, source_root, target, revision, files, output, source_url=No
     manifest = {"schema_version": 1, "target": target, "source_revision_claim": revision.lower(),
                 "revision_membership_verified": False, "revision_note": "The revision is a caller-supplied provenance label; per-file SHA256 pins are measured. A Git/archival attestation is still required.",
                 "source_url_claim": source_url, "content_pin_sha256": source_pin,
-                "recipe_sha256": digest(recipe_bytes), "files": manifest_files}
+                "recipe_sha256": digest(recipe_bytes), "adapter_contract": adapter, "files": manifest_files}
     gaps = [{"id": "source-attestation", "layer": "source provenance", "status": "unresolved", "detail": "Verify selected content against the claimed immutable upstream revision."},
             {"id": "xnu-services", "layer": "kernel/IOKit", "status": "unimplemented", "detail": "Implement DMA/IOMMU ownership, mapping, synchronization, workqueues, allocator and Linux/DRM contract replacements."},
             {"id": "hardware-backend", "layer": "GPU kernel backend", "status": "unimplemented", "detail": recipe["focus"]},
             {"id": "userspace-abi", "layer": "IOAccelerator and userspace", "status": "unimplemented", "detail": "Establish a measured Tahoe kernel/user ABI, resource lifetime and command validation contract."},
             {"id": "workload-translation", "layer": "Metal/OpenGL/OpenCL userspace", "status": "unimplemented", "detail": "Implement API semantics, shader compilation and backend execution; source intake emits none of these."},
             {"id": "runtime-acceptance", "layer": "physical hardware", "status": "not_run", "detail": "Require measured PCI identity, real submission/fence, compute/readback and reset-free stress evidence."}]
+    gaps.extend([
+        {"id": "family-admission", "layer": "GPU architecture", "status": "unverified", "detail": adapter},
+        {"id": "adapter-firmware", "layer": "firmware", "status": "unimplemented", "detail": recipe["requirements"]["firmware"]},
+        {"id": "adapter-userspace", "layer": "userspace ABI", "status": "unimplemented", "detail": recipe["requirements"]["userspace"]},
+        {"id": "adapter-source-provenance", "layer": "source provenance", "status": "unresolved", "detail": recipe["requirements"]["source_provenance"]},
+    ])
     for item, inv in zip(manifest_files, inventories):
         if item["license"]["missing_or_conflicting"] or item["license"]["gpl_component_review_required"]:
             gaps.append({"id": "license:" + item["path"], "layer": "source licensing", "status": "review_required", "detail": item["license"]})
@@ -169,7 +288,7 @@ def prepare(command, source_root, target, revision, files, output, source_url=No
                     "simple_integer_extraction": "implemented", "driver_compilation": "unavailable", "xnu_gpu_backend": "unimplemented",
                     "workload_translation": "unimplemented", "hardware_execution": "not_run", "driver_ready": False}
     plan = {"schema_version": 1, "concept": "Metal Emulation Layer Logic for OpenGL/OpenCL Workloads", "target_recipe": target,
-            "recipe": recipe, "content_pin_sha256": source_pin, "capabilities": capabilities,
+            "recipe": recipe, "adapter_contract": adapter, "content_pin_sha256": source_pin, "capabilities": capabilities,
             "required_work": gaps, "generation_scope": "Review-only integer macro extraction and build metadata; no working driver or API compatibility implied."}
     artifacts = {"source-manifest.json": canonical(manifest), "inventory.json": canonical({"schema_version": 1, "files": inventories}),
                  "plan.json": canonical(plan), "gap-report.json": canonical({"driver_ready": False, "ready_gate": "fail", "gaps": gaps})}
@@ -195,7 +314,7 @@ def prepare(command, source_root, target, revision, files, output, source_url=No
             dest = "generated/" + slug + ".h"
             artifacts[dest] = "\n".join(lines) + "\n"
             exports.append({"path": dest, "source": item["path"], "constant_count": len(extracted)})
-        artifacts["backend.json"] = canonical({"target": target, "content_pin_sha256": source_pin, "capabilities": capabilities, "review_headers": exports, "implemented_entry_points": [], "pci_device_ids": []})
+        artifacts["backend.json"] = canonical({"target": target, "adapter_contract": adapter, "content_pin_sha256": source_pin, "capabilities": capabilities, "review_headers": exports, "implemented_entry_points": [], "pci_device_ids": []})
         artifacts["CMakeLists.txt"] = 'cmake_minimum_required(VERSION 3.20)\nproject(MellowSourceReview LANGUAGES NONE)\n# Integrate reviewed constants only after the kernel and userspace gaps are implemented.\nmessage(FATAL_ERROR "This is source review output, not a compilable XNU GPU driver. See gap-report.json.")\n'
     artifacts["artifact-manifest.json"] = canonical({"schema_version": 1, "operation": command, "files": [{"path": name, "sha256": digest(content.encode())} for name, content in sorted(artifacts.items())], "success_meaning": "Requested review artifacts generated; driver readiness remains false."})
     out.mkdir(parents=True, exist_ok=True)

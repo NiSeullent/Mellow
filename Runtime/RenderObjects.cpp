@@ -2,7 +2,12 @@
 #include "RenderObjects.hpp"
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <utility>
+#if defined(__APPLE__)
+#include <IOSurface/IOSurface.h>
+#include <CoreFoundation/CoreFoundation.h>
+#endif
 
 namespace MellowMTL {
 namespace {
@@ -22,6 +27,45 @@ std::shared_ptr<RenderTexture> RenderDevice::newTexture(uint32_t width, uint32_t
     }
     return std::shared_ptr<RenderTexture>(new RenderTexture(shared_from_this(), width, height));
 }
+#if defined(__APPLE__)
+std::shared_ptr<RenderTexture> RenderDevice::newIOSurfaceTexture(uint32_t width, uint32_t height, Error &e) {
+    auto texture = newTexture(width, height, e);
+    if (!texture) return {};
+    const size_t row = IOSurfaceAlignProperty(kIOSurfaceBytesPerRow, static_cast<size_t>(width) * 4);
+    if (row < static_cast<size_t>(width) * 4 || row > std::numeric_limits<size_t>::max() / height) {
+        failRender(e, ErrorCode::Execution, "IOSurface row alignment overflow"); return {};
+    }
+    const size_t bytes = IOSurfaceAlignProperty(kIOSurfaceAllocSize, row * height);
+    if (bytes < row * height || bytes > static_cast<size_t>(std::numeric_limits<int64_t>::max())) {
+        failRender(e, ErrorCode::Execution, "IOSurface allocation alignment overflow"); return {};
+    }
+    CFMutableDictionaryRef properties = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    if (!properties) { failRender(e, ErrorCode::Execution, "Cannot allocate IOSurface properties"); return {}; }
+    const CFStringRef keys[] = {kIOSurfaceWidth, kIOSurfaceHeight, kIOSurfacePixelFormat,
+        kIOSurfaceBytesPerElement, kIOSurfaceElementWidth, kIOSurfaceElementHeight,
+        kIOSurfaceBytesPerRow, kIOSurfaceAllocSize};
+    const int64_t values[] = {width, height, 0x42475241, 4, 1, 1,
+        static_cast<int64_t>(row), static_cast<int64_t>(bytes)};
+    bool complete = true;
+    for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i) {
+        CFNumberRef value = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt64Type, &values[i]);
+        if (!value) { complete = false; break; }
+        CFDictionarySetValue(properties, keys[i], value); CFRelease(value);
+    }
+    if (complete) texture->surface_ = IOSurfaceCreate(properties);
+    CFRelease(properties);
+    if (!texture->surface_) { failRender(e, ErrorCode::Execution, "IOSurfaceCreate failed"); return {}; }
+    const auto surface = texture->surface_;
+    if (IOSurfaceGetWidth(surface) != width || IOSurfaceGetHeight(surface) != height ||
+        IOSurfaceGetPixelFormat(surface) != 0x42475241 || IOSurfaceGetPlaneCount(surface) != 0 ||
+        IOSurfaceGetBytesPerElement(surface) != 4 || IOSurfaceGetBytesPerRow(surface) < row ||
+        IOSurfaceGetBytesPerRow(surface) > IOSurfaceGetAllocSize(surface) / height) {
+        failRender(e, ErrorCode::Execution, "Allocated IOSurface does not satisfy BGRA8 layout"); return {};
+    }
+    return texture;
+}
+#endif
 std::shared_ptr<RenderLibrary> RenderDevice::newLibraryWithSource(const std::string &source, Error &e) {
     e = {};
     if (source.empty() || source.size() > MellowRT::RenderShaderJit::MaxSourceBytes) { failRender(e, ErrorCode::InvalidArgument, "Render source must contain 1-65536 bytes"); return {}; }
@@ -44,12 +88,22 @@ std::shared_ptr<RenderCommandQueue> RenderDevice::newCommandQueue() { return std
 MellowRT::OpenGLDeviceInfo RenderDevice::hardware() const { return provider_->deviceInfo(); }
 uint64_t RenderDevice::pipelineBuildCount() const { return provider_->pipelineBuildCount(); }
 RenderTexture::RenderTexture(std::shared_ptr<RenderDevice> d, uint32_t w, uint32_t h) : device_(std::move(d)), width_(w), height_(h) {}
+RenderTexture::~RenderTexture() {
+#if defined(__APPLE__)
+    if (surface_) CFRelease(surface_);
+#endif
+}
 std::vector<uint8_t> RenderTexture::read(Error &e) const {
     e = {}; std::lock_guard<std::mutex> lock(mutex_);
     if (!sequence_) { failRender(e, ErrorCode::InvalidState, "Texture has no completed GPU content"); return {}; }
     return rgba_;
 }
 uint64_t RenderTexture::contentSequence() const { std::lock_guard<std::mutex> lock(mutex_); return sequence_; }
+#if defined(__APPLE__)
+IOSurfaceRef RenderTexture::iosurface() const {
+    std::lock_guard<std::mutex> lock(mutex_); return sequence_ ? surface_ : nullptr;
+}
+#endif
 RenderLibrary::RenderLibrary(std::shared_ptr<RenderDevice> d, std::string s) : device_(std::move(d)), source_(std::move(s)) {}
 std::shared_ptr<RenderFunction> RenderLibrary::newFunction(const std::string &entry, MellowRT::RenderShaderJit::Stage stage, Error &e) {
     e = {}; auto compiled = MellowRT::RenderShaderJit::compileMsl(source_, entry, stage);
@@ -79,6 +133,10 @@ bool RenderCommandBuffer::present(Error &e) {
     e = {};
     if (status_ != CommandStatus::Executable || draws_.empty() || draws_.back().present)
         return failRender(e, ErrorCode::InvalidState, "Presentation needs a completed final encoder and can be requested once");
+#if defined(__APPLE__)
+    if (draws_.back().pass.colorTexture->surface_)
+        return failRender(e, ErrorCode::Unsupported, "Commit the IOSurface then present its completed content with the CoreAnimation presenter");
+#endif
     draws_.back().present = true; return true;
 }
 bool RenderCommandBuffer::commit(Error &e) {
@@ -93,9 +151,20 @@ bool RenderCommandBuffer::commit(Error &e) {
         options.width = texture->width_; options.height = texture->height_;
         options.present = draw.present; options.params = draw.params; options.clearColor = draw.pass.clearColor;
         MellowRT::OpenGLFrame frame;
+        // A failed GPU write may have changed the underlying surface. Invalidate
+        // the old completion before submission so it cannot authorize a snapshot.
+        texture->sequence_ = 0; texture->rgba_.clear();
+        bool surfaceCompleted = true;
+#if defined(__APPLE__)
+        const bool ok = texture->surface_ ?
+            device_->provider_->renderToIOSurface(draw.pipeline->compiled_, options, texture->surface_, frame) :
+            device_->provider_->render(draw.pipeline->compiled_, options, frame);
+        if (texture->surface_) surfaceCompleted = frame.ioSurfaceWritten && frame.ioSurfaceID == IOSurfaceGetID(texture->surface_);
+#else
         const bool ok = device_->provider_->render(draw.pipeline->compiled_, options, frame);
+#endif
         const size_t stride = static_cast<size_t>(texture->width_) * 4;
-        if (!ok || !frame.renderSubmitted || !frame.fenceSignaled || !frame.readbackCompleted || !frame.resourcesReleased ||
+        if (!ok || !surfaceCompleted || !frame.renderSubmitted || !frame.fenceSignaled || !frame.readbackCompleted || !frame.resourcesReleased ||
             !frame.epoch || !frame.sequence || frame.width != texture->width_ || frame.height != texture->height_ ||
             frame.rgba.size() != stride * texture->height_ || (draw.present && !frame.swapCompleted)) {
             status_ = CommandStatus::Error; failure_ = {ErrorCode::Execution, frame.error.empty() ? "Render completion contract failed" : frame.error};
