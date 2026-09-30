@@ -1,0 +1,196 @@
+{
+  "schema_version": 1,
+  "updated": "2026-09-30",
+  "source_ref": "abb2bf9fab5d0b0c9a7452db8503f795c1ed50fd",
+  "basis": ["README.md", "Mellow/kern_model.hpp", "docs/IMPLEMENTATION-STATUS.md", "docs/NATIVE-GPU-OWNER.md", "docs/GPU-FAMILY-SOURCE-INTAKE.md", "porting/gpu-families.json"],
+  "goal_achieved": false,
+  "runtime_meaning": {"ko": "false는 지원 완료 증거가 없음을 나타내며, 실제 기기에서 실패 실험을 했다는 뜻이 아닙니다.", "en": "false means completed support is not evidenced; it does not assert a failed experiment on physical hardware."},
+  "taxonomy_sources": {
+    "linux-intel-pciids": {"title": "Linux Intel PCI family definitions", "url": "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/include/drm/intel/pciids.h"},
+    "linux-xe-pci": {"title": "Linux Xe platform and graphics IP definitions", "url": "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c"}
+  },
+  "stages": {
+    "partial": {"ko": "부분 구현", "en": "Partial implementation"},
+    "identified": {"ko": "식별 테이블", "en": "Device identification"},
+    "source": {"ko": "소스 검토", "en": "Source review"}
+  },
+  "families": {
+    "intel-arrow-lake": {"ko": "Arrow Lake", "en": "Arrow Lake"},
+    "intel-meteor-lake": {"ko": "Meteor Lake", "en": "Meteor Lake"},
+    "intel-tiger-lake": {"ko": "Tiger Lake", "en": "Tiger Lake"},
+    "intel-alder-lake": {"ko": "Alder Lake", "en": "Alder Lake"},
+    "intel-raptor-lake": {"ko": "Raptor Lake", "en": "Raptor Lake"},
+    "intel-lunar-lake": {"ko": "Lunar Lake", "en": "Lunar Lake"},
+    "intel-alchemist": {"ko": "Arc Alchemist · DG2", "en": "Arc Alchemist · DG2"},
+    "intel-battlemage": {"ko": "Arc Battlemage", "en": "Arc Battlemage"},
+    "intel-other": {"ko": "기타 Intel · i915 / Xe", "en": "Other Intel · i915 / Xe"},
+    "maxwell": {"ko": "Maxwell", "en": "Maxwell"},
+    "pascal": {"ko": "Pascal", "en": "Pascal"},
+    "volta": {"ko": "Volta", "en": "Volta"},
+    "turing": {"ko": "Turing", "en": "Turing"},
+    "ampere": {"ko": "Ampere", "en": "Ampere"},
+    "ada": {"ko": "Ada", "en": "Ada"},
+    "hopper": {"ko": "Hopper", "en": "Hopper"},
+    "blackwell": {"ko": "Blackwell", "en": "Blackwell"},
+    "amd-rx9070": {"ko": "RX 9070 · 별도 연구", "en": "RX 9070 · separate research"}
+  },
+  "devices": [
+    {
+      "id": "intel-7d41", "vendor": "Intel", "name": "Intel Graphics 4-Core", "model": "Arrow Lake-U", "pci_id": "8086:7D41", "family": "intel-arrow-lake", "stage": "partial",
+      "implemented": {"ko": "Xe 메모리, GuC·ADS, 제출·fence·readback, IOKit 연결 소스와 커널 객체 빌드 기록이 있습니다.", "en": "Xe memory, GuC/ADS, submission, fence/readback and IOKit sources have kernel-object build records."},
+      "remaining": {"ko": "실제 PCI·펌웨어·VM·context를 통합 소유하는 드라이버와 Metal·디스플레이 통합이 남아 있습니다.", "en": "A driver owning the actual PCI device, firmware, VM and contexts, plus Metal/display integration, remains incomplete."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false},
+      "evidence": ["docs/NATIVE-GPU-BOUNDARY.md", "validation/native-gpu/direct-dma-checkpoint.json", "Mellow/kern_model.hpp"]
+    },
+    {
+      "id": "intel-7d40", "vendor": "Intel", "name": "Intel Graphics", "model": "Meteor Lake", "pci_id": "8086:7D40", "family": "intel-meteor-lake", "stage": "identified",
+      "implemented": {"ko": "기기 ID를 인식하는 저장소 식별 테이블이 있습니다.", "en": "The repository contains a device-identification table for this PCI ID."},
+      "remaining": {"ko": "이 기기의 native 실행·펌웨어·디스플레이 실기 기록은 없습니다.", "en": "No native execution, firmware or display test on this physical device is recorded."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Mellow/kern_model.hpp", "README.md"]
+    },
+    {
+      "id": "intel-7d45", "vendor": "Intel", "name": "Intel Graphics", "model": "Meteor Lake", "pci_id": "8086:7D45", "family": "intel-meteor-lake", "stage": "identified",
+      "implemented": {"ko": "기기 ID를 인식하는 저장소 식별 테이블이 있습니다.", "en": "The repository contains a device-identification table for this PCI ID."},
+      "remaining": {"ko": "이 기기의 native 실행·펌웨어·디스플레이 실기 기록은 없습니다.", "en": "No native execution, firmware or display test on this physical device is recorded."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Mellow/kern_model.hpp", "README.md"]
+    },
+    {
+      "id": "intel-7d55", "vendor": "Intel", "name": "Intel Arc Graphics", "model": "Meteor Lake", "pci_id": "8086:7D55", "family": "intel-meteor-lake", "stage": "identified",
+      "implemented": {"ko": "기기 ID를 인식하는 저장소 식별 테이블이 있습니다.", "en": "The repository contains a device-identification table for this PCI ID."},
+      "remaining": {"ko": "이 기기의 native 실행·펌웨어·디스플레이 실기 기록은 없습니다.", "en": "No native execution, firmware or display test on this physical device is recorded."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Mellow/kern_model.hpp", "README.md"]
+    },
+    {
+      "id": "intel-7dd5", "vendor": "Intel", "name": "Intel Graphics", "model": "Meteor Lake", "pci_id": "8086:7DD5", "family": "intel-meteor-lake", "stage": "identified",
+      "implemented": {"ko": "기기 ID를 인식하는 저장소 식별 테이블이 있습니다.", "en": "The repository contains a device-identification table for this PCI ID."},
+      "remaining": {"ko": "이 기기의 native 실행·펌웨어·디스플레이 실기 기록은 없습니다.", "en": "No native execution, firmware or display test on this physical device is recorded."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Mellow/kern_model.hpp", "README.md"]
+    },
+    {
+      "id": "intel-7d51", "vendor": "Intel", "name": "Intel Graphics", "model": "Arrow Lake-H", "pci_id": "8086:7D51", "family": "intel-arrow-lake", "stage": "identified",
+      "implemented": {"ko": "기기 ID를 인식하는 저장소 식별 테이블이 있습니다.", "en": "The repository contains a device-identification table for this PCI ID."},
+      "remaining": {"ko": "이 기기의 native 실행·펌웨어·디스플레이 실기 기록은 없습니다.", "en": "No native execution, firmware or display test on this physical device is recorded."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Mellow/kern_model.hpp", "README.md"]
+    },
+    {
+      "id": "intel-7d67", "vendor": "Intel", "name": "Intel Graphics", "model": "Arrow Lake-S", "pci_id": "8086:7D67", "family": "intel-arrow-lake", "stage": "identified",
+      "implemented": {"ko": "기기 ID를 인식하는 저장소 식별 테이블이 있습니다.", "en": "The repository contains a device-identification table for this PCI ID."},
+      "remaining": {"ko": "이 기기의 native 실행·펌웨어·디스플레이 실기 기록은 없습니다.", "en": "No native execution, firmware or display test on this physical device is recorded."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Mellow/kern_model.hpp", "README.md"]
+    },
+    {
+      "id": "intel-tiger-lake", "vendor": "Intel", "name": "Intel Tiger Lake", "model": "Xe-LP · i915 / Xe source path", "pci_id": null, "family": "intel-tiger-lake", "stage": "source",
+      "implemented": {"ko": "공식 원본의 계열·DMA 범위·출처를 기록한 i915·Xe 소스 검토 단계입니다.", "en": "i915/Xe source review records the upstream family, DMA range and provenance."},
+      "remaining": {"ko": "이 계열의 통합 native 드라이버는 미구현이며 지원은 미완료입니다. 기기별 실행·Metal·디스플레이 실기 근거가 필요합니다.", "en": "An integrated native driver for this family is unimplemented and support is incomplete. Device-specific GPU, Metal and display hardware evidence is required."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["porting/gpu-families.json", "docs/GPU-FAMILY-SOURCE-INTAKE.md"], "taxonomy_source": "linux-xe-pci"
+    },
+    {
+      "id": "intel-alder-lake", "vendor": "Intel", "name": "Intel Alder Lake", "model": "Xe-LP · i915 / Xe source path", "pci_id": null, "family": "intel-alder-lake", "stage": "source",
+      "implemented": {"ko": "공식 원본의 계열·DMA 범위·출처를 기록한 i915·Xe 소스 검토 단계입니다.", "en": "i915/Xe source review records the upstream family, DMA range and provenance."},
+      "remaining": {"ko": "이 계열의 통합 native 드라이버는 미구현이며 지원은 미완료입니다. 기기별 실행·Metal·디스플레이 실기 근거가 필요합니다.", "en": "An integrated native driver for this family is unimplemented and support is incomplete. Device-specific GPU, Metal and display hardware evidence is required."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["porting/gpu-families.json", "docs/GPU-FAMILY-SOURCE-INTAKE.md"], "taxonomy_source": "linux-xe-pci"
+    },
+    {
+      "id": "intel-raptor-lake", "vendor": "Intel", "name": "Intel Raptor Lake", "model": "Xe-LP · i915 / Xe source path", "pci_id": null, "family": "intel-raptor-lake", "stage": "source",
+      "implemented": {"ko": "공식 원본의 RPL PCI 계열과 i915·Xe 검토 경로·출처를 기록했습니다.", "en": "The upstream RPL PCI family, i915/Xe review paths and provenance are recorded."},
+      "remaining": {"ko": "이 계열의 통합 native 드라이버는 미구현이며 지원은 미완료입니다. 기기별 실행·Metal·디스플레이 실기 근거가 필요합니다.", "en": "An integrated native driver for this family is unimplemented and support is incomplete. Device-specific GPU, Metal and display hardware evidence is required."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["porting/gpu-families.json", "docs/GPU-FAMILY-SOURCE-INTAKE.md"], "taxonomy_source": "linux-intel-pciids"
+    },
+    {
+      "id": "intel-lunar-lake", "vendor": "Intel", "name": "Intel Lunar Lake", "model": "Xe2-LPG · Xe source path", "pci_id": null, "family": "intel-lunar-lake", "stage": "source",
+      "implemented": {"ko": "공식 원본의 LNL 계열과 Xe·GMD 식별 검토 경로·출처를 기록했습니다.", "en": "The upstream LNL family, Xe/GMD identification review path and provenance are recorded."},
+      "remaining": {"ko": "이 계열의 통합 native 드라이버는 미구현이며 지원은 미완료입니다. 기기별 실행·Metal·디스플레이 실기 근거가 필요합니다.", "en": "An integrated native driver for this family is unimplemented and support is incomplete. Device-specific GPU, Metal and display hardware evidence is required."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["porting/gpu-families.json", "docs/GPU-FAMILY-SOURCE-INTAKE.md"], "taxonomy_source": "linux-intel-pciids"
+    },
+    {
+      "id": "intel-arc-alchemist", "vendor": "Intel", "name": "Intel Arc Alchemist", "model": "DG2 · Xe-HPG · i915 / Xe source path", "pci_id": null, "family": "intel-alchemist", "stage": "source",
+      "implemented": {"ko": "공식 원본의 DG2 계열과 i915·Xe 검토 경로·출처를 기록했습니다.", "en": "The upstream DG2 family, i915/Xe review paths and provenance are recorded."},
+      "remaining": {"ko": "이 계열의 통합 native 드라이버는 미구현이며 지원은 미완료입니다. 기기별 실행·Metal·디스플레이 실기 근거가 필요합니다.", "en": "An integrated native driver for this family is unimplemented and support is incomplete. Device-specific GPU, Metal and display hardware evidence is required."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["porting/gpu-families.json", "docs/GPU-FAMILY-SOURCE-INTAKE.md"], "taxonomy_source": "linux-intel-pciids"
+    },
+    {
+      "id": "intel-arc-battlemage", "vendor": "Intel", "name": "Intel Arc Battlemage", "model": "BMG · Xe2-HPG · Xe source path", "pci_id": null, "family": "intel-battlemage", "stage": "source",
+      "implemented": {"ko": "공식 원본의 BMG 계열과 Xe·GMD 식별 검토 경로·출처를 기록했습니다.", "en": "The upstream BMG family, Xe/GMD identification review path and provenance are recorded."},
+      "remaining": {"ko": "이 계열의 통합 native 드라이버는 미구현이며 지원은 미완료입니다. 기기별 실행·Metal·디스플레이 실기 근거가 필요합니다.", "en": "An integrated native driver for this family is unimplemented and support is incomplete. Device-specific GPU, Metal and display hardware evidence is required."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["porting/gpu-families.json", "docs/GPU-FAMILY-SOURCE-INTAKE.md"], "taxonomy_source": "linux-intel-pciids"
+    },
+    {
+      "id": "intel-other", "vendor": "Intel", "name": "Intel · i915 / Xe", "model": "Other Intel", "pci_id": null, "family": "intel-other", "stage": "source",
+      "implemented": {"ko": "i915·Xe 원본의 경로·해시·출처와 미구현 항목을 기록하는 검토 도구가 있습니다.", "en": "Source-intake tools record i915/Xe paths, hashes, provenance and implementation gaps."},
+      "remaining": {"ko": "기기별 backend와 실기 수용이 필요합니다. 7D41 구현은 다른 Intel 기기의 지원 근거가 아닙니다.", "en": "Device-specific backends and hardware acceptance are required. The 7D41 work does not establish support for other Intel devices."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["docs/GPU-FAMILY-SOURCE-INTAKE.md", "porting/backend-recipes.json"]
+    },
+    {
+      "id": "rtx-3080", "vendor": "NVIDIA", "name": "GeForce RTX 3080", "model": "Ampere · GA102", "pci_id": null, "family": "ampere", "stage": "partial",
+      "implemented": {"ko": "공통 DMA 소유권, C56F 일반 채널용 GPFIFO·복사/fence 큐, GSP ELF·Radix3 형식 코드가 있습니다.", "en": "Shared DMA ownership, C56F general-channel GPFIFO/copy/fence queues and GSP ELF/Radix3 format code exist."},
+      "remaining": {"ko": "실제 firmware 부팅·GPUVM·채널 생성·장치 callback·디스플레이 연결은 미완성입니다.", "en": "Actual firmware boot, GPUVM, channel creation, device callbacks and display integration are incomplete."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["docs/NATIVE-GPU-OWNER.md", "Drivers/PortedNvidia/PORTING-NOTES.md", "README.md"]
+    },
+    {
+      "id": "rtx-3090", "vendor": "NVIDIA", "name": "GeForce RTX 3090", "model": "Ampere · GA102", "pci_id": null, "family": "ampere", "stage": "partial",
+      "implemented": {"ko": "RTX 3080과 같은 공통 DMA·C56F 큐·복사/fence·GSP 형식 소스가 있습니다.", "en": "The shared DMA, C56F queue, copy/fence and GSP format sources also form the RTX 3090 research path."},
+      "remaining": {"ko": "해당 실물의 장치 소유권·채널 협상·GPU 실행·사용자 공간 driver 연결은 미검증입니다.", "en": "Ownership, channel negotiation, GPU execution and userspace integration on this physical model remain unverified."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["docs/NATIVE-GPU-OWNER.md", "README.md"]
+    },
+    {
+      "id": "rtx-4080", "vendor": "NVIDIA", "name": "GeForce RTX 4080", "model": "Ada · AD103", "pci_id": null, "family": "ada", "stage": "partial",
+      "implemented": {"ko": "공통 GSP 형식과 upstream의 Ampere 상속을 조사했습니다. 외부 OpenNVDA 기록은 참고 자료입니다.", "en": "Shared GSP formats and upstream Ampere inheritance have been investigated. OpenNVDA reports are external references."},
+      "remaining": {"ko": "C56F 적용에는 실물 채널 클래스 협상이 필요합니다. Mellow의 firmware·GPUVM·Metal 통합과 실기 실행은 미검증입니다.", "en": "C56F use requires real channel-class negotiation. Mellow firmware/GPUVM/Metal integration and hardware execution remain unverified."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["docs/NATIVE-GPU-OWNER.md", "README.md"]
+    },
+    {
+      "id": "nvidia-maxwell", "vendor": "NVIDIA", "name": "NVIDIA Maxwell", "model": "MaxwellA", "pci_id": null, "family": "maxwell", "stage": "partial",
+      "implemented": {"ko": "MaxwellA 형식 GPFIFO·메서드 패킷 인코더가 있습니다.", "en": "MaxwellA-format GPFIFO and method packet encoders exist."},
+      "remaining": {"ko": "nouveau 검토 경로입니다. nvidia-open 대상이 아니며, 통합 native 드라이버·firmware·실기 검증이 남아 있습니다.", "en": "Uses the Nouveau review path, outside nvidia-open scope. A native driver, firmware integration and hardware tests remain."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Drivers/PortedNvidia/PORTING-NOTES.md", "docs/GPU-FAMILY-SOURCE-INTAKE.md"]
+    },
+    {
+      "id": "nvidia-pascal", "vendor": "NVIDIA", "name": "NVIDIA Pascal", "model": "PascalA", "pci_id": null, "family": "pascal", "stage": "partial",
+      "implemented": {"ko": "PascalA 형식 GPFIFO·메서드 패킷 인코더가 있습니다.", "en": "PascalA-format GPFIFO and method packet encoders exist."},
+      "remaining": {"ko": "nouveau 검토 경로입니다. nvidia-open 대상이 아니며, 통합 native 드라이버·firmware·실기 검증이 남아 있습니다.", "en": "Uses the Nouveau review path, outside nvidia-open scope. A native driver, firmware integration and hardware tests remain."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Drivers/PortedNvidia/PORTING-NOTES.md", "docs/GPU-FAMILY-SOURCE-INTAKE.md"]
+    },
+    {
+      "id": "nvidia-volta", "vendor": "NVIDIA", "name": "NVIDIA Volta", "model": "VoltaA", "pci_id": null, "family": "volta", "stage": "partial",
+      "implemented": {"ko": "VoltaA 형식 GPFIFO·메서드 패킷 인코더가 있습니다.", "en": "VoltaA-format GPFIFO and method packet encoders exist."},
+      "remaining": {"ko": "nouveau 등의 별도 경로를 검토합니다. nvidia-open 대상이 아니며 통합 드라이버·실기 검증이 남아 있습니다.", "en": "Requires a separate path such as Nouveau, outside nvidia-open scope. Driver integration and hardware tests remain."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Drivers/PortedNvidia/PORTING-NOTES.md", "docs/GPU-FAMILY-SOURCE-INTAKE.md"]
+    },
+    {
+      "id": "nvidia-turing", "vendor": "NVIDIA", "name": "NVIDIA Turing", "model": "TuringA", "pci_id": null, "family": "turing", "stage": "partial",
+      "implemented": {"ko": "TuringA 패킷 인코더와 공통 GSP ELF·Radix3 형식 코드가 있습니다.", "en": "TuringA packet encoders and shared GSP ELF/Radix3 format code exist."},
+      "remaining": {"ko": "Turing 채널용 실행 큐·부팅·통합 드라이버는 없습니다. nvidia-open/nouveau 원본을 검토합니다.", "en": "A Turing execution queue, boot path and integrated driver are absent. nvidia-open/Nouveau source review is available."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Drivers/PortedNvidia/PORTING-NOTES.md", "docs/NATIVE-GPU-OWNER.md"]
+    },
+    {
+      "id": "nvidia-ampere", "vendor": "NVIDIA", "name": "NVIDIA Ampere", "model": "AmpereA · C56F / C6B5", "pci_id": null, "family": "ampere", "stage": "partial",
+      "implemented": {"ko": "패킷 인코더, C56F 일반 coherent-system 채널용 큐, C6B5 복사/fence와 공통 GSP 형식 코드가 있습니다.", "en": "Packet encoders, a C56F general coherent-system queue, C6B5 copy/fence and shared GSP format code exist."},
+      "remaining": {"ko": "실제 channel·GPUVM·firmware 소유자와 native 서비스·Metal·display 연결, 실기 검증이 남아 있습니다.", "en": "Actual channel/GPUVM/firmware ownership, native services, Metal/display integration and hardware tests remain."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["docs/NATIVE-GPU-OWNER.md", "Drivers/PortedNvidia/PORTING-NOTES.md"]
+    },
+    {
+      "id": "nvidia-ada", "vendor": "NVIDIA", "name": "NVIDIA Ada", "model": "Ampere inheritance research", "pci_id": null, "family": "ada", "stage": "partial",
+      "implemented": {"ko": "공통 GSP 형식과 upstream Ampere 상속을 조사했습니다. 별도 AdaA 인코더의 지원을 선언하지 않습니다.", "en": "Shared GSP formats and upstream Ampere inheritance are investigated; no separate AdaA encoder is claimed."},
+      "remaining": {"ko": "실물 채널 클래스 협상·실행 큐 연결·firmware·Metal·디스플레이와 실기 검증이 남아 있습니다.", "en": "Real channel-class negotiation, queue/firmware integration, Metal/display and hardware tests remain."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["docs/NATIVE-GPU-OWNER.md", "README.md"]
+    },
+    {
+      "id": "nvidia-hopper", "vendor": "NVIDIA", "name": "NVIDIA Hopper", "model": "HopperA", "pci_id": null, "family": "hopper", "stage": "partial",
+      "implemented": {"ko": "HopperA 패킷과 extended-base/fetch 형식 인코더가 있습니다.", "en": "HopperA packet and extended-base/fetch format encoders exist."},
+      "remaining": {"ko": "Hopper 채널 실행 큐·부팅 경로·통합 드라이버와 실기 검증은 미완성입니다.", "en": "A Hopper execution queue, boot path, integrated driver and hardware validation remain incomplete."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Drivers/PortedNvidia/PORTING-NOTES.md", "README.md"]
+    },
+    {
+      "id": "nvidia-blackwell", "vendor": "NVIDIA", "name": "NVIDIA Blackwell", "model": "BlackwellA / BlackwellB", "pci_id": null, "family": "blackwell", "stage": "partial",
+      "implemented": {"ko": "BlackwellA/B 패킷과 extended-base/fetch 형식 인코더가 있습니다.", "en": "BlackwellA/B packet and extended-base/fetch format encoders exist."},
+      "remaining": {"ko": "해당 채널 실행 큐·FSP/GSP 부팅 연결·통합 드라이버와 실기 검증은 미완성입니다.", "en": "The corresponding execution queues, FSP/GSP boot integration, native driver and hardware validation remain incomplete."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["Drivers/PortedNvidia/PORTING-NOTES.md", "README.md"]
+    },
+    {
+      "id": "amd-rx9070", "vendor": "AMD", "name": "AMD Radeon RX 9070", "model": "Additional research", "pci_id": null, "family": "amd-rx9070", "stage": "source", "additional": true,
+      "implemented": {"ko": "Intel·NVIDIA 주 개발 대상과 분리한 amdgpu 원본 검토 도구 단계입니다.", "en": "An additional amdgpu source-review path, separate from the main Intel/NVIDIA development scope."},
+      "remaining": {"ko": "기기별 native backend·Metal·WindowServer는 미구현·미검증입니다.", "en": "The device-specific native backend, Metal and WindowServer remain unimplemented and unverified."},
+      "runtime": {"native_gpu": false, "metal": false, "windowserver": false}, "evidence": ["README.md", "porting/backend-recipes.json"]
+    }
+  ]
+}
