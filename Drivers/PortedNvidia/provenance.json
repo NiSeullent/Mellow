@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "upstream_repository": "https://github.com/NVIDIA/open-gpu-kernel-modules",
+  "upstream_revision": "e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb",
+  "source_access": "Read pinned official web source; no upstream checkout or downloaded source files.",
+  "upstream_file_content_hashes": null,
+  "hash_scope": "Pinned URLs were inspected; full upstream file content hashes were not measured.",
+  "license": "MIT; original NVIDIA notices retained in source and LICENSE.MIT",
+  "sources": [
+    {"path": "src/common/sdk/nvidia/inc/class/clb06f.h", "channel_class": "0xB06F", "fields": "GP_ENTRY*, DMA_INCR*, DMA_NONINCR*, DMA_ONEINCR*, DMA_IMMD*"},
+    {"path": "src/common/sdk/nvidia/inc/class/clc06f.h", "channel_class": "0xC06F", "fields": "GP_ENTRY*, DMA_INCR*, DMA_NONINCR*, DMA_ONEINCR*, DMA_IMMD*"},
+    {"path": "src/common/sdk/nvidia/inc/class/clc36f.h", "channel_class": "0xC36F", "fields": "GP_ENTRY*, DMA_INCR*, DMA_NONINCR*, DMA_ONEINCR*, DMA_IMMD*"},
+    {"path": "src/common/sdk/nvidia/inc/class/clc46f.h", "channel_class": "0xC46F", "fields": "GP_ENTRY*, DMA_INCR*, DMA_NONINCR*, DMA_ONEINCR*, DMA_IMMD*"},
+    {"path": "src/common/sdk/nvidia/inc/class/clc56f.h", "channel_class": "0xC56F", "fields": "GP_ENTRY*, DMA_INCR*, DMA_NONINCR*, DMA_ONEINCR*, DMA_IMMD*"},
+    {"path": "src/common/sdk/nvidia/inc/class/clc86f.h", "channel_class": "0xC86F", "fields": "GP_ENTRY* including PB_EXTENDED_BASE_OPERAND and SET_PB_SEGMENT_EXTENDED_BASE"},
+    {"path": "src/common/sdk/nvidia/inc/class/clc96f.h", "channel_class": "0xC96F", "fields": "GP_ENTRY* including PB_EXTENDED_BASE_OPERAND and SET_PB_SEGMENT_EXTENDED_BASE"},
+    {"path": "src/common/sdk/nvidia/inc/class/clca6f.h", "channel_class": "0xCA6F", "fields": "GP_ENTRY* including PB_EXTENDED_BASE_OPERAND and SET_PB_SEGMENT_EXTENDED_BASE"},
+    {"path": "kernel-open/nvidia-uvm/uvm_turing_host.c", "symbols": ["uvm_hal_turing_host_set_gpfifo_entry", "uvm_hal_turing_host_set_gpfifo_noop"]},
+    {"path": "kernel-open/nvidia-uvm/uvm_push_macros.h", "symbols": ["UVM_METHOD_INC", "UVM_METHOD_NONINC"]},
+    {"path": "kernel-open/nvidia-uvm/uvm_hopper_host.c", "symbols": ["uvm_hal_hopper_host_set_gpfifo_pushbuffer_segment_base", "uvm_hal_hopper_host_set_gpfifo_entry"]},
+    {"path": "kernel-open/nvidia-uvm/uvm_hal.c", "symbols": ["host_table", "arch_table"], "facts": "Blackwell A/B inherit Hopper GPFIFO packing; Ada architecture inherits Ampere. This does not identify a particular Ada device's negotiated channel class."}
+  ],
+  "adaptation": "Portable checked C++ field packing, Hopper/Blackwell extended-base plus fetch pair, explicit little-endian serialization and format whitelist. Method headers on Hopper/Blackwell use the shared C46F UVM method macros. No upstream driver function body was copied unchanged.",
+  "additional_software_policy": [
+    "Reject zero-length pushbuffer entries; explicit control NOP is separate.",
+    "Require the complete pushbuffer range to fit the 40-bit address field.",
+    "Public standalone fetch rejects Hopper/Blackwell; the paired API must establish the extended base.",
+    "Extended-base pairs admit 57-bit addresses but reject crossing a 40-bit segment and explicitly emit even a zero base.",
+    "Reject address wrap for incrementing and increment-once method packets.",
+    "Leave output unchanged on every encoding error."
+  ],
+  "hardware_admission": false,
+  "gpu_execution_verified": false,
+  "metal_acceleration_verified": false
+}
