@@ -76,10 +76,14 @@ the existing surface presenter. The render client additionally requires AppKit,
 QuartzCore, CoreGraphics, CoreFoundation, IOSurface, OpenGL, Foundation, and
 Metal frameworks. Full macOS 15/26 userspace SDKs and native runtime tests are
 required; source inspection or a kernel SDK is not a native build or GPU test.
-The counter attachment loop uses the SDK's named `MTLMaxRenderPassSampleBuffers`
-declaration with no guessed numeric fallback. Availability and declaration of
-that symbol, along with the entire Objective-C adapter, remain pending actual
-macOS 15/26 userspace SDK compilation.
+The first native build with Xcode 16.4 / macOS 15.5 SDK rejected the nonexistent
+`MTLMaxRenderPassSampleBuffers` identifier. The counter attachment check now
+inspects indices 0–3, as the existing runtime adapter and Google's
+[pinned Dawn Metal implementation](https://dawn.googlesource.com/dawn/+/48f5ceeea3ef22d294effa5b8cc00f4ebad4a735/src/dawn/native/metal/CommandBufferMTL.mm)
+do. Apple's public attachment array exposes indexed access without a count
+query. This is an implementation bound, not a claimed Apple guarantee for
+every future SDK. Counter sample buffers remain unsupported; native SDK
+compilation does not establish GPU execution or system Metal registration.
 
 API semantics were checked against Apple's documentation for
 [texture readback](https://developer.apple.com/documentation/metal/mtltexture),

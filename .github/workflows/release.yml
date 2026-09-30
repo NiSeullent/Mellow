@@ -1,0 +1,77 @@
+name: Build compiled development release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing immutable tag to compile and publish as an experimental prerelease
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mellow-release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+      tag: ${{ steps.source.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve existing tag to an immutable source commit
+        id: source
+        env:
+          MELLOW_TAG: ${{ inputs.tag }}
+        run: |
+          git check-ref-format "refs/tags/$MELLOW_TAG"
+          git show-ref --verify --quiet "refs/tags/$MELLOW_TAG"
+          commit=$(git rev-parse "refs/tags/$MELLOW_TAG^{commit}")
+          printf 'commit=%s\ntag=%s\n' "$commit" "$MELLOW_TAG" >> "$GITHUB_OUTPUT"
+  build:
+    needs: source
+    uses: ./.github/workflows/build.yml
+    with:
+      checkout_ref: ${{ needs.source.outputs.commit }}
+      source_ref: refs/tags/${{ needs.source.outputs.tag }}
+      release_tag: ${{ needs.source.outputs.tag }}
+  publish:
+    needs: [source, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: Mellow-macos-x86_64
+          path: release-assets
+      - name: Publish the actual compiled package as an experimental prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          MELLOW_TAG: ${{ needs.source.outputs.tag }}
+          MELLOW_COMMIT: ${{ needs.source.outputs.commit }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          root = pathlib.Path('release-assets')
+          manifest = json.loads((root / 'manifest.json').read_text())
+          assert manifest['source_commit'] == os.environ['MELLOW_COMMIT']
+          assert manifest['release_tag'] == os.environ['MELLOW_TAG']
+          assert manifest['binary_compiled'] is True and manifest['build']['status'] == 'BUILT_ONLY'
+          assert manifest['hardware_support_verified'] is False
+          assert manifest['system_metal_registered'] is False
+          assert manifest['windowserver_acceleration_verified'] is False
+          archive = root / 'Mellow-macos-x86_64.zip'
+          assert archive.stat().st_size > 0
+          actual = hashlib.sha256(archive.read_bytes()).hexdigest()
+          assert (root / 'Mellow-macos-x86_64.zip.sha256').read_text() == actual + '  Mellow-macos-x86_64.zip\n'
+          PY
+          printf '%s\n' 'Experimental Intel macOS build products. The kext, opt-in userspace framework and CLI tools were compiled in macOS CI. No GPU client or kext was activated in CI. Hardware support, system Metal registration and WindowServer acceleration remain unverified. No Developer ID signing or notarization. See the bundled manifest, licenses and installation guide.' > "$RUNNER_TEMP/mellow-release-notes.txt"
+          gh release create "$MELLOW_TAG" --verify-tag --prerelease --title "Mellow $MELLOW_TAG — compiled development package" --notes-file "$RUNNER_TEMP/mellow-release-notes.txt" release-assets/Mellow-macos-x86_64.zip release-assets/Mellow-macos-x86_64.zip.sha256 release-assets/manifest.json release-assets/install-mellow.sh release-assets/uninstall-mellow.sh

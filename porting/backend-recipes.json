@@ -85,7 +85,7 @@
       "architectures": ["nvidia-turing", "nvidia-ampere", "nvidia-ada", "nvidia-blackwell"],
       "excluded_architectures": ["nvidia-maxwell", "nvidia-pascal", "nvidia-volta"],
       "source_prefixes": ["kernel-open/", "src/nvidia/", "src/nvidia-modeset/", "src/common/"],
-      "admission_prefixes": ["kernel-open/", "src/nvidia/"],
+      "admission_prefixes": ["kernel-open/", "src/nvidia/", "src/nvidia-modeset/"],
       "focus": ["GPU virtual memory ownership", "GSP firmware licensing and protocol", "channel submission", "interrupt and fence completion"],
       "requirements": {
         "architecture": ["The open RM kernel module source supports Turing and newer; Maxwell, Pascal and Volta are excluded from this adapter contract.", "Listed RTX-era families are nonexhaustive upstream references; verify measured device/stepping against the pinned RM release without admitting hardware from a recipe match."],
@@ -94,7 +94,7 @@
         "source_provenance": ["Record the immutable NVIDIA release commit, per-file SHA256 and selected build configuration.", "Verify revision membership and review OS-interface, RM, modeset, firmware and userspace dependency/license closure; preserve original notices."]
       },
       "pci_device_ids": [],
-      "hardware_admission": "Open source kernel modules alone do not supply a macOS userspace driver or admit a GPU."
+      "hardware_admission": "Turing and newer only; Maxwell, Pascal and Volta excluded. Matching GSP firmware and userspace versions required. Open source kernel modules alone do not supply a macOS userspace driver or admit a GPU."
     }
   }
 }

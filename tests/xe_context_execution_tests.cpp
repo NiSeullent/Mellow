@@ -15,12 +15,14 @@ struct Fixture {
     XeFence::Timeline *activeFence=&fence;
     uint32_t ring[1024] {},tail=0;uint8_t heaps[4][4096] {};
     bool admit=true,stopped=true,notifyOk=true,stageOk=true,syncOk=true,retained=false;
+    uint64_t clock=1;bool lateHeaps=false,lateSync=false,lateNotify=false;
     unsigned pins=0,binds=0,retains=0,releases=0,stages=0,fenceRetains=0,fenceReleases=0;
     XeDispatch::Policy policy{112,3,false,false};
     LiveContext context(){return {51,7,19,5,0x200000,0x210000,4096,ring,&tail,0x200119,false};}
     static bool yes(void *){return true;}
     ExecutionBackend backend(){
         ExecutionBackend b;b.opaque=this;
+        b.nowMicros=[](void *p){return static_cast<Fixture *>(p)->clock;};
         b.admitted=[](void *p,const LiveContext &c,const XeDispatch::Policy &){return static_cast<Fixture *>(p)->admit && c.epoch==7 && c.owner==51;};
         b.freshStopped=[](void *p,const LiveContext &){auto f=static_cast<Fixture *>(p);return f->stopped && f->tail==0;};
         b.retainContext=[](void *p,const LiveContext &){auto f=static_cast<Fixture *>(p);++f->retains;f->retained=true;return true;};
@@ -29,8 +31,12 @@ struct Fixture {
             if(!f->stageOk)return false;
             CHECK(f->retained);
             for(unsigned i=0;i<6;++i)CHECK(f->slots[i].activeUses==1);
-            std::memcpy(f->heaps[0],s.isa,4096);std::memcpy(f->heaps[1],s.indirect,4096);std::memcpy(f->heaps[2],s.surface,4096);std::memcpy(f->heaps[3],s.batch,4096);return true;};
-        b.synchronizeContext=[](void *p,const LiveContext &){auto f=static_cast<Fixture *>(p);CHECK(f->tail==80 && f->activeFence->lastPublished()==1);return f->syncOk;};
+            std::memcpy(f->heaps[0],s.isa,4096);std::memcpy(f->heaps[1],s.indirect,4096);std::memcpy(f->heaps[2],s.surface,4096);std::memcpy(f->heaps[3],s.batch,4096);
+            if(f->lateHeaps)f->clock=10;
+            return true;};
+        b.synchronizeContext=[](void *p,const LiveContext &){auto f=static_cast<Fixture *>(p);CHECK(f->tail==80 && f->activeFence->lastPublished()==1);
+            if(f->lateSync)f->clock=10;
+            return f->syncOk;};
         b.quiesced=[](void *p,const LiveContext &){return static_cast<Fixture *>(p)->stopped;};return b;
     }
     Fixture(){
@@ -45,7 +51,7 @@ struct Fixture {
         op.admitted=[](void *p,uint64_t e){return e==7 && static_cast<Fixture *>(p)->admit;};
         op.authorizeAction=[](void *p,uint64_t,const XeGuC::Action &a){auto f=static_cast<Fixture *>(p);CHECK(f->retained && f->tail==80);
             if(a.words[0]==0x1001){CHECK(f->activeFence->lastPublished()==1);f->stopped=false;}return true;};
-        op.notify=[](void *p){return static_cast<Fixture *>(p)->notifyOk;};
+        op.notify=[](void *p){auto f=static_cast<Fixture *>(p);if(f->lateNotify)f->clock=10;return f->notifyOk;};
         MellowXe::FirmwareInfo fw;fw.release={70,53,0};fw.submission={1,26,0};
         CHECK(transport.attach({&h,hw,1024,0x400000,0x410000},{&g,gw,2048,0x400040,0x420000},op,7,fw)==XeGuC::Status::Ok);
         bindFence(fence);
@@ -67,14 +73,17 @@ int main(int argc,char **argv){
     const char *path=argc>1?argv[1]:"compiler-evidence/mellow_evidence_mtl.bin";
     std::ifstream file(path,std::ios::binary);CHECK(bool(file));std::vector<uint8_t> data((std::istreambuf_iterator<char>(file)),{});
     XeZebin::Image image;CHECK(image.parse(data.data(),data.size())==XeZebin::Error::None);
-    for(unsigned mode=0;mode<6;++mode){
+    for(unsigned mode=0;mode<12;++mode){
         auto f=new Fixture;auto execution=new EvidenceExecution(f->vm,f->transport,f->fence,f->backend());
         if(mode==1)f->admit=false;
         if(mode==2)f->stageOk=false;
         if(mode==3)f->syncOk=false;
         if(mode==4)f->notifyOk=false;
+        if(mode==9)f->lateHeaps=true;
+        if(mode==10)f->lateSync=true;
+        if(mode==11)f->lateNotify=true;
         auto result=execution->begin(image,f->context(),f->handles,f->policy,1234,32,false,1,10);
-        if(mode==0 || mode==5){
+        if(mode==0 || (mode>=5 && mode<=8)){
             CHECK(result==ExecutionStatus::Pending && execution->state()==ExecutionState::Enabling);
             CHECK(f->hw[1]==0x20004502 && f->hw[3]==5 && f->hw[11]==0x200119);
             CHECK(f->hw[14]==0x20001001 && f->hw[15]==5 && f->hw[16]==1 && f->h.tail==17);
@@ -82,24 +91,47 @@ int main(int argc,char **argv){
             CHECK(execution->close()==ExecutionStatus::Busy);
             f->enableAck();CHECK(execution->poll(2)==ExecutionStatus::Pending);
             CHECK(execution->state()==ExecutionState::Running);
-            CHECK(execution->poll(10)==ExecutionStatus::Timeout && execution->retainedVmUses()==6);
-            CHECK(execution->close()==ExecutionStatus::Busy);
             CHECK(f->vm.retire(51,f->handles[5])==XeMemory::Status::Ok);
             CHECK(f->vm.reclaim(51,f->handles[5])==XeMemory::Status::Busy);
             if(mode==0){
                 // Simulated GPU write, never a production completion callback.
-                f->completion=1;CHECK(execution->poll(11)==ExecutionStatus::Ok);
+                f->completion=1;CHECK(execution->poll(3)==ExecutionStatus::Ok);
                 CHECK(execution->state()==ExecutionState::Completed && execution->retainedVmUses()==0);
                 CHECK(f->retained && f->fence.held());
-            }else {f->completion=1ULL<<32;CHECK(execution->poll(11)==ExecutionStatus::Quarantined);CHECK(execution->retainedVmUses()==6);}
+            }else if(mode==5){
+                CHECK(execution->poll(10)==ExecutionStatus::Timeout && execution->retainedVmUses()==6);
+                CHECK(execution->close()==ExecutionStatus::Busy);
+                f->completion=1;
+                CHECK(execution->poll(11)==ExecutionStatus::Timeout && execution->state()==ExecutionState::Failed);
+                CHECK(execution->poll(100)==ExecutionStatus::Timeout && execution->retainedVmUses()==6);
+            }else if(mode==6){
+                // First observation at the deadline cannot admit existing fence1.
+                f->completion=1;
+                CHECK(execution->poll(10)==ExecutionStatus::Timeout && execution->retainedVmUses()==6);
+                CHECK(execution->poll(11)==ExecutionStatus::Timeout);
+            }else if(mode==7){
+                f->admit=false;CHECK(execution->poll(3)==ExecutionStatus::Quarantined);
+                f->admit=true;f->completion=1;
+                CHECK(execution->poll(4)==ExecutionStatus::Quarantined && execution->retainedVmUses()==6);
+            }else {
+                f->completion=1ULL<<32;CHECK(execution->poll(3)==ExecutionStatus::Quarantined);
+                f->completion=1;CHECK(execution->poll(4)==ExecutionStatus::Quarantined && execution->retainedVmUses()==6);
+            }
+        }else if(mode>=9){
+            CHECK(result==ExecutionStatus::Timeout && execution->state()==ExecutionState::Failed);
+            CHECK(execution->retainedVmUses()==6 && execution->contextHeld());
+            CHECK(f->tail==(mode==9?0U:80U));
+            CHECK(f->h.tail==(mode==11?13U:0U));
+            f->completion=1;CHECK(execution->poll(12)==ExecutionStatus::Timeout);
+            f->stopped=false;CHECK(execution->close()==ExecutionStatus::Busy);
         }else CHECK(result==ExecutionStatus::Unavailable || result==ExecutionStatus::Quarantined);
         if(mode==1)CHECK(f->retains==0 && f->stages==0 && f->tail==0 && f->h.tail==0);
         else CHECK(execution->contextHeld());
         const XeGuC::Cookie uncertainRegistration{7,uint16_t(f->hw[0]>>16)};
         XeGuC::Reply uncertainReply;
-        if(mode==4)CHECK(f->transport.query(uncertainRegistration,uncertainReply)==XeGuC::Status::Ok);
+        if(mode==4 || mode==11)CHECK(f->transport.query(uncertainRegistration,uncertainReply)==XeGuC::Status::Ok);
         f->admit=true;f->stopped=true;CHECK(execution->close()==ExecutionStatus::Ok);
-        if(mode==4)CHECK(f->transport.query(uncertainRegistration,uncertainReply)==XeGuC::Status::UnknownCookie);
+        if(mode==4 || mode==11)CHECK(f->transport.query(uncertainRegistration,uncertainReply)==XeGuC::Status::UnknownCookie);
         CHECK(execution->retainedVmUses()==0 && !execution->contextHeld());
         CHECK(execution->begin(image,f->context(),f->handles,f->policy,1,1,false,12,20)==ExecutionStatus::Busy);
         delete execution;delete f;
@@ -108,29 +140,54 @@ int main(int argc,char **argv){
         auto f=new Fixture;auto execution=new EvidenceExecution(f->vm,f->transport,f->fence,f->backend());
         CHECK(execution->begin(image,f->context(),f->handles,f->policy,1234,32,false,1,100)==ExecutionStatus::Pending);
         const XeGuC::Cookie registration{7,uint16_t(f->hw[0]>>16)},enable{7,uint16_t(f->hw[13]>>16)};
-        // GPU completion is independent of the asynchronous control reply.
+        // Simulated GPU completion is independent of the pending control reply.
         f->completion=1;CHECK(execution->poll(2)==ExecutionStatus::Ok);
         CHECK(execution->retainedVmUses()==0 && execution->contextHeld());
         f->stopped=true;CHECK(execution->close()==ExecutionStatus::Busy);
         XeGuC::Reply reply;
-        CHECK(f->transport.query(enable,reply)==XeGuC::Status::Ok && reply.creditsHeld);
+        CHECK(f->transport.query(enable,reply)==XeGuC::Status::Ok && reply.creditsHeld && reply.state==XeGuC::ReplyState::Pending);
         CHECK(f->transport.query(registration,reply)==XeGuC::Status::Ok);
-        CHECK(execution->contextHeld() && f->fence.held() && f->releases==0);
-        CHECK(execution->close()==ExecutionStatus::Busy);
+        CHECK(execution->contextHeld() && f->fence.held() && f->releases==0 && f->fenceReleases==0);
+        CHECK(f->transport.responseCredits()==1019);
+        CHECK(execution->close()==ExecutionStatus::Busy && f->transport.responseCredits()==1019);
         f->enableAck(3);CHECK(execution->close()==ExecutionStatus::Ok);
         CHECK(f->transport.query(enable,reply)==XeGuC::Status::UnknownCookie);
         CHECK(f->transport.query(registration,reply)==XeGuC::Status::UnknownCookie);
-        CHECK(!execution->contextHeld() && !f->fence.held() && f->releases==1);
+        CHECK(!execution->contextHeld() && !f->fence.held() && f->releases==1 && f->fenceReleases==1);
+        CHECK(f->transport.responseCredits()==1023);
+        CHECK(execution->close()==ExecutionStatus::Ok && f->releases==1 && f->fenceReleases==1);
+        delete execution;delete f;
+    }
+    {
+        auto f=new Fixture;auto execution=new EvidenceExecution(f->vm,f->transport,f->fence,f->backend());
+        CHECK(execution->begin(image,f->context(),f->handles,f->policy,1234,32,false,1,10)==ExecutionStatus::Pending);
+        const XeGuC::Cookie registration{7,uint16_t(f->hw[0]>>16)},enable{7,uint16_t(f->hw[13]>>16)};
+        CHECK(execution->poll(10)==ExecutionStatus::Timeout);
+        CHECK(f->transport.expire(10)==XeGuC::Status::Ok);
+        f->stopped=true;CHECK(execution->close()==ExecutionStatus::Busy);
+        XeGuC::Reply reply;
+        CHECK(f->transport.query(enable,reply)==XeGuC::Status::Ok && reply.creditsHeld && reply.state==XeGuC::ReplyState::TimedOut && !reply.late);
+        CHECK(execution->retainedVmUses()==6 && execution->contextHeld() && f->fence.held());
+        CHECK(f->releases==0 && f->fenceReleases==0 && f->transport.responseCredits()==1019);
+        CHECK(execution->close()==ExecutionStatus::Busy);
+        f->enableAck(11);
+        CHECK(f->transport.query(enable,reply)==XeGuC::Status::Ok && !reply.creditsHeld && reply.state==XeGuC::ReplyState::TimedOut && reply.late);
+        f->completion=1;CHECK(execution->poll(11)==ExecutionStatus::Timeout && execution->retainedVmUses()==6);
+        CHECK(execution->close()==ExecutionStatus::Ok);
+        CHECK(f->transport.query(enable,reply)==XeGuC::Status::UnknownCookie);
+        CHECK(f->transport.query(registration,reply)==XeGuC::Status::UnknownCookie);
+        CHECK(execution->retainedVmUses()==0 && !execution->contextHeld() && !f->fence.held());
+        CHECK(f->releases==1 && f->fenceReleases==1 && f->transport.responseCredits()==1023);
         delete execution;delete f;
     }
     {
         auto f=new Fixture;CHECK(f->fence.close()==XeFence::Status::Ok);
-        // More jobs than the bounded pending-cookie table can hold. Every job
-        // uses a fresh fence timeline while sharing one transport/reset epoch.
+        // Reuse one transport/epoch for more jobs than its cookie table holds.
+        // Each job has a fresh fence and an independently sampled owner clock.
         for(unsigned iteration=0;iteration<XeGuC::maxPending+1;++iteration){
             auto fence=new XeFence::Timeline;f->stopped=true;f->tail=0;f->h.head=f->h.tail;
             f->bindFence(*fence);
-            const auto at=f->h.tail;const uint64_t now=1+iteration*3;
+            const auto at=f->h.tail;const uint64_t now=1+iteration*3;f->clock=now;
             auto execution=new EvidenceExecution(f->vm,f->transport,*fence,f->backend());
             CHECK(execution->begin(image,f->context(),f->handles,f->policy,1234,32,false,now,now+100)==ExecutionStatus::Pending);
             const XeGuC::Cookie registration{7,uint16_t(f->hw[at]>>16)},enable{7,uint16_t(f->hw[(at+13)&1023]>>16)};

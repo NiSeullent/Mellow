@@ -4,6 +4,23 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional planned release tag for this exact branch commit (does not create or move a tag)
+        required: false
+        type: string
+        default: ''
+  workflow_call:
+    inputs:
+      checkout_ref:
+        type: string
+        required: true
+      source_ref:
+        type: string
+        required: true
+      release_tag:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -12,9 +29,11 @@ jobs:
   build:
     name: Native Intel build and host tests
     runs-on: macos-15-intel
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.checkout_ref || github.sha }}
       - name: Check pinned dependencies
         run: |
           test -f MacKernelSDK/Library/x86_64/libkmod.a
@@ -38,7 +57,15 @@ jobs:
           xcrun swiftc -swift-version 5 -O -target x86_64-apple-macos13.0 Tools/metal-probe.swift -o build/metal-probe -framework Metal -framework IOKit -framework CryptoKit
       - name: Compile public IOKit diagnostic client
         run: |
-          xcrun clang -std=c11 -Wall -Wextra -Werror Userspace/tahoe_diag_client.c -framework IOKit -framework CoreFoundation -o build/tahoe-diag-client
+          xcrun clang -std=c11 -Wall -Wextra -Werror -arch x86_64 -mmacosx-version-min=15.0 Userspace/tahoe_diag_client.c -framework IOKit -framework CoreFoundation -o build/tahoe-diag-client
+      - name: Compile actual Objective-C++ userspace library and acceptance clients
+        run: |
+          python3 Tools/build-apple-userspace.py --out "$RUNNER_TEMP/mellow-apple-userspace" --deployment-target 15.0
+      - name: Compile native Metal client and ABI inventory tool
+        run: |
+          make -f Tools/NativeMetalClient.mk MELLOW_OUT="$RUNNER_TEMP/mellow-native-clients" MELLOW_ARCH=x86_64 all
+      - name: Check package checksums and archive rejection
+        run: python3 packaging/build-release.py --self-test
       - name: Package native artifacts
         run: |
           mkdir -p build/package
@@ -49,6 +76,51 @@ jobs:
           cp build/native-Release/macho-validation.json build/package/
           printf '%s\n' 'Native build and host tests only. GPU execution on 8086:7D41, Tahoe installation, and Metal acceleration are NOT verified by CI.' > build/package/VALIDATION-SCOPE.txt
           (cd build/package && zip -r ../Mellow-native-development.zip .)
+      - name: Package verified development binaries and framework
+        env:
+          MELLOW_SOURCE_REF: ${{ inputs.source_ref || github.ref }}
+          MELLOW_RELEASE_TAG: ${{ inputs.release_tag || '' }}
+        run: |
+          args=(--kext-settings build/native-Release/build-settings.json --kext-validation build/native-Release/macho-validation.json --userspace-dir "$RUNNER_TEMP/mellow-apple-userspace" --native-clients-dir "$RUNNER_TEMP/mellow-native-clients" --metal-probe build/metal-probe --diagnostic-client build/tahoe-diag-client --out "$RUNNER_TEMP/mellow-release" --source-commit "$(git rev-parse HEAD)" --source-ref "$MELLOW_SOURCE_REF" --repository "$GITHUB_REPOSITORY")
+          if [ -n "$MELLOW_RELEASE_TAG" ]; then args+=(--release-tag "$MELLOW_RELEASE_TAG"); fi
+          python3 packaging/build-release.py "${args[@]}"
+      - name: Check userspace installation and removal without kext activation
+        run: |
+          prefix="$RUNNER_TEMP/mellow-install-check"
+          bash packaging/install-mellow.sh --archive "$RUNNER_TEMP/mellow-release/Mellow-macos-x86_64.zip" --prefix "$prefix"
+          test -f "$prefix/Frameworks/MellowAppleUserspace.framework/MellowAppleUserspace"
+          test -f "$prefix/bin/libMellowAppleUserspace.dylib"
+          test -x "$prefix/bin/mellow-compute-acceptance"
+          cmp "$RUNNER_TEMP/mellow-release/payload/bin/libMellowAppleUserspace.dylib" "$prefix/bin/libMellowAppleUserspace.dylib"
+          cmp "$RUNNER_TEMP/mellow-release/payload/frameworks/MellowAppleUserspace.framework/MellowAppleUserspace" "$prefix/Frameworks/MellowAppleUserspace.framework/MellowAppleUserspace"
+          otool -L "$prefix/bin/mellow-compute-acceptance" | grep -F '@rpath/libMellowAppleUserspace.dylib'
+          otool -l "$prefix/bin/mellow-compute-acceptance" | grep -F '@loader_path'
+          printf '%s\n' 'user-owned data must survive removal' > "$prefix/user-owned-note.txt"
+          bash packaging/uninstall-mellow.sh --prefix "$prefix"
+          test ! -e "$prefix/bin/mellow-compute-acceptance"
+          test ! -e "$prefix/Frameworks/MellowAppleUserspace.framework/MellowAppleUserspace"
+          test "$(cat "$prefix/user-owned-note.txt")" = 'user-owned data must survive removal'
+          if bash packaging/install-mellow.sh --archive "$RUNNER_TEMP/mellow-release/Mellow-macos-x86_64.zip" --prefix "$RUNNER_TEMP/mellow-wrong-digest-install" --sha256 0000000000000000000000000000000000000000000000000000000000000000; then
+            echo 'Installer accepted an incorrect external ZIP digest' >&2
+            exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/mellow-wrong-digest-install"
+          if bash packaging/install-mellow.sh --archive "$RUNNER_TEMP/no-such-mellow.zip" --prefix "$RUNNER_TEMP/mellow-invalid-install"; then
+            echo 'Installer accepted an absent archive' >&2
+            exit 1
+          fi
+          test ! -e "$RUNNER_TEMP/mellow-invalid-install/bin/libMellowAppleUserspace.dylib"
+      - name: Upload complete compiled package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mellow-macos-x86_64
+          path: |
+            ${{ runner.temp }}/mellow-release/Mellow-macos-x86_64.zip
+            ${{ runner.temp }}/mellow-release/Mellow-macos-x86_64.zip.sha256
+            ${{ runner.temp }}/mellow-release/manifest.json
+            ${{ runner.temp }}/mellow-release/install-mellow.sh
+            ${{ runner.temp }}/mellow-release/uninstall-mellow.sh
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -58,4 +130,6 @@ jobs:
             build/native-Release/*.log
             build/native-Release/*.json
             build/host-tests/host-tests.json
+            ${{ runner.temp }}/mellow-apple-userspace/apple-userspace-build.json
+            ${{ runner.temp }}/mellow-release/release-build.json
           if-no-files-found: error

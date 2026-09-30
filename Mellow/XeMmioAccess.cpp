@@ -49,6 +49,14 @@ MmioStatus ForceWake::acquire(WakeDomain domain) {
     if (!io_.read32(io_.opaque,ack[index],value) || value==0xFFFFFFFFU) return MmioStatus::IoFailure;
     // Never adopt somebody else's kernel-bit hold and later release it.
     if (value&kernelBit) return MmioStatus::Busy;
+    // A foreign request may still be awaiting ACK. Validate its request bit too
+    // before issuing our first write; ACK=0 alone cannot grant ownership.
+    // Request/ACK register protocol: Intel Xe at Linux revision
+    // 0d9ff90a5422cc7509258aaaba1e7481df4d332a, xe_force_wake.c and
+    // regs/xe_gt_regs.h (this ownership rejection is a local safeguard):
+    // https://github.com/torvalds/linux/tree/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe
+    if (!io_.read32(io_.opaque,control[index],value) || value==0xFFFFFFFFU) return MmioStatus::IoFailure;
+    if (value&kernelBit) return MmioStatus::Busy;
     // A failing backend can have issued the write before detecting an error.
     // Keep the mapping quarantined rather than assume the hardware stayed idle.
     if (!io_.write32(io_.opaque,control[index],kernelMask|kernelBit)) {

@@ -76,7 +76,8 @@ def directory_prefixes(value, label):
             raise PortError("Noncanonical relative directory prefix: " + label)
 
 
-def recipe_registry():
+def load_recipes():
+    """Return exact registry bytes and the shared, validated source-intake mapping."""
     data, recipes = registry(RECIPES_PATH, "recipes")
     for target, recipe in recipes.items():
         for field in ("vendor", "adapter_contract", "hardware_admission"):
@@ -99,9 +100,19 @@ def recipe_registry():
     return data, recipes
 
 
-def available_targets():
+def recipe_choices():
     """Use the same validated recipe registry for CLI admission and planning."""
-    return tuple(sorted(recipe_registry()[1]))
+    return tuple(sorted(load_recipes()[1]))
+
+
+def recipe_registry():
+    """Compatibility entry point for the shared recipe loader."""
+    return load_recipes()
+
+
+def available_targets():
+    """Compatibility entry point for registry-derived target choices."""
+    return recipe_choices()
 
 
 def family_contract(target, recipe, gpu_family):
@@ -224,7 +235,7 @@ def inventory(relative, text):
 def prepare(command, source_root, target, revision, files, output, source_url=None, require_ready=False, gpu_family=None):
     if command not in ("inspect", "plan", "generate"):
         raise PortError("Unknown operation")
-    recipe_bytes, recipes = recipe_registry()
+    recipe_bytes, recipes = load_recipes()
     if target not in recipes:
         raise PortError("An explicit supported target recipe is required")
     recipe = recipes[target]

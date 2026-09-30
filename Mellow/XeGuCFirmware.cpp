@@ -219,8 +219,8 @@ Error Loader::start(const Plan &input) {
         if(!backend_.mappingPublished(backend_.opaque,at(plan_,i),plan_.epoch))return fail(Error::Mapping);
         error=verifyGgtt(backend_.io,at(plan_,i));if(error!=Error::None)return fail(error);
     }
-    if(plan_.profile==Profile::Submission && (!backend_.fullAdsValid ||
-        !backend_.fullAdsValid(backend_.opaque,plan_,info_)))return fail(Error::Unavailable);
+    if(plan_.profile==Profile::Submission && (!backend_.preloadAdsValid ||
+        !backend_.preloadAdsValid(backend_.opaque,plan_,info_)))return fail(Error::Unavailable);
     state_=State::Starting;
     error=reset();if(error!=Error::None)return fail(error);
     error=wopcm();if(error!=Error::None)return fail(error);
@@ -259,6 +259,13 @@ Error Loader::resetAndRelease() {
     if(!allowed())return Error::Unavailable;
     if(touchedHardware_) {const Error error=reset();if(error!=Error::None)return fail(error);}
     state_=State::Failed;return releaseRegions();
+}
+bool Loader::submissionReady(uint64_t owner,uint64_t epoch) const {
+    if (!submissionProfile() || !running(owner,epoch) || !backend_.goldenAdsValid ||
+        !backend_.goldenAdsValid(backend_.opaque,plan_,info_)) return false;
+    // Golden inspection can synchronize DMA or otherwise block. Recheck the
+    // retained physical epoch and actual firmware state after that operation.
+    return running(owner,epoch);
 }
 bool Loader::running(uint64_t owner,uint64_t epoch) const {
     if(state_!=State::Running || owner!=plan_.owner || epoch!=plan_.epoch)return false;

@@ -4,9 +4,10 @@
 #include <IOKit/IOMapper.h>
 
 namespace XeMemory {
-// Obtain the mapper for the admitted PCI device with
-// IOMapper::copyMapperForDevice. Null is refused, never silently replaced with
-// identity mapping or a mapper from another device. Caller owns/retains mapper.
+// Retain the admitted PCI device's actual iommu-parent mapper. A mapper lookup
+// that falls back to the system mapper is not device ownership evidence.
+// Null is refused, never silently replaced with identity mapping or a mapper
+// from another device. Caller owns/retains mapper and physical admission.
 struct IOKitContext {
     IOKitContext() = default;
     IOKitContext(const IOKitContext &) = delete;
@@ -32,6 +33,22 @@ void *kernelBuffer(const Pin &pin);
 // This verifies owner, complete allocation extent and retained mapper identity;
 // pin.cookie remains a trusted kernel handle, never an arbitrary client pointer.
 void *resolvePinnedBuffer(IOKitContext &context, uint64_t owner, uint64_t bytes, const Pin &pin);
+// Inspect a direct shared pin without preparing, completing, synchronizing,
+// allocating or writing its memory. Requires the caller's sleepable owner lock
+// throughout; segment enumeration changes the command's internal cursor. The
+// original CPU extent, descriptor, prepared range and preparation ID must stay
+// unchanged, with a valid charge under the context's current quotas. Each
+// freshly enumerated 4K DMA page must equal the stored pin and
+// translate to the original descriptor's physical first and last byte through
+// the same retained 4K mapper. A bounce descriptor or any mismatch returns null
+// while retaining the entire pin and its quota charge. The generic resolver
+// above continues to support pins whose command uses a bounce buffer.
+// This is a bounded page-identity inspection, not proof of CPU cache coherence,
+// active device/IOMMU ownership, GPU IOTLB health or GPU completion. The physical
+// owner must independently prove those before and after using the result.
+// pin.cookie remains a private trusted kernel handle, never a client address.
+void *resolveDirectPinnedBuffer(IOKitContext &context, uint64_t owner, uint64_t bytes,
+                               const Pin &pin);
 // This adapter allocates and pins real IOKit-owned system-memory pages. It does
 // NOT create GPU page tables, publish a context root, invalidate GPU TLBs, handle
 // GPU interrupts or provide bind/unbind/fenceComplete callbacks.

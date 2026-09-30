@@ -94,7 +94,8 @@ public:
     // The real Loader backend connects this owner's exact region holds and
     // synchronization. io/revision come from the same admitted physical owner.
     // Every region hold is exclusive: the Loader ABI has no borrower identity.
-    // fullAdsValid is deliberately absent: Submission profile remains refused.
+    // Both preloadAdsValid and goldenAdsValid are deliberately absent:
+    // Submission profile remains refused until an actual ADS owner supplies them.
     XeGuCFirmware::Backend firmwareBackend(MellowXe::MmioAccess, uint8_t physicalRevision);
     uint64_t chargedBytes() const { return charged_; }
     size_t allocations() const;

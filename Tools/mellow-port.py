@@ -5,12 +5,12 @@ import json
 from pathlib import Path
 import sys
 
-from mellow_port import PortError, available_targets, prepare
+from mellow_port import PortError, recipe_choices, prepare
 
 
 def main(argv=None):
     try:
-        targets = available_targets()
+        targets = recipe_choices()
     except (PortError, OSError) as error:
         print(json.dumps({"artifacts_generated": False, "driver_ready": False, "error": str(error)}), file=sys.stderr)
         return 1

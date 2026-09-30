@@ -36,6 +36,7 @@ struct Device {
     bool invalidateWorks {true}, pinFail {}, partialPinFail {}, emptyPinSuccess {}, syncWorks {true};
     bool unpinWorks {true}, unpinLeavesToken {}, wrongCpu {}, overflowCpu {}, overflowPages {};
     bool metadataInCpu {}, aliasCpu {}, badPage {}, corruptWrites {}, cpuAccessible {true};
+    bool revokeOnSync {}, corruptPteOnSync {}, revokeCpuOnSync {};
     uint32_t pat {2};
     unsigned pins {}, unpins {}, cpuChecks {}, syncs {}, reads {}, writes {}, invalidations {}, releases {}, mmioWrites {};
     unsigned failWrite {}, failRead {};
@@ -91,6 +92,11 @@ struct Device {
     }
     static XeMemory::Status sync(void *p, const XeMemory::Pin &pin, bool device) {
         auto &s = d(p); ++s.syncs; CHECK(device); CHECK(s.resolve(pin) != nullptr);
+        if (s.syncWorks) {
+            if (s.revokeOnSync) s.live = false;
+            if (s.corruptPteOnSync) s.ptes[0] ^= 4096;
+            if (s.revokeCpuOnSync) s.cpuAccessible = false;
+        }
         return s.syncWorks ? XeMemory::Status::Ok : XeMemory::Status::BackendFailure;
     }
     Pins pinOps() {
@@ -158,7 +164,7 @@ static void normalOwnership() {
     CHECK(d.regions->chargedBytes() == 8192 && d.totalPinned == 8192);
     const uint8_t bytes[] = {1, 2, 3, 4}; CHECK(d.regions->write(h, 5, bytes, 4) == Status::Ok);
     CHECK(std::memcmp(r.cpu + 5, bytes, 4) == 0);
-    auto b = d.backend(); CHECK(b.fullAdsValid == nullptr);
+    auto b = d.backend(); CHECK(b.preloadAdsValid == nullptr && b.goldenAdsValid == nullptr);
     CHECK(b.admitted(b.opaque, Device::OwnerId, Device::Epoch));
     CHECK(!b.admitted(b.opaque, Device::OwnerId, Device::Epoch + 1));
     uint32_t pat = 0; CHECK(b.readPat3(b.opaque, pat) && pat == 2);
@@ -349,6 +355,32 @@ static void reverseCleanupAndSpaceLease() {
     CHECK(d.regions->allocations() == 0 && d.releases == 1);
     d.spaceRelease = true; CHECK(d.regions->close() == Status::Ok && d.releases == 2);
 }
+static void successfulSyncMustRevalidateAuthorityAndBacking() {
+    for (unsigned fault = 0; fault < 3; ++fault) {
+        Device d; CHECK(d.initialize() == Status::Ok); const auto h = d.allocation(); const auto r = d.exported(h);
+        auto b = d.backend(); CHECK(b.retain(b.opaque, r, true));
+        const auto writes = d.writes; const auto pte = d.ptes[0];
+        switch (fault) {
+        case 0: d.revokeOnSync = true; break;
+        case 1: d.corruptPteOnSync = true; break;
+        default: d.revokeCpuOnSync = true; break;
+        }
+        // The callback reports successful synchronization. Actual production
+        // Owner must then reject the changed epoch, PTE or CPU association.
+        CHECK(!b.synchronize(b.opaque, r) && d.syncs == 1 && d.regions->draining());
+        View view; CHECK(d.regions->inspect(h, view) == Status::Ok);
+        CHECK(view.state == State::Quarantined && view.firmwareReferences == 1 && view.ggttBackingHeld);
+        CHECK(d.totalPinned == 8192 && d.regions->chargedBytes() == 8192 && d.unpins == 0 && d.writes == writes);
+        CHECK(d.regions->retire(h) == Status::Busy);
+        d.live = true; d.cpuAccessible = true; d.ptes[0] = pte;
+        d.revokeOnSync = d.corruptPteOnSync = d.revokeCpuOnSync = false;
+        d.quiet = false; CHECK(!b.release(b.opaque, r));
+        CHECK(d.regions->retire(h) == Status::Busy && d.unpins == 0 && d.totalPinned == 8192);
+        d.quiet = true; CHECK(b.release(b.opaque, r));
+        CHECK(d.regions->retire(h) == Status::Ok && d.totalPinned == 0);
+        CHECK(d.regions->close() == Status::Ok);
+    }
+}
 static void loaderRejectsRealUnidentifiedImage() {
   for (bool consumersStopped : {true, false}) {
     Device d; CHECK(d.initialize() == Status::Ok);
@@ -421,14 +453,117 @@ static void actualIOKitFactory() {
     CHECK(context.pinnedBytes == 0 && Mock::unsafeClearCalls == 0 && Mock::prematureDestroy == 0);
     mapper->release(); CHECK(Mock::objects.empty() && Mock::allocations.empty());
 }
+static void actualIOKitSyncRevalidation() {
+    namespace Mock = NativeMemoryShim;
+    for (unsigned fault = 0; fault < 3; ++fault) {
+        Mock::reset(); auto *mapper = new IOMapper;
+        XeMemory::IOKitContext context; context.mapper = mapper;
+        {
+            Device d; const XeGgtt::Range range {Device::Base, d.ptes.size() * 4096ULL};
+            CHECK(d.regions->initialize(Device::OwnerId, Device::Epoch, &range, 1,
+                makeIOKitPins(context), d.hardware()) == Status::Ok);
+            const auto h = d.allocation(); const auto r = d.exported(h); auto b = d.backend();
+            CHECK(b.retain(b.opaque, r, true));
+            const auto pte = d.ptes[0]; const auto writes = d.writes;
+            Mock::faults.syncContext = &d;
+            switch (fault) {
+            case 0: Mock::faults.afterSync = [](void *opaque, IOOptionBits) { Device::d(opaque).live = false; }; break;
+            case 1: Mock::faults.afterSync = [](void *opaque, IOOptionBits) { Device::d(opaque).ptes[0] ^= 4096; }; break;
+            default: Mock::faults.afterSync = [](void *, IOOptionBits) { Mock::faults.copyDescriptor = true; }; break;
+            }
+            // Actual production DMA synchronize returns success; only the
+            // subsequent direct association/epoch/PTE check sees the fault.
+            CHECK(!b.synchronize(b.opaque, r) && Mock::syncCalls == 1);
+            View view; CHECK(d.regions->inspect(h, view) == Status::Ok);
+            CHECK(view.state == State::Quarantined && view.firmwareReferences == 1 && view.ggttBackingHeld);
+            CHECK(context.pinnedBytes == 8192 && d.regions->chargedBytes() == 8192 && d.writes == writes);
+            CHECK(Mock::commandCompleteCalls == 0 && Mock::descriptorCompleteCalls == 0);
+            CHECK(d.regions->retire(h) == Status::Busy);
+            Mock::faults.afterSync = nullptr; Mock::faults.copyDescriptor = false;
+            d.live = true; d.ptes[0] = pte; d.quiet = false;
+            CHECK(!b.release(b.opaque, r) && context.pinnedBytes == 8192);
+            d.quiet = true; CHECK(b.release(b.opaque, r));
+            CHECK(d.regions->retire(h) == Status::Ok && context.pinnedBytes == 0);
+            CHECK(d.regions->close() == Status::Ok);
+        }
+        CHECK(Mock::commandCompleteCalls == 1 && Mock::descriptorCompleteCalls == 1);
+        CHECK(Mock::unsafeClearCalls == 0 && Mock::prematureDestroy == 0);
+        mapper->release(); CHECK(Mock::objects.empty() && Mock::allocations.empty());
+    }
+}
+static void actualIOKitInspectionMustNotOutlivePhysicalAdmission() {
+    namespace Mock = NativeMemoryShim;
+    Mock::reset(); auto *mapper = new IOMapper;
+    XeMemory::IOKitContext context; context.mapper = mapper;
+    {
+        Device d; const XeGgtt::Range range {Device::Base, d.ptes.size() * 4096ULL};
+        CHECK(d.regions->initialize(Device::OwnerId, Device::Epoch, &range, 1,
+            makeIOKitPins(context), d.hardware()) == Status::Ok);
+        Mock::faults.inspectionContext = &d;
+        Mock::faults.afterInspectionAddress = 0x801fff;
+        Mock::faults.afterInspection = [](void *opaque) { Device::d(opaque).live = false; };
+        Handle h; CHECK(d.regions->allocate(Device::OwnerId, Device::Epoch, 8192, h) == Status::Quarantined);
+        CHECK(Mock::inspectionCallbacks == 1 && d.writes == 0 && d.mmioWrites == 0);
+        CHECK(context.pinnedBytes == 8192 && d.regions->chargedBytes() == 8192);
+        CHECK(Mock::commandCompleteCalls == 0 && Mock::descriptorCompleteCalls == 0);
+        CHECK(d.regions->close() == Status::Quarantined);
+        CHECK(context.pinnedBytes == 8192 && d.releases == 0);
+        Mock::faults.afterInspection = nullptr; d.live = true;
+        CHECK(d.regions->retire(h) == Status::Ok && context.pinnedBytes == 0);
+        CHECK(d.regions->close() == Status::Ok);
+    }
+    mapper->release(); CHECK(Mock::objects.empty() && Mock::allocations.empty());
+}
+static void actualIOKitBounceFailsBeforePublication() {
+    namespace Mock = NativeMemoryShim;
+    for (bool uncertainCleanup : {false, true}) {
+        Mock::reset(); auto *mapper = new IOMapper;
+        {
+            XeMemory::IOKitContext context; context.mapper = mapper;
+            Device d; const XeGgtt::Range range {Device::Base, d.ptes.size() * 4096ULL};
+            CHECK(d.regions->initialize(Device::OwnerId, Device::Epoch, &range, 1,
+                makeIOKitPins(context), d.hardware()) == Status::Ok);
+            Mock::faults.copyDescriptor = true; Mock::faults.commandComplete = uncertainCleanup;
+            Handle h;
+            CHECK(d.regions->allocate(Device::OwnerId, Device::Epoch, 8192, h) ==
+                (uncertainCleanup ? Status::Quarantined : Status::Invalid));
+            CHECK(d.writes == 0 && d.mmioWrites == 0 && d.ptes[0] == 0 && d.ptes[1] == 0);
+            CHECK(Mock::commandCompleteCalls == 1 && Mock::unsafeClearCalls == 0 && Mock::prematureDestroy == 0);
+            if (!uncertainCleanup) {
+                CHECK(h.slot == SIZE_MAX && context.pinnedBytes == 0 && d.regions->chargedBytes() == 0);
+                CHECK(d.regions->allocations() == 0 && Mock::descriptorCompleteCalls == 1);
+                CHECK(d.regions->close() == Status::Ok);
+            } else {
+                View view; CHECK(d.regions->inspect(h, view) == Status::Ok);
+                CHECK(view.state == State::Quarantined && !view.ggttBackingHeld && view.firmwareReferences == 0);
+                CHECK(context.pinnedBytes == 8192 && d.regions->chargedBytes() == 8192 && d.regions->allocations() == 1);
+                CHECK(Mock::lastCommand && !Mock::lastCommand->active && Mock::lastCommand->getMemoryDescriptor());
+                Mock::faults = {}; // A later OS success cannot recover lost cleanup authority.
+                CHECK(d.regions->retire(h) == Status::Quarantined && d.regions->close() == Status::Quarantined);
+                CHECK(context.pinnedBytes == 8192 && d.regions->chargedBytes() == 8192 && d.releases == 0);
+                CHECK(Mock::commandCompleteCalls == 1 && Mock::descriptorCompleteCalls == 0);
+            }
+        }
+        mapper->release();
+        if (!uncertainCleanup) CHECK(Mock::objects.empty() && Mock::allocations.empty());
+        else CHECK(!Mock::objects.empty() && !Mock::allocations.empty());
+    }
+    // Explicit host-world teardown after retained production owners/contexts
+    // have left scope; this is not a production DMA retirement operation.
+    Mock::disposeQuarantinedHostWorld();
+    CHECK(Mock::objects.empty() && Mock::allocations.empty());
+}
 #endif
 int main() {
     normalOwnership(); exactIdentityAndNoMutation(); inputAdmission(); pinAndCpuFailures();
     publicationInverseAndQuarantine(); freshReadbackAndEpochLoss();
     synchronizationAndUnpinUncertainty(); reverseCleanupAndSpaceLease(); loaderRejectsRealUnidentifiedImage();
+    successfulSyncMustRevalidateAuthorityAndBacking();
     allocationBound();
 #ifdef XE_REGION_OWNER_IOKIT_SHIM_TEST
     actualIOKitFactory();
+    actualIOKitSyncRevalidation(); actualIOKitInspectionMustNotOutlivePhysicalAdmission();
+    actualIOKitBounceFailsBeforePublication();
 #endif
     std::printf("PASS xe_guc_region_owner_tests (%u checks; simulated hardware/DMA boundary)\n", checks);
 }

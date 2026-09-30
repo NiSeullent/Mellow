@@ -1,0 +1,277 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-09-30T13:04:01.607301+00:00",
+  "base_commit": "b1785aa71b23955359621a338729d3a0d89698b5",
+  "scope": "source checkpoint, host-only synthetic boundary tests and kernel object compilation",
+  "source_hashes": {
+    "Drivers/PortedXe/LICENSE.MIT": "cd653efa1b8639891f58c3792e2d16c0683fe61ce650f51047e0ed3225901d7c",
+    "Mellow.xcodeproj/project.pbxproj": "ae87f1e20a45a25a1d70ddf0cdff0847352f12b347787d7cb9b7a2ad7a89b8d7",
+    "Mellow/NativeGpuIOKit.cpp": "4dc40a0965d1abaa04825ad9805fa25a29faf82891d258b10e977afb99197029",
+    "Mellow/NativeGpuIOKit.hpp": "837b843f3bffa56766b6fa47b7f6019f12a205d6ab0a2daf0c63e982fdb4cd67",
+    "Mellow/XeContextExecution.cpp": "b2f79e9757c92455375a6ef863d6f7b841b83ef56d3056e0904f5cb73183fda6",
+    "Mellow/XeContextExecution.hpp": "faaddf2912bebed46e46a4d854c1521c88940382fa9ceb59ba2be4ef21e50762",
+    "Mellow/XeGgttIOKit.cpp": "ea7ee9d5462d51a62989050adda552766f61d4f7629b02a7917497d87d3df692",
+    "Mellow/XeGuCAds.cpp": "0870a143848f1a9db2617d0c6f15e2587514db9e87249f76bd6620e30da01e36",
+    "Mellow/XeGuCAds.hpp": "888a1e959c7ba253bf09884ff64c284cb56f09be9d9b6e5bea0d60ba05e81788",
+    "Mellow/XeGuCFirmware.cpp": "463334b132d5da924724804d1c85a9ecfd55c5a601facd7d3d20a344132edaa8",
+    "Mellow/XeGuCFirmware.hpp": "4df78e230e705ddfd3b0f6ee6708a7945fc49866b346e633e65e86dcb0e582a9",
+    "Mellow/XeGuCFirmwareIOKit.cpp": "1f3044bbcbfdf199465b7178a02d005ffeada9a141a978aae427db97b92a3499",
+    "Mellow/XeGuCFirmwareIOKit.hpp": "b9e212974cd99b8c4407fa52b49bc499aa9d35c392d3f97033a0dfaa2a39f2ee",
+    "Mellow/XeMmioAccess.cpp": "d5813ee5fb5f37fe5e68fa99c661dfab59c5140cb904e201454afefd34e16431",
+    "README.md": "efb598e520ab94d428f91c7c95bf50b0c3c2c6686bcde6a680dce3645bbc0b29",
+    "docs/IMPLEMENTATION-STATUS.md": "7dbd224743a8317d7bcd96f9790588f2e49e6df914ae11585a311cc76a427072",
+    "docs/NATIVE-GPU-BOUNDARY.md": "d745ea8da683d5d40b047318d7e58f49f652525e4254d47fc96deceb697442ea",
+    "docs/XE-GUC-ADS.md": "e1073fbd7acac43b6ebd9501e598681acd8a0357a42b87265d6b695f9ab70551",
+    "docs/XE-GUC-FIRMWARE.md": "b275d0ecfb5013b081173bbed32d1163cefe5f059c9a2862239687c464169c35",
+    "tests/native_gpu_iokit_shim.hpp": "b6547aba1bc4b5018d5756aea7df784faaa2efe39339bbc431f850cefcea4f5a",
+    "tests/native_gpu_iokit_tests.cpp": "2a1f2eaf0f0c9f6277f514e654585afd1c67977307382bbd136b40001856a6dd",
+    "tests/xe_context_execution_tests.cpp": "e4a06b0f4c7c7662b76d24677ac55012b1b89ae691b97814bed816fa946be486",
+    "tests/xe_guc_ads_tests.cpp": "20f9c0dfff52db0dd64fdeb92dfe9efef939059fe1a0288b77152555ee4088e6",
+    "tests/xe_guc_firmware_tests.cpp": "c9b134de69634abc649c180835697e6c8323e31a1e585f895eeb1c167086eb1a",
+    "tests/xe_mmio_tests.cpp": "faaf33bd018a23ca2286bf32aa069827905b25aa4dd560b3dd8536ece71a2032"
+  },
+  "kernel_objects": [
+    {
+      "source": "Mellow/NativeGpuIOKit.cpp",
+      "target": "x86_64-apple-darwin24",
+      "exit_code": 0,
+      "artifact_sha256": "e44a6b026488d4b681f46183646fbc84a07e2cfeb867c611b1fed51178d0a187",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/NativeGpuIOKit.cpp",
+      "target": "x86_64-apple-darwin25",
+      "exit_code": 0,
+      "artifact_sha256": "fd1999fee610c282fe804abccd89a248c5882df5862ad5fad50f21b4d9dbad56",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeGgttIOKit.cpp",
+      "target": "x86_64-apple-darwin24",
+      "exit_code": 0,
+      "artifact_sha256": "ab35e7907b9483ac8fab144b42ab5f9c345e5a6bf3d0b667b407fafd8e7239d7",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeGgttIOKit.cpp",
+      "target": "x86_64-apple-darwin25",
+      "exit_code": 0,
+      "artifact_sha256": "67df13f503c7aa7f52cb7c9acf795577b4aee3d3479b83aff95c6023b48419bd",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeMmioAccess.cpp",
+      "target": "x86_64-apple-darwin24",
+      "exit_code": 0,
+      "artifact_sha256": "2dcbd39c9279128797e4a415996de0ba5082a71dddab54f80c6c299fe97ad520",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeMmioAccess.cpp",
+      "target": "x86_64-apple-darwin25",
+      "exit_code": 0,
+      "artifact_sha256": "4aa09b4dd3aee695cc0f8058ea496bb18a553aacbfa805908b2d0880851d4b3a",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeGuCFirmware.cpp",
+      "target": "x86_64-apple-darwin24",
+      "exit_code": 0,
+      "artifact_sha256": "85ca138e0e2c96374b0efedcc190dd915dbe5767759e0aa927a82af8cb1bc97a",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeGuCFirmware.cpp",
+      "target": "x86_64-apple-darwin25",
+      "exit_code": 0,
+      "artifact_sha256": "d4c0874e4bdfd1ca788a3f032bf30e8f5e1b7e2b12f51d36e0817e32772f5597",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeGuCFirmwareIOKit.cpp",
+      "target": "x86_64-apple-darwin24",
+      "exit_code": 0,
+      "artifact_sha256": "5dbeea9611d14467032bfc1cbc759b44de4e14062438eac01e7e75dcdf1e266d",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeGuCFirmwareIOKit.cpp",
+      "target": "x86_64-apple-darwin25",
+      "exit_code": 0,
+      "artifact_sha256": "62432840aa4dd42a95b3a8868ff44dbb19b6c6e6b3b36e6580aa51edb0152854",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeContextExecution.cpp",
+      "target": "x86_64-apple-darwin24",
+      "exit_code": 0,
+      "artifact_sha256": "6a7851b3b11a8464842450cc35f724c6821cda01c1741c9ffa540fe361506658",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeContextExecution.cpp",
+      "target": "x86_64-apple-darwin25",
+      "exit_code": 0,
+      "artifact_sha256": "8d438cbcd5b1a30b3d5b6cc5da3f1f4af35f10933a07546ecd6254fe454f1dd4",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeGuCAds.cpp",
+      "target": "x86_64-apple-darwin24",
+      "exit_code": 0,
+      "artifact_sha256": "83d2e6d8704cf2bf4b04862a366c4f8d4acae1802697c950b4257b081835bacd",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    },
+    {
+      "source": "Mellow/XeGuCAds.cpp",
+      "target": "x86_64-apple-darwin25",
+      "exit_code": 0,
+      "artifact_sha256": "5f368a639b605649a5166f704bb557653cbe7214786ecaea74a253a455c302cb",
+      "format": "Mach-O64",
+      "architecture": "x86_64",
+      "kind": "object_only",
+      "hardware_executed": false,
+      "full_kext_linked": false
+    }
+  ],
+  "host_tests": [
+    {
+      "name": "GuC ADS preload/capture serialization",
+      "checks": 166,
+      "passed": true,
+      "sanitizers": [
+        "address",
+        "undefined"
+      ],
+      "compiler": "clang++",
+      "binary_sha256": "d77e1e184bdd9a8df6490b701c7baf5861e8c8383495f8dc080dbcb5a48ae129",
+      "scope": "Explicit synthetic topology, ownership, DMA and captures; malformed layout, denied pointer authority, immutable capture values, empty BCS list, sync and revoked source publication.",
+      "gpu_execution": false,
+      "iokit_runtime_tested": false
+    },
+    {
+      "name": "Native IOKit transaction method bodies",
+      "checks": 406,
+      "passed": true,
+      "sanitizers": [
+        "address",
+        "undefined"
+      ],
+      "compiler": "clang++",
+      "binary_sha256": "d0f31569bc9cfa815fd8f1493efe85fd14744971b55f1d8948d23eca9add740d",
+      "scope": "Production methods with include-only synthetic OS substitution; retained failed preparation, abort retries, original owner IDs, reference counts and no releases under held lock.",
+      "gpu_execution": false,
+      "iokit_runtime_tested": false
+    },
+    {
+      "name": "Xe context execution retirement",
+      "checks": 1266,
+      "passed": true,
+      "sanitizers": [
+        "address",
+        "undefined"
+      ],
+      "compiler": "clang++",
+      "binary_sha256": "4aaed17194d2107bfaa28159ffef327ca23894294abc9e4bc5fe7c8b66c5cea5",
+      "scope": "Production VM/GuC/fence code with simulated hardware callbacks; terminal/deadline behavior, late control acknowledgement and response-credit retirement across33jobs.",
+      "gpu_execution": false,
+      "iokit_runtime_tested": false
+    },
+    {
+      "name": "Forcewake",
+      "checks": 3134,
+      "passed": true,
+      "sanitizers": [
+        "address",
+        "undefined"
+      ],
+      "compiler": "clang++",
+      "binary_sha256": "0e6e39c26e2cf932000ce357fd0ce9e567cb9aa1e66832c1308bb3100e3ae1e4",
+      "scope": "Production ForceWake code with simulated MMIO/time; refuses pending foreign requests, failed/all-ones control reads and never clears a foreign hold.",
+      "gpu_execution": false,
+      "iokit_runtime_tested": false
+    },
+    {
+      "name": "GuC loader with original firmware",
+      "checks": 1513,
+      "passed": true,
+      "sanitizers": [
+        "address",
+        "undefined"
+      ],
+      "compiler": "clang++",
+      "binary_sha256": "8afffeefd3851992fd7a72f7910445b0671cfb52eac78b2c1b6fecf4bbb301c8",
+      "scope": "Production firmware loader with simulated MMIO/ownership; original pinned Intel firmware, pre-load versus golden admission and authority loss during golden validation.",
+      "gpu_execution": false,
+      "iokit_runtime_tested": false
+    }
+  ],
+  "firmware_input": {
+    "source": "installed /usr/lib/firmware/i915/mtl_guc_70.bin.xz, decompressed locally",
+    "bytes": 320320,
+    "sha256": "7794f0b6abe5fcd9c6f47035dafe2199f30a6e7d230bd5a53fbf8005a60e5911",
+    "downloaded": false,
+    "physically_authenticated": false
+  },
+  "total_host_checks": 6485,
+  "full_kext_linked": false,
+  "native_hardware_owner_integrated": false,
+  "darwin_userspace_built": false,
+  "physical_gpu_executed": false,
+  "system_metal_registered": false,
+  "windowserver_verified": false,
+  "full_goal_complete": false,
+  "credential_scan_passed": true
+}

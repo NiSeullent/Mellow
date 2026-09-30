@@ -1,0 +1,36 @@
+name: Publish Mellow website
+
+on:
+  # The parallel codex/mellow-pages branch owns the shared public homepage.
+  # This reviewed alternative is manual-only to avoid competing deployments.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload static website
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: website
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

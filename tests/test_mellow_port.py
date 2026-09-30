@@ -9,12 +9,12 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "Tools"))
-from mellow_port import PortError, available_targets, prepare
-from mellow_port.core import FAMILIES_PATH, RECIPES_PATH, inventory, lexical
+from mellow_port import PortError, load_recipes, recipe_choices, available_targets, prepare
+from mellow_port.core import FAMILIES_PATH, RECIPES_PATH, inventory, lexical, recipe_registry
 
 REVISION = "4d7d9486c04d917265f64c55bd23b2cc4fe7749c"
 FILE = "drivers/gpu/drm/xe/regs/test_regs.h"
@@ -120,6 +120,51 @@ class PortTests(unittest.TestCase):
             self.run_port(target, target=target, files=[relative])
             self.assertEqual(json.loads((self.root / target / "backend.json").read_text())["pci_device_ids"], [])
 
+    def test_linux_family_recipes_enforce_allowlists_and_admission(self):
+        shared = ["include/drm/fixture.h", "include/linux/fixture.h",
+                  "include/uapi/drm/fixture.h", "include/uapi/linux/fixture.h"]
+        cases = (
+            ("i915", "drivers/gpu/drm/i915/gem/fixture.h", "drivers/gpu/drm/i915-extra/fixture.h"),
+            ("nouveau", "drivers/gpu/drm/nouveau/nvkm/fixture.h", "drivers/gpu/drm/nouveau-extra/fixture.h"),
+        )
+        for relative in shared + [path for _, admitted, sibling in cases for path in (admitted, sibling)]:
+            path = self.source / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(SOURCE, encoding="utf-8")
+        for target, admitted, sibling in cases:
+            with self.subTest(target=target):
+                result = self.run_port(target, target=target, files=[admitted, *shared])
+                self.assertFalse(result["driver_ready"])
+                self.assertFalse(result["compile_performed"])
+                self.assertFalse(result["hardware_test_performed"])
+                backend = json.loads((self.root / target / "backend.json").read_text())
+                self.assertEqual(backend["pci_device_ids"], [])
+                self.assertEqual(backend["implemented_entry_points"], [])
+                self.assertFalse(backend["capabilities"]["driver_ready"])
+            for selected in (shared, [FILE], [sibling]):
+                with self.subTest(target=target, files=selected), self.assertRaises(PortError):
+                    self.run_port(target + "-rejected", target=target, files=selected)
+                self.assertFalse((self.root / (target + "-rejected")).exists())
+
+    def test_nvidia_open_modeset_intake_is_review_only(self):
+        admitted = "src/nvidia-modeset/fixture.h"
+        sibling = "src/nvidia-modeset-extra/fixture.h"
+        for relative in (admitted, sibling):
+            path = self.source / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(SOURCE, encoding="utf-8")
+        result = self.run_port("modeset", target="nvidia-open", files=[admitted])
+        self.assertFalse(result["driver_ready"])
+        self.assertFalse(result["compile_performed"])
+        self.assertFalse(result["hardware_test_performed"])
+        backend = json.loads((self.root / "modeset/backend.json").read_text())
+        self.assertEqual(backend["pci_device_ids"], [])
+        self.assertEqual(backend["implemented_entry_points"], [])
+        self.assertFalse(backend["capabilities"]["driver_ready"])
+        with self.assertRaises(PortError):
+            self.run_port("modeset-rejected", target="nvidia-open", files=[sibling])
+        self.assertFalse((self.root / "modeset-rejected").exists())
+
     def make_source(self, relative):
         path = self.source / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -130,6 +175,31 @@ class PortTests(unittest.TestCase):
         recipes = json.loads(RECIPES_PATH.read_bytes())["recipes"]
         self.assertEqual(set(available_targets()), set(recipes))
         self.assertTrue({"xe", "amdgpu", "nvidia-open", "i915", "nouveau"} <= set(recipes))
+
+    def test_recipe_api_preserves_exact_registry_bytes_and_manifest_pin(self):
+        raw = b"\n" + RECIPES_PATH.read_bytes() + b"\n"
+        registry_file = self.root / "spaced-recipes.json"
+        registry_file.write_bytes(raw)
+        with patch("mellow_port.core.RECIPES_PATH", registry_file):
+            data, recipes = load_recipes()
+            self.assertEqual(data, raw)
+            self.assertEqual(recipe_registry(), (data, recipes))
+            self.assertEqual(recipe_choices(), tuple(sorted(recipes)))
+            self.assertEqual(available_targets(), recipe_choices())
+            self.run_port("exact-registry")
+        manifest = json.loads((self.root / "exact-registry/source-manifest.json").read_bytes())
+        self.assertEqual(manifest["recipe_sha256"], hashlib.sha256(raw).hexdigest())
+        self.assertFalse(manifest["revision_membership_verified"])
+
+    def test_recipe_api_compatibility_entries_do_not_bypass_validation(self):
+        raw = RECIPES_PATH.read_text(encoding="utf-8").replace(
+            '"schema_version": 1', '"schema_version": 1, "schema_version": 1', 1)
+        registry_file = self.root / "duplicate-api-recipes.json"
+        registry_file.write_text(raw, encoding="utf-8")
+        with patch("mellow_port.core.RECIPES_PATH", registry_file):
+            for entry_point in (load_recipes, recipe_registry, recipe_choices, available_targets):
+                with self.subTest(entry_point=entry_point.__name__), self.assertRaisesRegex(PortError, "Duplicate JSON"):
+                    entry_point()
 
     def test_all_family_source_pairs_keep_hardware_admission_closed(self):
         profiles = json.loads(FAMILIES_PATH.read_bytes())["families"]
@@ -362,6 +432,72 @@ class PortTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertTrue(json.loads(result.stdout)["artifacts_generated"])
         self.assertFalse((self.source / "SHOULD-NOT-EXIST").exists())
+
+    def test_cli_target_choices_match_shared_recipe_registry(self):
+        recipe_bytes, recipes = load_recipes()
+        self.assertEqual(recipe_bytes, RECIPES_PATH.read_bytes())
+        self.assertEqual(json.loads(recipe_bytes)["recipes"], recipes)
+        self.assertEqual(recipe_choices(), tuple(sorted(recipes)))
+        self.assertEqual(available_targets(), recipe_choices())
+        result = subprocess.run([sys.executable, str(REPO / "Tools/mellow-port.py"), "--help"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--target {" + ",".join(sorted(recipes)) + "}", " ".join(result.stdout.split()))
+        self.assertTrue({"xe", "i915", "amdgpu", "nouveau", "nvidia-open"}.issubset(recipes))
+
+    def test_cli_admits_a_new_validated_registry_target_without_hardcoded_choices(self):
+        document = json.loads(RECIPES_PATH.read_bytes())
+        document["recipes"]["xe-review"] = document["recipes"]["xe"]
+        registry_file = self.root / "extended-recipes.json"
+        registry_file.write_text(json.dumps(document), encoding="utf-8")
+        spec = importlib.util.spec_from_file_location("mellow_port_cli_extended_tests", REPO / "Tools/mellow-port.py")
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        stdout = io.StringIO()
+        output = self.root / "registry-target-cli"
+        with patch("mellow_port.core.RECIPES_PATH", registry_file), redirect_stdout(stdout):
+            result = cli.main(["plan", "--source-root", str(self.source), "--target", "xe-review",
+                               "--revision", REVISION, "--file", FILE, "--output", str(output),
+                               "--require-ready"])
+        self.assertEqual(result, 2)
+        receipt = json.loads(stdout.getvalue())
+        self.assertEqual(receipt["target"], "xe-review")
+        self.assertTrue(receipt["artifacts_generated"])
+        self.assertFalse(receipt["driver_ready"])
+        self.assertFalse(receipt["compile_performed"])
+        self.assertFalse(receipt["hardware_test_performed"])
+
+    def test_cli_new_targets_emit_review_artifacts_with_readiness_false(self):
+        for target, relative in (("i915", "drivers/gpu/drm/i915/fixture.h"),
+                                 ("nouveau", "drivers/gpu/drm/nouveau/fixture.h")):
+            with self.subTest(target=target):
+                path = self.source / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(SOURCE, encoding="utf-8")
+                output = self.root / ("cli-" + target)
+                result = subprocess.run([sys.executable, str(REPO / "Tools/mellow-port.py"), "plan",
+                                         "--source-root", str(self.source), "--target", target,
+                                         "--revision", REVISION, "--file", relative,
+                                         "--output", str(output), "--require-ready"], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                receipt = json.loads(result.stdout)
+                self.assertEqual(receipt["target"], target)
+                self.assertTrue(receipt["artifacts_generated"])
+                self.assertFalse(receipt["driver_ready"])
+                self.assertFalse(receipt["compile_performed"])
+                self.assertFalse(receipt["hardware_test_performed"])
+                self.assertFalse(json.loads((output / "gap-report.json").read_text())["driver_ready"])
+
+    def test_cli_rejects_unregistered_targets_before_writing(self):
+        for target in ("rtx", "nouveau-extra"):
+            with self.subTest(target=target):
+                output = self.root / ("cli-rejected-" + target)
+                result = subprocess.run([sys.executable, str(REPO / "Tools/mellow-port.py"), "plan",
+                                         "--source-root", str(self.source), "--target", target,
+                                         "--revision", REVISION, "--file", FILE,
+                                         "--output", str(output)], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("invalid choice", result.stderr)
+                self.assertFalse(output.exists())
 
     def test_optional_real_pinned_xe_subset(self):
         capture = REPO.parent / "xe-submission-primary/drivers_gpu_drm_xe_abi_guc_klvs_abi.h"

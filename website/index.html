@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101713">
+  <meta name="description" content="Mellow — Intel·NVIDIA 그래픽의 macOS 포팅 프로젝트. GPU별 개발 상태, 검증 근거, 개발용 바이너리와 설치 안내.">
+  <title>Mellow — GPU 호환성 · 다운로드</title>
+  <link rel="canonical" href="./">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#compatibility" data-i18n="skip">GPU 목록으로 바로 가기</a>
+  <header class="site-header">
+    <div class="container nav-wrap">
+      <a class="brand" href="./" aria-label="Mellow home"><img src="./icon.svg" alt="" width="32" height="32">mellow<span class="brand-dot">.</span></a>
+      <nav aria-label="Main">
+        <a href="#compatibility" data-i18n="navDevices">GPU 목록</a>
+        <a href="#download" data-i18n="navDownload">다운로드</a>
+        <a href="#install" data-i18n="navInstall">설치</a>
+      </nav>
+      <div class="nav-actions"><button id="language" type="button" aria-label="Switch to English">EN</button><a class="github-link" href="https://github.com/NiSeullent/Mellow">GitHub ↗</a></div>
+    </div>
+  </header>
+  <main>
+    <section class="hero container">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="live-dot"></span> INTEL & NVIDIA · macOS</p>
+        <h1 data-i18n="heroTitle">내 GPU의 가능성,<br>현재 단계부터.</h1>
+        <p class="hero-description" data-i18n="heroDescription">Mellow는 macOS 드라이버가 없는 그래픽을 위한 포팅 프로젝트입니다. 기기별 개발 상태를 확인하고, 개발용 패키지를 받아보세요.</p>
+        <div class="hero-actions"><a class="button button-primary" href="#compatibility" data-i18n="checkGpu">내 GPU 확인하기 <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="#download" data-i18n="getPackage">패키지 받기 <span aria-hidden="true">↓</span></a></div>
+        <p class="hero-note" data-i18n="heroNote">현재 native GPU·시스템 Metal·WindowServer 실기 지원 완료 기기는 0대입니다.</p>
+      </div>
+      <aside class="hero-panel" aria-label="Development scope">
+        <div class="panel-top"><span>MELLOW / GRAPHICS</span><span class="outline-pill" data-i18n="development">개발 중</span></div>
+        <div class="chip-art" aria-hidden="true"><div class="chip">m<span>.</span></div><span class="trace trace-one"></span><span class="trace trace-two"></span><span class="trace trace-three"></span><span class="trace trace-four"></span></div>
+        <div class="panel-status"><span class="status-dot"></span><span data-i18n="hardwarePending">native 구현·검증 중</span><span class="panel-date">2026.09.30</span></div>
+        <div class="scope-grid"><div><span>Native GPU</span><strong data-i18n="unverified">미검증</strong></div><div><span>Metal</span><strong data-i18n="unverified">미검증</strong></div><div><span>WindowServer</span><strong data-i18n="unverified">미검증</strong></div></div>
+      </aside>
+    </section>
+
+    <p class="container provenance"><span data-i18n="sourceSnapshot">상태 기록의 소스</span> <a id="source-commit" href="https://github.com/NiSeullent/Mellow/commit/abb2bf9fab5d0b0c9a7452db8503f795c1ed50fd">abb2bf9</a> <span aria-hidden="true">·</span> <a id="checkpoint-link" href="https://github.com/NiSeullent/Mellow/blob/abb2bf9fab5d0b0c9a7452db8503f795c1ed50fd/validation/native-gpu/direct-dma-checkpoint.json" data-i18n="verificationRecord">검증 범위 보기 ↗</a></p>
+    <section id="compatibility" class="compatibility-section">
+      <div class="container">
+        <div class="section-heading"><div><p class="eyebrow">01 / COMPATIBILITY</p><h2 data-i18n="compatTitle">GPU별 현재 단계</h2></div><a class="text-link" href="./compatibility.json" data-i18n="openData">데이터 원본 ↗</a></div>
+        <p class="section-description" data-i18n="compatDescription">모델명·PCI ID·계열로 찾아보세요. 부분 구현이나 ID 등록은 macOS 가속 지원 완료를 의미하지 않습니다.</p>
+        <div class="filters">
+          <label class="search-field"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m15.5 15.5 5 5"></path></svg><span class="sr-only" data-i18n="searchLabel">GPU 검색</span><input id="search" type="search" placeholder="예: RTX 3080, 7D41, Lunar Lake" data-i18n-placeholder="searchPlaceholder" autocomplete="off"></label>
+          <label class="select-field"><span data-i18n="familyLabel">계열</span><select id="family"><option value="all" data-i18n="allFamilies">모든 계열</option></select></label>
+          <label class="select-field"><span data-i18n="stageLabel">개발 단계</span><select id="stage"><option value="all" data-i18n="allStages">모든 단계</option></select></label>
+        </div>
+        <div class="filter-bottom"><div class="vendor-buttons" role="group" aria-label="GPU vendor"><button type="button" data-vendor="all" aria-pressed="true" data-i18n="all">전체</button><button type="button" data-vendor="Intel" aria-pressed="false">Intel</button><button type="button" data-vendor="NVIDIA" aria-pressed="false">NVIDIA</button><button type="button" data-vendor="AMD" aria-pressed="false" hidden>AMD</button></div><label class="additional-toggle"><input id="additional" type="checkbox"><span data-i18n="additionalResearch">별도 AMD 연구 포함</span></label></div>
+        <div class="results-meta"><p id="result-count" role="status" aria-live="polite" data-i18n="loadingDevices">목록을 불러오는 중입니다.</p><span id="data-date"></span></div>
+        <div class="table-wrap"><table class="device-table"><caption class="sr-only" data-i18n="tableCaption">기기별 개발 상태와 검증 근거</caption><thead><tr><th scope="col" data-i18n="deviceColumn">기기 / 계열</th><th scope="col" data-i18n="stageColumn">개발 단계</th><th scope="col" data-i18n="detailsColumn">구현과 남은 작업</th><th scope="col" data-i18n="runtimeColumn">macOS 실기 결과</th></tr></thead><tbody id="device-list"></tbody></table></div>
+        <div id="empty-state" class="empty-state" hidden><h3 data-i18n="noResults">일치하는 GPU가 없습니다.</h3><p data-i18n="noResultsHelp">검색어나 필터를 바꿔보세요. 목록에 없다는 이유로 지원 여부를 추정하지 않습니다.</p><button id="reset-filters" class="button button-quiet" type="button" data-i18n="resetFilters">필터 초기화</button></div>
+        <p id="data-error" class="data-error" hidden data-i18n="dataError">목록을 불러오지 못했습니다. GitHub README에서 기기별 상태를 확인해 주세요.</p>
+        <noscript><p class="data-error">검색 목록에는 JavaScript가 필요합니다. <a href="https://github.com/NiSeullent/Mellow#readme">GitHub README에서 GPU별 상태 확인 ↗</a></p></noscript>
+        <div class="stage-key"><p><span class="stage-pill partial" data-i18n="partialLabel">부분 구현</span><span data-i18n="partialExplanation">일부 코드·빌드·호스트 검사 기록</span></p><p><span class="stage-pill identified" data-i18n="identifiedLabel">식별 테이블</span><span data-i18n="identifiedExplanation">기기 ID 인식 코드</span></p><p><span class="stage-pill source" data-i18n="sourceLabel">소스 검토</span><span data-i18n="sourceExplanation">원본 검토 경로·미구현 항목 기록</span></p></div>
+        <p class="scope-note" data-i18n="scopeNote">Windows의 기존 Intel 드라이버를 이용한 compute·render 결과와 커널 객체·호스트 검사는 별도 기록입니다. 이 목록의 native macOS GPU·Metal·WindowServer 실기 성공으로 계산하지 않습니다.</p>
+      </div>
+    </section>
+
+    <section id="download" class="container download-section">
+      <div class="section-heading"><div><p class="eyebrow">02 / DOWNLOAD</p><h2 data-i18n="downloadTitle">개발용 패키지 받기</h2></div></div>
+      <div class="download-card">
+        <div><div class="package-icon" aria-hidden="true">↓</div><p class="eyebrow">macOS 15 / 26 · Intel x86_64</p><h3>Mellow for macOS</h3><p class="package-description" data-i18n="packageDescription">Mellow.kext, 사용자 공간 framework와 CLI를 담는 개발용 바이너리 패키지입니다.</p><p id="release-info" class="release-info" role="status" aria-live="polite" data-i18n="checkingReleases">공개 릴리스의 바이너리 자산을 확인 중입니다.</p></div>
+        <div class="download-actions"><a id="binary-download" class="button button-primary" hidden data-i18n="downloadBinary">바이너리 ZIP 다운로드 ↓</a><a class="button button-quiet" href="https://github.com/NiSeullent/Mellow/releases" data-i18n="allReleases">GitHub 릴리스 보기 ↗</a><div class="asset-links"><a id="manifest-link" hidden data-i18n="manifest">패키지 정보</a><a id="checksum-link" hidden data-i18n="checksum">SHA-256</a></div><p id="release-size"></p></div>
+      </div>
+      <p class="download-note" data-i18n="downloadNote">실험용 빌드이며 Developer ID 서명·공증과 기기별 가속 검증은 완료되지 않았습니다. 소스 ZIP을 설치용 바이너리로 표시하지 않습니다. Apple Silicon 설치 대상이 아닙니다.</p>
+    </section>
+
+    <section id="install" class="container install-section">
+      <div class="section-heading"><div><p class="eyebrow">03 / GET STARTED</p><h2 data-i18n="installTitle">터미널에서 설치하기</h2></div><a id="installer-source" class="text-link" href="https://github.com/NiSeullent/Mellow/blob/codex/mellow-family-routing-20260930/packaging/install-mellow.sh" data-i18n="readInstaller">설치 스크립트 읽기 ↗</a></div>
+      <p class="section-description" data-i18n="installDescription">설치 스크립트를 파일로 받아 확인한 뒤 실행합니다. 기본 설치 위치는 ~/Library/Mellow이며, 사용자 공간 파일만 설치합니다.</p>
+      <div class="install-steps"><div><span>1</span><h3 data-i18n="stepDownload">파일 받기</h3><p data-i18n="stepDownloadText">바이너리 릴리스에 포함된 설치 스크립트를 내려받습니다.</p></div><div><span>2</span><h3 data-i18n="stepReview">내용 확인하기</h3><p data-i18n="stepReviewText">설치할 버전과 스크립트의 변경 범위를 확인합니다.</p></div><div><span>3</span><h3 data-i18n="stepInstall">설치 실행하기</h3><p data-i18n="stepInstallText">선택한 릴리스의 ZIP과 SHA-256을 확인해 설치합니다.</p></div></div>
+      <div class="terminal"><div class="terminal-top"><span>01 <span aria-hidden="true">/</span><span data-i18n="downloadAndReview">다운로드 · 내용 확인</span></span><button id="copy-install" type="button" disabled data-i18n="copyCommands">명령 복사</button></div><pre><code id="install-code"># 설치 가능한 바이너리 릴리스가 확인되면 버전별 명령이 표시됩니다.</code></pre></div>
+      <p class="install-status" data-i18n="reviewBeforeRun">스크립트를 읽고 확인한 뒤 아래 설치 명령을 별도로 실행하세요.</p>
+      <div class="terminal"><div class="terminal-top"><span>02 <span aria-hidden="true">/</span><span data-i18n="runSelectedVersion">선택한 버전 설치</span></span><button id="copy-run" type="button" disabled data-i18n="copyCommands">명령 복사</button></div><pre><code id="run-code"># 바이너리 릴리스 확인 중</code></pre></div>
+      <p id="install-status" class="install-status" aria-live="polite" data-i18n="installWaiting">바이너리가 아직 게시되지 않았다면 Releases에서 개발 소스와 검증 기록을 확인할 수 있습니다.</p>
+      <details class="install-details"><summary data-i18n="kextDetails">kext 설치와 실기 검증은 어떻게 진행하나요?</summary><p data-i18n="kextDetailsText">기본 설치는 시스템 kext를 변경하거나 GPU 검증을 실행하지 않습니다. /Library/Extensions 복사는 --install-kext, 필요한 Lilu 설치는 --install-dependencies, 표준 kmutil 준비는 --prepare-kext를 명시적으로 선택한 경우에만 진행합니다. 자동 재부팅이나 보안 설정 변경은 하지 않습니다. 이 절차의 성공도 Metal·WindowServer 가속 지원의 증거가 아닙니다.</p><a id="install-docs" class="text-link" href="https://github.com/NiSeullent/Mellow/blob/codex/mellow-family-routing-20260930/docs/INSTALLATION.md" data-i18n="installDocs">설치·검증 문서 보기 ↗</a></details>
+    </section>
+
+    <section class="container resources-section"><div class="section-heading"><div><p class="eyebrow">04 / PROJECT</p><h2 data-i18n="resourcesTitle">진행 과정도 함께 공개합니다.</h2></div></div><div class="resource-grid"><a data-repo-path="README.md" href="https://github.com/NiSeullent/Mellow#readme"><span class="resource-number">01</span><h3 data-i18n="resourceStatus">기기별 구현 상태 ↗</h3><p data-i18n="resourceStatusText">현재 코드와 실제 검증 결과를 함께 읽어보세요.</p></a><a data-repo-path="docs/NATIVE-GPU-OWNER.md" href="https://github.com/NiSeullent/Mellow"><span class="resource-number">02</span><h3 data-i18n="resourceOwner">native GPU 개발 ↗</h3><p data-i18n="resourceOwnerText">장치·메모리·firmware·채널 소유권과 남은 연결입니다.</p></a><a data-repo-path="docs/NATIVE-METAL-WINDOW-PATH.md" href="https://github.com/NiSeullent/Mellow"><span class="resource-number">03</span><h3 data-i18n="resourceMetal">Metal·창 표시 경로 ↗</h3><p data-i18n="resourceMetalText">앱의 명시적 선택 경로와 시스템 통합을 구분합니다.</p></a></div></section>
+  </main>
+  <footer class="container site-footer"><a class="brand" href="./">mellow<span class="brand-dot">.</span></a><p>Metal Emulation Layer Logic for OpenGL/OpenCL Workloads</p><a href="https://github.com/NiSeullent/Mellow" data-i18n="viewSource">프로젝트 소스 ↗</a></footer>
+</body>
+</html>
