@@ -4,7 +4,7 @@
 
 [공식 홈페이지](https://niseullent.github.io/Mellow/) ·
 [검색 가능한 호환성 목록](https://niseullent.github.io/Mellow/#compatibility) ·
-[다운로드](https://niseullent.github.io/Mellow/#download) ·
+[다운로드](https://niseullent.github.io/Mellow/#downloads) ·
 [macOS CLI 설치 안내](docs/INSTALLATION.md)
 
 **현재 Mellow의 native macOS GPU 실행·Metal·WindowServer를 실기로 검증해 지원 완료한 기기는 없습니다.**
@@ -39,7 +39,11 @@ GuC transport 105,180회·context execution 483회 sanitizer 호스트 검사도
 이 기록의 GPU callback은 시험 모델이며 `gpu_execution=false`입니다.
 기존 kext의 부분 이식·진단 빌드와 별도로 기록하며, 새 전체 kext 링크·적재·실기 실행을 뜻하지 않습니다.
 앱이 명시적으로 선택하는 [macOS compute/render·IOSurface 창 표시 소스](docs/NATIVE-METAL-WINDOW-PATH.md)도
-있지만 Apple 사용자 공간 SDK 빌드와 실제 macOS 실행은 아직 검증되지 않았습니다.
+있습니다. [macOS CI](https://github.com/NiSeullent/Mellow/actions/runs/36731714064)에서
+Xcode 16.4·macOS 15.5 SDK로 사용자 공간 라이브러리·acceptance 프로그램·native CLI와
+framework의 실제 빌드·서명 검사·ZIP 생성까지 통과했습니다. 해당 실행의 설치 검사는
+JSON manifest 처리에서 실패했으며, 수정한 설치 프로그램을 다시 검증합니다.
+GPU·Metal·창 표시 acceptance 실행과 시스템 통합은 아직 검증되지 않았습니다.
 Ice Lake 호환성 연구 경로는 실기 미검증이고 Tiger Lake 경로는 폐기 예정(`DEPRECATED`)입니다.
 기기 이름·ID 등록·Recovery 입력에 있는 framebuffer만으로 macOS 버전별 지원을 추정하지 않습니다.
 

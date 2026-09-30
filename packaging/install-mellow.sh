@@ -47,6 +47,79 @@ choose_source() {
 valid_hash() { [[ "$1" =~ ^[[:xdigit:]]{64}$ ]]; }
 hash_file() { /usr/bin/shasum -a 256 "$1" | /usr/bin/awk '{print $1}'; }
 field() { /usr/bin/plutil -extract "$2" raw -expect "$3" -o - "$1"; }
+# JSON permits null, which plist cannot represent. Parse the original JSON
+# without evaluating it, and project only the installer's required scalar
+# fields into a private flat plist. The checksummed JSON is never rewritten.
+manifest_fields_plist() {
+    /usr/bin/osascript -l JavaScript - "$1" "$2" "$source_kind" >/dev/null <<'JXA'
+ObjC.import('Foundation');
+function run(argv) {
+    if (argv.length !== 3 || ['archive', 'version', 'url'].indexOf(argv[2]) < 0)
+        throw new Error('Invalid manifest parser arguments');
+    var readError = Ref();
+    var contents = $.NSString.stringWithContentsOfFileEncodingError(
+        argv[0], $.NSUTF8StringEncoding, readError);
+    var text = ObjC.unwrap(contents);
+    if (typeof text !== 'string') throw new Error('Cannot read UTF-8 manifest');
+    var manifest = JSON.parse(text);
+    if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest))
+        throw new Error('Manifest must be a JSON object');
+    function present(key) { return Object.prototype.hasOwnProperty.call(manifest, key); }
+    function xml(value) {
+        for (var i = 0; i < value.length; ++i) {
+            var code = value.charCodeAt(i);
+            if ((code < 32 && code !== 9 && code !== 10 && code !== 13) ||
+                code === 65534 || code === 65535)
+                throw new Error('Manifest string contains an invalid XML character');
+            if (code >= 55296 && code <= 56319) {
+                var next = value.charCodeAt(++i);
+                if (!(next >= 56320 && next <= 57343))
+                    throw new Error('Manifest string contains an unpaired surrogate');
+            } else if (code >= 56320 && code <= 57343) {
+                throw new Error('Manifest string contains an unpaired surrogate');
+            }
+        }
+        return value.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    }
+    var fields = [];
+    function stringField(key) {
+        if (!present(key) || typeof manifest[key] !== 'string' ||
+            !manifest[key].length || manifest[key].length > 4096)
+            throw new Error('Invalid manifest string: ' + key);
+        fields.push('<key>' + key + '</key><string>' + xml(manifest[key]) + '</string>');
+    }
+    if (!present('schema_version') || typeof manifest.schema_version !== 'number' ||
+        !isFinite(manifest.schema_version) || manifest.schema_version < 1 ||
+        manifest.schema_version > 2147483647 ||
+        Math.floor(manifest.schema_version) !== manifest.schema_version)
+        throw new Error('Invalid manifest integer: schema_version');
+    fields.push('<key>schema_version</key><integer>' + manifest.schema_version + '</integer>');
+    ['package_name', 'asset_name', 'repository', 'architecture', 'minimum_macos',
+        'source_commit'].forEach(stringField);
+    ['binary_compiled', 'experimental', 'signed', 'developer_id_signed', 'notarized',
+        'hardware_support_verified', 'system_metal_registered',
+        'windowserver_acceleration_verified'].forEach(function (key) {
+        if (!present(key) || typeof manifest[key] !== 'boolean')
+            throw new Error('Invalid manifest boolean: ' + key);
+        fields.push('<key>' + key + '</key>' + (manifest[key] ? '<true/>' : '<false/>'));
+    });
+    // Local archives and explicit URLs may be untagged development builds.
+    // A named release download must contain its exact nonempty tag.
+    if (present('release_tag') && manifest.release_tag !== null) stringField('release_tag');
+    else if (argv[2] === 'version') throw new Error('Named release requires release_tag');
+    var output = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" ' +
+        '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n' +
+        '<plist version="1.0"><dict>\n' + fields.join('\n') + '\n</dict></plist>\n';
+    var writeError = Ref();
+    if (!$(output).writeToFileAtomicallyEncodingError(
+        argv[1], true, $.NSUTF8StringEncoding, writeError))
+        throw new Error('Cannot write private manifest field plist');
+    return '';
+}
+JXA
+}
 valid_relative() {
     local name=$1 piece
     [[ "$name" =~ ^[A-Za-z0-9_.@+/-]+$ ]] || return 1
@@ -313,21 +386,23 @@ done < <(/usr/bin/find "$payload" -type f -print0)
 (cd "$payload" && /usr/bin/shasum -a 256 -c SHA256SUMS > "$temporary/checksum-verification") || die 'Payload checksum mismatch.'
 
 manifest="$payload/manifest.json"
-/usr/bin/plutil -lint "$manifest" >/dev/null || die 'Invalid manifest.'
-[ "$(field "$manifest" schema_version integer)" = 1 ] &&
-[ "$(field "$manifest" package_name string)" = Mellow ] &&
-[ "$(field "$manifest" asset_name string)" = "$ASSET" ] &&
-[ "$(field "$manifest" repository string)" = "$REPOSITORY" ] &&
-[ "$(field "$manifest" architecture string)" = x86_64 ] || die 'Release manifest identity mismatch.'
-for key in binary_compiled experimental; do [ "$(field "$manifest" "$key" bool)" = true ] || die "Invalid $key status."; done
+manifest_fields="$temporary/manifest-fields.plist"
+manifest_fields_plist "$manifest" "$manifest_fields" || die 'Invalid JSON manifest or required manifest field type.'
+/usr/bin/plutil -lint "$manifest_fields" >/dev/null || die 'Invalid private manifest field plist.'
+[ "$(field "$manifest_fields" schema_version integer)" = 1 ] &&
+[ "$(field "$manifest_fields" package_name string)" = Mellow ] &&
+[ "$(field "$manifest_fields" asset_name string)" = "$ASSET" ] &&
+[ "$(field "$manifest_fields" repository string)" = "$REPOSITORY" ] &&
+[ "$(field "$manifest_fields" architecture string)" = x86_64 ] || die 'Release manifest identity mismatch.'
+for key in binary_compiled experimental; do [ "$(field "$manifest_fields" "$key" bool)" = true ] || die "Invalid $key status."; done
 for key in signed developer_id_signed notarized hardware_support_verified system_metal_registered windowserver_acceleration_verified; do
-    [ "$(field "$manifest" "$key" bool)" = false ] || die "Unexpected $key; this installer handles development packages only."
+    [ "$(field "$manifest_fields" "$key" bool)" = false ] || die "Unexpected $key; this installer handles development packages only."
 done
-minimum=$(field "$manifest" minimum_macos string)
+minimum=$(field "$manifest_fields" minimum_macos string)
 version_at_least "$minimum" 15.0 && version_at_least "$host_version" "$minimum" || die "This archive requires macOS $minimum or later."
-commit=$(field "$manifest" source_commit string)
+commit=$(field "$manifest_fields" source_commit string)
 [[ "$commit" =~ ^[a-f0-9]{40}$ ]] || die 'Invalid source commit.'
-if [ "$source_kind" = version ]; then [ "$(field "$manifest" release_tag string)" = "$source_value" ] || die 'Release tag mismatch.'; fi
+if [ "$source_kind" = version ]; then [ "$(field "$manifest_fields" release_tag string)" = "$source_value" ] || die 'Release tag mismatch.'; fi
 [ -f "$payload/frameworks/MellowAppleUserspace.framework/MellowAppleUserspace" ] &&
 [ -f "$payload/bin/metal-inventory" ] && [ -f "$payload/bin/libMellowAppleUserspace.dylib" ] || die 'Native user-space artifacts missing.'
 printf 'Experimental Mellow source %s: native GPU/Metal/WindowServer support remains unverified.\n' "$commit"

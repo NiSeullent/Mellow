@@ -119,6 +119,11 @@ bash uninstall-mellow.sh --remove-kext --prepare-kext
 
 다운로드는 HTTPS로 임시 폴더에 저장하고, ZIP 전체 digest와 내부 `SHA256SUMS`를 검사합니다.
 manifest의 패키지·저장소·아키텍처·OS 요구사항·실제 빌드 상태도 확인합니다.
+JSON의 `null`은 plist에 없는 값이므로 원본 manifest를 `plutil`로 직접 검사하지 않습니다.
+macOS 내장 `osascript`의 JavaScript로 JSON을 읽고, 필요한 최상위 필드의 정확한 자료형을
+확인한 뒤 임시 plist로 검사합니다. 파일 내용을 코드로 실행하지 않고 앱 자동화 권한도 요청하지 않습니다.
+원본 `manifest.json`과 checksum은 바꾸지 않습니다. 로컬 ZIP과 명시적 URL은 릴리스 태그가
+없을 수 있으며, `--version` 다운로드는 manifest의 태그가 요청한 버전과 일치해야 합니다.
 ZIP에는 경로 이탈, 중복·대소문자 충돌, symlink와 특수 파일을 허용하지 않습니다.
 서로 다른 릴리스의 ZIP과 checksum을 섞으면 설치하지 않습니다.
 
