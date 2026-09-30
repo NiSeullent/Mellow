@@ -39,9 +39,13 @@ GuC와 NVIDIA 인코더 변경은 로컬 commit `52d35fa`에 보존했다. GuC p
 
 기존 Intel `XeMemoryIOKit`은 DMA complete 오류를 descriptor clear의 성공으로 숨기지 않게 수정했다. 정리 결과가 불확실하면 pin과 IOMMU 자원의 소유권을 보존하며, 이후 NotReady나 GPU reset으로 이를 해제하지 않는다. 복사 시점의 정확한 출처·파일 해시는 `porting/native-owner-snapshot.json`에 있다.
 
-`PortedNvidiaGsp/Radix3`는 공식 GSP LibOS 이미지의 3단계 DMA scatter 주소표를 검증해 직렬화한다. `FirmwareImage`는 동일 release의 ELF 컨테이너에서 실제 chip/HAL이 선택한 서명 섹션과 이미지·버전·원시 build-id note를 추출한다. 컨테이너는 빌린 읽기 전용 메모리이며, 일치하는 문자열과 서명 바이트를 cryptographic 인증으로 취급하지 않는다. 이 파서는 Clang 메모리 오류 검사와 GCC에서 각각 2,369개 검사를 통과했다. 실제 주소 소유권과 firmware 인증·boot는 제공하지 않는다. 195개 직렬화 검사가 Clang 메모리 오류 검사와 GCC에서 통과했다. 전체 호스트 검사 20개 묶음은 통과했으며 compiler가 보고한 실제 로컬 의존 파일의 변경 여부도 확인한다. 실제 PCI 거래·DMA·GPU 작업과 시스템 Metal·WindowServer는 미검증이다.
+`PortedNvidiaGsp/Radix3`는 공식 GSP LibOS 이미지의 3단계 DMA scatter 주소표를 검증해 직렬화한다. `FirmwareImage`는 동일 release의 ELF 컨테이너에서 실제 chip/HAL이 선택한 서명 섹션과 이미지·버전·원시 build-id note를 추출한다. 컨테이너는 빌린 읽기 전용 메모리이며, 일치하는 문자열과 서명 바이트를 cryptographic 인증으로 취급하지 않는다. 이 파서는 Clang 메모리 오류 검사와 GCC에서 각각 2,369개 검사를 통과했다. 실제 주소 소유권과 firmware 인증·boot는 제공하지 않는다. 195개 직렬화 검사가 Clang 메모리 오류 검사와 GCC에서 통과했다. a46eb68의 전체 호스트 검사는 20개 묶음이며, execution staging·GSP DMA owner를 포함한 후속 통합 검사는 22개 묶음이 통과했다. compiler가 보고한 실제 로컬 의존 파일의 변경 여부도 확인한다. 실제 PCI 거래·DMA·GPU 작업과 시스템 Metal·WindowServer는 미검증이다.
 
 `XeGuCRegionOwner`는 기존의 실제 XeMemory pin, GGTT reserve/publish/readback, GuC Loader hold와 역순 해제를 연결한다. 로더가 영역을 중복 보유할 수 없게 하고, reset을 허용하는 조건과 실제 GuC/GPU/display consumer가 멈춘 조건을 별도로 검사한다. 정확한 IOKit resolver는 context·owner·크기·descriptor 길이·mapper와 DMA preparation을 확인한다. 실제 reset/전원·range lease·PAT/PTE·invalidate 하드웨어 콜백은 필수이며 full ADS와 service startup은 아직 연결되지 않았다. Host portable 175,056개, 실제 factory 코드를 OS shim에 연결한 175,069개, DMA 경계 8,296개 검사가 Clang 메모리 오류 검사와 함께 통과했다. IOVM 주소 숫자만으로 물리 backing의 비중첩을 입증한다고 주장하지 않는다.
+
+`XeContext::IOKitExecutionStaging`은 기존 execution scheduler가 보유한 여섯 IOKit pin을 확인하고, 네 개의 전체 heap을 복사·readback한 뒤 여섯 DMA 자원을 동기화한다. 물리 context의 admission·수명·ring/LRC barrier·quiescence는 기존 실제 owner에 위임한다. mapper와 PPGTT, full ADS·GuC·IRQ를 연결하는 물리 owner는 여전히 필요하다. 자세한 계약은 [XE-EXECUTION-IOKIT.md](XE-EXECUTION-IOKIT.md)에 있다.
+
+`PortedNvidiaGsp::FirmwareOwner`는 실제 DMA memory owner에 이미지·서명·선택한 boot binary·WPR metadata의 네 자원을 보유하고 복사·동기화한다. kernel entry point는 이미 연결된 `NativeMemoryIOKit`의 backend를 사용한다. 실제 chip/HAL 선택, firmware 인증, FWSEC/FRTS/RISC-V bootstrap과 성공한 GSP_INIT_DONE은 물리 owner가 제공해야 한다. 누락되면 부팅을 거절하고 자원을 유지한다. 27,070개 합성 소유권 검사는 Clang 메모리 오류 검사와 GCC에서 통과했지만 실제 GSP 부팅 증거는 아니다. [NVIDIA-GSP-FIRMWARE-OWNER.md](NVIDIA-GSP-FIRMWARE-OWNER.md)에 범위와 출처를 기록한다.
 
 ## 현재 구현한 macOS 사용자 공간 경로
 
@@ -55,7 +59,7 @@ GuC와 NVIDIA 인코더 변경은 로컬 commit `52d35fa`에 보존했다. GuC p
 
 `Userspace/Diagnostics/MetalInventory.mm`은 실제 시스템 Metal device, IORegistry provider chain, Objective-C instance/class method type과 ivar 배치, display device 연결을 읽는다. private selector를 호출하거나 명시적 드라이버 적재를 요청하지 않는다. 일반 Metal 열거가 기존 provider를 내부 초기화할 수 있다는 경계도 기록한다. 측정한 타입과 exact OS build는 다음 Apple ABI 구현에 사용할 자료이며, method name만으로 잘못된 factory나 user-client layout을 만들지 않는다.
 
-네이티브 빌드와 실기 실행 방법은 [APPLE-USERSPACE-NATIVE-BUILD.md](APPLE-USERSPACE-NATIVE-BUILD.md), 미해결 시스템 등록 ABI는 [ABI-CONTRACT.md](../Userspace/WindowServer/ABI-CONTRACT.md)에 있다. 현재 Linux 개발 환경에는 Foundation/Metal/OpenGL/IOSurface 사용자 공간 SDK가 없어 이 Objective-C++ 코드는 실제 Apple SDK 컴파일·실행 **NOT_RUN**이다.
+네이티브 빌드와 실기 실행 방법은 [APPLE-USERSPACE-NATIVE-BUILD.md](APPLE-USERSPACE-NATIVE-BUILD.md), 미해결 시스템 등록 ABI는 [ABI-CONTRACT.md](../Userspace/WindowServer/ABI-CONTRACT.md)에 있다. 실제 GitHub macOS Intel 환경에서 Apple SDK 15.5·26.2를 사용한 라이브러리와 네 클라이언트의 컴파일·링크가 [e20496a 빌드](https://github.com/NiSeullent/Mellow/actions/runs/36722621188)에서 통과했다. 소스 34개와 산출물 21개의 해시, 각 대상의 다섯 linked Mach-O 구조를 확인했다. acceptance 클라이언트와 GPU 실행은 **NOT_RUN**이며, CPU descriptor 경계 검사는 macOS 15.7.9에서만 실행했다. 별도 [a46eb68 kext 빌드](https://github.com/NiSeullent/Mellow/actions/runs/36719120292)는 SDK 15.5에서 진단용 kext를 링크했으며 실제 적재·가속을 검증하지 않았다.
 
 이 앱용 경로는 macOS에 이미 존재하는 가속 OpenCL/CGL provider를 사용한다. provider가 없는 미지원 Intel·NVIDIA GPU를 직접 구동하는 kernel/firmware/VM/submission driver를 제공하지 않는다. 최종 성공 조건인 모든 대상 모델의 시스템 Metal·WindowServer 가속은 아직 충족되지 않았다.
 

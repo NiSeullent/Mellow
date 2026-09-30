@@ -106,6 +106,21 @@ jobs:
                       print(command.get('stdout', ''))
                       print(command.get('stderr', ''))
           PY
+      - name: Retain source identity and redistribution notices
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, shutil, subprocess
+          root = pathlib.Path.cwd()
+          package = pathlib.Path(os.environ['RUNNER_TEMP']) / 'mellow-apple-userspace-${{ matrix.deployment }}'
+          package.mkdir(parents=True, exist_ok=True)
+          commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          (package / 'SOURCE-COMMIT.txt').write_text(commit + '\n')
+          (package / 'SOURCE-URL.txt').write_text('https://github.com/NiSeullent/Mellow/tree/' + commit + '\n')
+          for name in ('LICENSE', 'NOTICE'):
+              shutil.copyfile(root / name, package / name)
+          shutil.copytree(root / 'LICENSES', package / 'LICENSES')
+          PY
       - name: Retain SDK build evidence
         uses: actions/upload-artifact@v4
         if: always()

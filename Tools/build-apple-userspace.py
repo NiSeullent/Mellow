@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import plistlib
 import shutil
 import struct
 import subprocess
@@ -37,6 +38,8 @@ FRAMEWORKS = (
     "QuartzCore", "CoreGraphics", "AppKit", "IOKit",
 )
 MAX_REPORT_BYTES = 1024 * 1024
+FRAMEWORK_BINARY = "MellowAppleUserspace.framework/Versions/A/MellowAppleUserspace"
+FRAMEWORK_INSTALL_NAME = "@rpath/" + FRAMEWORK_BINARY
 
 
 class NotAvailable(RuntimeError):
@@ -133,7 +136,7 @@ def binary_identity(path, deployment, sdk_version, role):
         if len(header) != 32:
             raise ValueError("Truncated Mach-O header: " + path.name)
         magic, cpu, subtype, kind, count, size, flags, _ = struct.unpack("<8I", header)
-        if magic != 0xfeedfacf or cpu != 0x01000007 or kind != (6 if role == "library" else 2):
+        if magic != 0xfeedfacf or cpu != 0x01000007 or kind != (6 if role in ("library", "framework") else 2):
             raise ValueError("Unexpected linked Mach-O architecture/type: " + path.name)
         if not 0 < count <= 4096 or not count * 8 <= size <= 2 * 1024 * 1024:
             raise ValueError("Invalid Mach-O load-command bounds: " + path.name)
@@ -184,6 +187,10 @@ def binary_identity(path, deployment, sdk_version, role):
     library_name = "@rpath/libMellowAppleUserspace.dylib"
     if role == "library" and install_names != [library_name]:
         raise ValueError("Unexpected userspace dylib install name")
+    if role == "framework" and install_names != [FRAMEWORK_INSTALL_NAME]:
+        raise ValueError("Unexpected userspace framework install name")
+    if role == "framework-client" and (FRAMEWORK_INSTALL_NAME not in dependencies or "@loader_path" not in rpaths):
+        raise ValueError("Framework client does not load the adjacent versioned Mellow framework")
     if role == "client" and (library_name not in dependencies or "@loader_path" not in rpaths):
         raise ValueError("Client does not load the adjacent Mellow userspace dylib")
     if role == "inventory" and library_name in dependencies:
@@ -200,7 +207,7 @@ def build(report, out, compiler, sdk, env, deployment):
                 "Userspace/AppleMetal/RenderPassLimits.hpp",
                 "Userspace/WindowServer/SurfacePresenter.h",
                 "Userspace/WindowServer/SurfaceSnapshot.hpp", "Userspace/WindowServer/RenderFixtureOracle.hpp", "tests/render_fixture.hpp",
-                "tests/opencl_runtime_sha256.hpp", "Tools/build-apple-userspace.py"]
+                "tests/opencl_runtime_sha256.hpp", "tests/apple_framework_link.mm", "Tools/build-apple-userspace.py"]
     sources = [*CPP_SOURCES, *OBJC_SOURCES, *[entry[0] for entry in CLIENTS.values()], INVENTORY_SOURCE]
     for name in sources + headers:
         if not (ROOT / name).is_file():
@@ -213,13 +220,14 @@ def build(report, out, compiler, sdk, env, deployment):
     objects.mkdir()
 
     def record_binary(path, role):
-        report.setdefault("binary_identity", {})[path.name] = binary_identity(
+        name = path.relative_to(out).as_posix()
+        report.setdefault("binary_identity", {})[name] = binary_identity(
             path, deployment, report["sdk"]["version"], role)
-        report["artifacts"][path.name] = digest(path)
+        report["artifacts"][name] = digest(path)
 
-    def compile_source(source):
+    def compile_source(source, additional=()):
         target = objects / object_name(source)
-        arguments = list(base)
+        arguments = [*base, *additional]
         # ARC and Objective-C blocks are applied only to actual Objective-C++
         # translation units; production C++ sources retain their own semantics.
         if source.endswith(".mm"):
@@ -235,6 +243,43 @@ def build(report, out, compiler, sdk, env, deployment):
     checked(report, "link userspace library", [*base, "-dynamiclib", *library_objects,
             "-Wl,-install_name,@rpath/" + library.name, *framework_flags, "-o", library], env)
     record_binary(library, "library")
+    # A real versioned macOS framework with its own install name, public headers
+    # and compiled binary. It exposes the explicit app adapter only; packaging
+    # it as a framework does not register a system Metal or display provider.
+    framework = out / "MellowAppleUserspace.framework"
+    version = framework / "Versions/A"
+    for directory in ("Headers", "Resources", "Modules"):
+        (version / directory).mkdir(parents=True, exist_ok=True)
+    binary = out / FRAMEWORK_BINARY
+    checked(report, "link versioned userspace framework", [*base, "-dynamiclib", *library_objects,
+            "-Wl,-install_name," + FRAMEWORK_INSTALL_NAME, *framework_flags, "-o", binary], env)
+    record_binary(binary, "framework")
+    for name in ("Userspace/AppleMetal/MellowAppleMetal.h", "Userspace/AppleMetal/MellowAppleRenderMetal.h",
+                 "Userspace/WindowServer/SurfacePresenter.h"):
+        shutil.copyfile(ROOT / name, version / "Headers" / Path(name).name)
+    (version / "Headers/MellowAppleUserspace.h").write_text(
+        '#import "MellowAppleMetal.h"\n#import "MellowAppleRenderMetal.h"\n#import "SurfacePresenter.h"\n')
+    (version / "Modules/module.modulemap").write_text(
+        'framework module MellowAppleUserspace {\n  umbrella header "MellowAppleUserspace.h"\n  export *\n  module * { export * }\n}\n')
+    with (version / "Resources/Info.plist").open("wb") as stream:
+        plistlib.dump({"CFBundleIdentifier": "com.NiSeullent.Mellow.AppleUserspace",
+                      "CFBundleName": "MellowAppleUserspace", "CFBundleExecutable": "MellowAppleUserspace",
+                      "CFBundlePackageType": "FMWK", "CFBundleVersion": "0.4.4",
+                      "CFBundleShortVersionString": "0.4.4", "LSMinimumSystemVersion": deployment,
+                      "MellowSystemMetalRegistered": False, "MellowSystemWindowServerVerified": False}, stream)
+    (framework / "Versions/Current").symlink_to("A")
+    for name in ("Headers", "Resources", "Modules", "MellowAppleUserspace"):
+        (framework / name).symlink_to("Versions/Current/" + name)
+    for path in version.rglob("*"):
+        if path.is_file():
+            report["artifacts"][path.relative_to(out).as_posix()] = digest(path)
+    report["framework_scope"] = "Explicit app compute/render/presentation adapters, not a system Metal/WindowServer driver"
+    framework_client_object = compile_source("tests/apple_framework_link.mm", ["-F", out])
+    framework_client = out / "mellow-framework-link-check"
+    checked(report, "link public framework consumer", [*base, framework_client_object,
+            "-F", out, "-framework", "MellowAppleUserspace", "-Wl,-rpath,@loader_path",
+            *framework_flags, "-o", framework_client], env)
+    record_binary(framework_client, "framework-client")
     for name, (source, filename) in CLIENTS.items():
         client_object = compile_source(source)
         target = out / filename

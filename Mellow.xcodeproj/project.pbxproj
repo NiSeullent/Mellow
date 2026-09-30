@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1EDD20260930E00000000001 /* FirmwareOwner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1EDD20260930E00000000002 /* FirmwareOwner.cpp */; };
+		1EDD20260930D00000000001 /* XeExecutionIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1EDD20260930D00000000002 /* XeExecutionIOKit.cpp */; };
 		1EDD20260930C00000000001 /* FirmwareImage.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1EDD20260930C00000000002 /* FirmwareImage.cpp */; };
 		1EDD20260930B00000000001 /* XeGuCRegionOwner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1EDD20260930B00000000002 /* XeGuCRegionOwner.cpp */; };
 		28D26C4F9D28BAEF8DF7A6E0 /* MemoryOwner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 801DB68AC6BCDFC892A7536D /* MemoryOwner.cpp */; };
@@ -75,6 +77,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1EDD20260930E00000000002 /* FirmwareOwner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FirmwareOwner.cpp; path = Drivers/PortedNvidiaGsp/FirmwareOwner.cpp; sourceTree = SOURCE_ROOT; };
+		1EDD20260930E00000000003 /* FirmwareOwner.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = FirmwareOwner.hpp; path = Drivers/PortedNvidiaGsp/FirmwareOwner.hpp; sourceTree = SOURCE_ROOT; };
+		1EDD20260930D00000000002 /* XeExecutionIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = XeExecutionIOKit.cpp; path = Mellow/XeExecutionIOKit.cpp; sourceTree = SOURCE_ROOT; };
+		1EDD20260930D00000000003 /* XeExecutionIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = XeExecutionIOKit.hpp; path = Mellow/XeExecutionIOKit.hpp; sourceTree = SOURCE_ROOT; };
 		1EDD20260930C00000000002 /* FirmwareImage.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FirmwareImage.cpp; path = Drivers/PortedNvidiaGsp/FirmwareImage.cpp; sourceTree = SOURCE_ROOT; };
 		1EDD20260930C00000000003 /* FirmwareImage.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = FirmwareImage.hpp; path = Drivers/PortedNvidiaGsp/FirmwareImage.hpp; sourceTree = SOURCE_ROOT; };
 		1EDD20260930B00000000002 /* XeGuCRegionOwner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = XeGuCRegionOwner.cpp; path = Mellow/XeGuCRegionOwner.cpp; sourceTree = SOURCE_ROOT; };
@@ -189,6 +195,10 @@
 		BFF974EEDBE2F7A8EFA151B3 /* NativeGpuSources */ = {
 			isa = PBXGroup;
 			children = (
+				1EDD20260930E00000000002 /* FirmwareOwner.cpp */,
+				1EDD20260930E00000000003 /* FirmwareOwner.hpp */,
+				1EDD20260930D00000000002 /* XeExecutionIOKit.cpp */,
+				1EDD20260930D00000000003 /* XeExecutionIOKit.hpp */,
 				1EDD20260930A00000000002 /* Radix3.cpp */,
 				1EDD20260930C00000000002 /* FirmwareImage.cpp */,
 				1EDD20260930C00000000003 /* FirmwareImage.hpp */,
@@ -471,6 +481,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1EDD20260930E00000000001 /* FirmwareOwner.cpp in Sources */,
+				1EDD20260930D00000000001 /* XeExecutionIOKit.cpp in Sources */,
 				1EDD20260930000000000001 /* CommandEncoding.cpp in Sources */,
 				1EDD20260930B00000000001 /* XeGuCRegionOwner.cpp in Sources */,
 				28D26C4F9D28BAEF8DF7A6E0 /* MemoryOwner.cpp in Sources */,
