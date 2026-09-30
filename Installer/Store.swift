@@ -164,7 +164,7 @@ final class InstallStore {
             if isDurabilityError(error) { throw error }
             // Roll back only the exact files created in this transaction. A
             // failed state commit leaves the prior current release intact.
-            if published { try? versions.move(release, to: versions, as: temporary) }
+            if published { _ = try? versions.move(release, to: versions, as: temporary) }
             if (try? versions.exists(temporary)) == true {
                 do { try stage.removeExact(files: tracked); _ = unlinkat(versions.fd, temporary, AT_REMOVEDIR) }
                 catch { /* Preserve any incomplete or externally changed tree for inspection. */ }
