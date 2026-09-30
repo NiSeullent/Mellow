@@ -1,0 +1,13 @@
+# Mellow static GitHub Pages site
+
+This directory is a reviewed site alternative; no dependency install or build is required. Asset and data paths are relative, including when published at `/Mellow/`. The shared public homepage is owned by the parallel `codex/mellow-pages` publication branch, which provides the broader 44-family/838-model catalog. Our Pages workflow is manual-only so routine commits cannot overwrite that homepage. Repository Pages enablement and environment permissions remain external deployment configuration.
+
+`compatibility.json` is shared by both language views. Its `source_ref` pins repository implementation/evidence links. Intel registered device names follow `Mellow/kern_model.hpp`; other family records do not invent model-specific PCI IDs. Additional Intel family naming sources are pinned official Linux PCI and Xe definitions, linked next to the corresponding rows. These sources describe Linux taxonomy, not Mellow macOS support.
+
+Every current runtime flag is false: support completion has no recorded hardware proof. This does not assert a failed physical experiment. Device identification, partial source/host checks and completed hardware support are separate facts; the page currently reports zero completed native GPU/Metal/WindowServer devices. Updating readiness requires an explicit data/UI contract change and new authoritative evidence. Windows driver results are not native macOS evidence.
+
+`app.js` discovers public GitHub Releases and enables download/install controls only for a release containing uploaded, nonempty `Mellow-macos-x86_64.zip`, its `.sha256`, `manifest.json` and `install-mellow.sh` assets. Source checkpoints or partial asset uploads cannot enable binary controls. Asset discovery is not compilation or hardware verification; the release manifest and installer validate the package contract. Links use each asset's version-specific URL. Network/API failure leaves GitHub Releases accessible and install controls disabled.
+
+Installer commands download a saved script and show it for review; execution is a separate copied command using `--version TAG`. Default prefix is `~/Library/Mellow`. The page never executes an installer or GPU test. Installation documentation uses the current development branch until a binary release is discovered, then the exact release tag.
+
+Review the published page at desktop and 360px mobile widths. Check Korean/English switching; searches for `7D41`, `RTX 3080` and `Lunar Lake`; vendor/family/stage combinations; no-match/reset; optional AMD visibility; evidence links; API failure; source-only releases; complete binary assets; and copied installer commands. Confirm all GPU rows remain unverified and downloaded package presence does not change device readiness.

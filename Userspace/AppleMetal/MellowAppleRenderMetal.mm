@@ -289,9 +289,12 @@ bool renderEntries(const std::string &source, std::string &vertex, std::string &
     for (NSUInteger i=1;i<8;++i) if (pass.colorAttachments[i].texture || pass.colorAttachments[i].resolveTexture) {
         commandError=renderFailure(MellowMTL::ErrorCode::Unsupported,@"Only color attachment zero is supported"); return nil;
     }
-    // Use the installed SDK's public declaration. An SDK missing this constant
-    // must fail compilation; a guessed capacity could silently ignore counters.
-    for (NSUInteger i=0;i<MTLMaxRenderPassSampleBuffers;++i) if (pass.sampleBufferAttachments[i].sampleBuffer) {
+    // Metal exposes indexed attachment access without a public count query.
+    // Inspect the four slots used by Dawn's Metal backend (48f5ceee), matching
+    // Runtime/NativeMetalRender.mm. There is no MTLMaxRenderPassSampleBuffers
+    // declaration in the macOS 15.5 SDK used for our native build.
+    constexpr NSUInteger counterAttachmentCount = 4;
+    for (NSUInteger i=0;i<counterAttachmentCount;++i) if (pass.sampleBufferAttachments[i].sampleBuffer) {
         commandError=renderFailure(MellowMTL::ErrorCode::Unsupported,@"Render counter sample buffers are unsupported"); return nil;
     }
     auto color=pass.colorAttachments[0];

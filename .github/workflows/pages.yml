@@ -1,11 +1,8 @@
 name: Publish Mellow website
 
 on:
-  push:
-    branches: [main, codex/mellow-family-routing-20260930]
-    paths:
-      - 'website/**'
-      - '.github/workflows/pages.yml'
+  # The parallel codex/mellow-pages branch owns the shared public homepage.
+  # This reviewed alternative is manual-only to avoid competing deployments.
   workflow_dispatch:
 
 permissions:

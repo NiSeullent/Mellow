@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Mellow contributors.
 #import "SurfacePresenter.h"
+#import <IOKit/IOReturn.h>
 #include "SurfaceSnapshot.hpp"
 #include <stdint.h>
 #if !__has_feature(objc_arc)
