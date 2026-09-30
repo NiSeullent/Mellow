@@ -251,7 +251,7 @@ def main():
                    "-o", str(executable)]
         command += ["-lopengl32", "-lgdi32", "-luser32", "-static-libgcc", "-static-libstdc++"] if os.name == "nt" else ["-pthread"]
         if macos:
-            command += ["-framework", "OpenGL"]
+            command += ["-framework", "OpenGL", "-framework", "IOSurface", "-framework", "CoreFoundation"]
         build = subprocess.run(command, capture_output=True, text=True, timeout=120, **options)
         report["build"] = dict(command=command, exit_code=build.returncode, stdout=build.stdout, stderr=build.stderr)
         if build.returncode:

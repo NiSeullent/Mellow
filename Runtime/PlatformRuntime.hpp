@@ -25,11 +25,14 @@ using Features = uint64_t;
 constexpr Features bit(Feature feature) { return static_cast<Features>(feature); }
 constexpr Features KnownFeatures = (1ULL << 13) - 1;
 
+enum class IdentityScope : uint8_t { ReportedPci, OpenClDeviceObject };
 struct DeviceIdentity {
     uint16_t vendorId {};
     uint16_t deviceId {};
     uint32_t revision {};
-    uint64_t instance {}; // Adapter's stable identity for this physical device.
+    uint64_t instance {}; // Adapter identity; a live API object in OpenClDeviceObject scope.
+    IdentityScope scope {IdentityScope::ReportedPci};
+    uint32_t apiVendorId {}; // Exact CL_DEVICE_VENDOR_ID; never a fabricated PCI ID.
 };
 bool sameDevice(const DeviceIdentity &, const DeviceIdentity &);
 

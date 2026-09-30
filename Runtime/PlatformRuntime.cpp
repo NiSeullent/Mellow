@@ -3,13 +3,20 @@
 namespace MellowRT {
 bool sameDevice(const DeviceIdentity &a, const DeviceIdentity &b) {
     return a.vendorId == b.vendorId && a.deviceId == b.deviceId &&
-           a.revision == b.revision && a.instance == b.instance;
+           a.revision == b.revision && a.instance == b.instance &&
+           a.scope == b.scope && a.apiVendorId == b.apiVendorId;
 }
 namespace {
 bool validProvider(const ProviderDescriptor &p) {
     if (!p.id || !p.device.instance || !p.resetEpoch ||
         p.evidenceEpoch != p.resetEpoch || !p.validationRecord ||
         (p.verified & ~p.advertised) || (p.advertised & ~KnownFeatures)) return false;
+    if (p.device.scope == IdentityScope::OpenClDeviceObject)
+        return p.api == Api::OpenCL && p.kind == ProviderKind::Host &&
+               p.execution == Execution::Hardware && p.device.apiVendorId &&
+               !p.device.deviceId && !p.device.revision &&
+               (!p.device.vendorId || p.device.vendorId == p.device.apiVendorId);
+    if (p.device.scope != IdentityScope::ReportedPci || p.device.apiVendorId) return false;
     if (p.api == Api::CpuReference)
         return p.kind == ProviderKind::Reference && p.execution == Execution::Software;
     if (p.api != Api::OpenGL && p.api != Api::OpenCL && p.api != Api::Native) return false;
@@ -204,6 +211,7 @@ CompletionStatus CompletionTracker::invalidateForReset(uint64_t epoch) {
 
 bool validCacheIdentity(const JitCacheIdentity &key) {
     if (key.schema != 1 || !key.device.instance || !key.device.vendorId || !key.device.deviceId ||
+        key.device.scope != IdentityScope::ReportedPci || key.device.apiVendorId ||
         (key.targetApi != Api::OpenGL && key.targetApi != Api::OpenCL && key.targetApi != Api::Native) ||
         (key.input != ShaderInput::MslSource && key.input != ShaderInput::Air &&
          key.input != ShaderInput::SpirV && key.input != ShaderInput::OpenClC && key.input != ShaderInput::Glsl)) return false;
