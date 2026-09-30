@@ -248,6 +248,86 @@ class PortTests(unittest.TestCase):
                 self.assertFalse(rejection["driver_ready"])
                 self.assertIn("error", rejection)
 
+    def test_duplicate_registry_keys_rejected_before_output(self):
+        recipes = RECIPES_PATH.read_text(encoding="utf-8")
+        families = FAMILIES_PATH.read_text(encoding="utf-8")
+        cases = [
+            ("RECIPES_PATH", recipes.replace('"schema_version": 1', '"schema_version": 1, "schema_version": 1', 1)),
+            ("RECIPES_PATH", recipes.replace('"vendor": "Intel"', '"vendor": "Intel", "vendor": "Intel"', 1)),
+            ("FAMILIES_PATH", families.replace('"physical_gpu_verified": false',
+                '"physical_gpu_verified": true, "physical_gpu_verified": false', 1)),
+        ]
+        for index, (field, raw) in enumerate(cases):
+            with self.subTest(field=field, index=index):
+                registry_file = self.root / ("duplicate-" + str(index) + ".json")
+                registry_file.write_text(raw, encoding="utf-8")
+                output = self.root / ("duplicate-output-" + str(index))
+                with patch("mellow_port.core." + field, registry_file), self.assertRaisesRegex(PortError, "Duplicate JSON"):
+                    self.run_port(output, gpu_family="intel-tgl")
+                self.assertFalse(output.exists())
+
+    def test_nonfinite_registry_metadata_rejected_before_output(self):
+        for field, original, collection, entry in (
+                ("RECIPES_PATH", RECIPES_PATH, "recipes", "xe"),
+                ("FAMILIES_PATH", FAMILIES_PATH, "families", "intel-tgl")):
+            document = json.loads(original.read_bytes())
+            document[collection][entry]["unreviewed_metadata"] = 0
+            valid = json.dumps(document)
+            for index, literal in enumerate(("NaN", "Infinity", "-Infinity", "1e999", "-1e999")):
+                with self.subTest(field=field, literal=literal):
+                    registry_file = self.root / (field + "-nonfinite-" + str(index) + ".json")
+                    registry_file.write_text(valid.replace('"unreviewed_metadata": 0',
+                        '"unreviewed_metadata": ' + literal, 1), encoding="utf-8")
+                    output = self.root / (field + "-nonfinite-output-" + str(index))
+                    with patch("mellow_port.core." + field, registry_file), self.assertRaisesRegex(PortError, "Nonfinite JSON"):
+                        self.run_port(output, gpu_family="intel-tgl")
+                    self.assertFalse(output.exists())
+            # Ordinary finite numbers and these words inside strings remain
+            # valid JSON metadata; rejecting numeric tokens is not text filtering.
+            document[collection][entry]["unreviewed_metadata"] = {"finite": 0.125, "text": "NaN Infinity"}
+            registry_file = self.root / (field + "-finite.json")
+            registry_file.write_text(json.dumps(document), encoding="utf-8")
+            with patch("mellow_port.core." + field, registry_file):
+                self.assertFalse(self.run_port(field + "-finite-output", gpu_family="intel-tgl")["driver_ready"])
+
+    def test_recipe_prefixes_require_canonical_relative_directories(self):
+        malformed = ("", "drivers/gpu/drm/xe", "/drivers/gpu/drm/xe/", "C:/drivers/",
+                     "../drivers/", "drivers/../xe/", "drivers/./xe/", "drivers//xe/",
+                     "drivers\\gpu\\xe\\", "./drivers/", "drivers/gpu/drm/xe//")
+        for field in ("source_prefixes", "admission_prefixes"):
+            for index, prefix in enumerate(malformed):
+                with self.subTest(field=field, prefix=prefix):
+                    document = json.loads(RECIPES_PATH.read_bytes())
+                    document["recipes"]["xe"][field] = [prefix]
+                    registry_file = self.root / (field + "-prefix-" + str(index) + ".json")
+                    registry_file.write_text(json.dumps(document), encoding="utf-8")
+                    output = self.root / (field + "-prefix-output-" + str(index))
+                    with patch("mellow_port.core.RECIPES_PATH", registry_file), self.assertRaises(PortError):
+                        self.run_port(output)
+                    self.assertFalse(output.exists())
+
+    def test_admission_prefixes_must_stay_in_source_directories(self):
+        for index, prefix in enumerate(("drivers/gpu/drm/xe-evil/", "drivers/gpu/drm/", "kernel-open/", "include/drm-evil/")):
+            with self.subTest(prefix=prefix):
+                document = json.loads(RECIPES_PATH.read_bytes())
+                document["recipes"]["xe"]["admission_prefixes"] = [prefix]
+                registry_file = self.root / ("outside-admission-" + str(index) + ".json")
+                registry_file.write_text(json.dumps(document), encoding="utf-8")
+                output = self.root / ("outside-admission-output-" + str(index))
+                with patch("mellow_port.core.RECIPES_PATH", registry_file), self.assertRaisesRegex(PortError, "Admission prefix"):
+                    self.run_port(output)
+                self.assertFalse(output.exists())
+        document = json.loads(RECIPES_PATH.read_bytes())
+        document["recipes"]["xe"]["admission_prefixes"] = ["drivers/gpu/drm/xe/regs/"]
+        registry_file = self.root / "nested-admission.json"
+        registry_file.write_text(json.dumps(document), encoding="utf-8")
+        with patch("mellow_port.core.RECIPES_PATH", registry_file):
+            self.assertFalse(self.run_port("nested-admission-output")["driver_ready"])
+        sibling = self.make_source("drivers/gpu/drm/xe-evil/fixture.h")
+        with self.assertRaises(PortError):
+            self.run_port("sibling-source-output", files=[sibling])
+        self.assertFalse((self.root / "sibling-source-output").exists())
+
     def test_output_never_overwrites_or_modifies_source(self):
         before = (self.source / FILE).read_bytes()
         with self.assertRaises(PortError):

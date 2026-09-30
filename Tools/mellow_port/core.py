@@ -1,6 +1,7 @@
 """Deterministic source manifests, lexical dependency inventories and review output."""
 import hashlib
 import json
+import math
 import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
@@ -22,13 +23,34 @@ def digest(data):
 
 
 def canonical(value):
-    return json.dumps(value, sort_keys=True, indent=2, ensure_ascii=True) + "\n"
+    return json.dumps(value, sort_keys=True, indent=2, ensure_ascii=True, allow_nan=False) + "\n"
+
+
+def unique_json_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise PortError("Duplicate JSON registry key: " + key)
+        result[key] = value
+    return result
+
+
+def reject_json_constant(value):
+    raise PortError("Nonfinite JSON registry constant: " + value)
+
+
+def finite_json_float(text):
+    value = float(text)
+    if not math.isfinite(value):
+        raise PortError("Nonfinite JSON registry number: " + text)
+    return value
 
 
 def registry(path, collection):
     try:
         data = path.read_bytes()
-        document = json.loads(data)
+        document = json.loads(data, object_pairs_hook=unique_json_object,
+                              parse_constant=reject_json_constant, parse_float=finite_json_float)
     except (OSError, UnicodeError, ValueError) as error:
         raise PortError("Cannot read " + collection + " registry: " + str(error)) from error
     if not isinstance(document, dict) or type(document.get("schema_version")) is not int or document["schema_version"] != 1:
@@ -44,14 +66,29 @@ def string_list(value, label, nonempty=False):
         raise PortError("Invalid string list: " + label)
 
 
+def directory_prefixes(value, label):
+    string_list(value, label, True)
+    for prefix in value:
+        # Match the source-path alphabet, with an explicit trailing separator.
+        # Do not normalize traversal, repeated separators or sibling prefixes.
+        if (not re.fullmatch(r"(?:[A-Za-z0-9_.+-]+/)+", prefix) or
+                any(part in (".", "..") for part in prefix[:-1].split("/"))):
+            raise PortError("Noncanonical relative directory prefix: " + label)
+
+
 def recipe_registry():
     data, recipes = registry(RECIPES_PATH, "recipes")
     for target, recipe in recipes.items():
         for field in ("vendor", "adapter_contract", "hardware_admission"):
             if not isinstance(recipe.get(field), str) or not recipe[field]:
                 raise PortError("Invalid recipe field: " + target + "." + field)
-        for field in ("architectures", "excluded_architectures", "source_prefixes", "admission_prefixes", "focus"):
-            string_list(recipe.get(field), target + "." + field, field in ("source_prefixes", "admission_prefixes", "focus"))
+        for field in ("architectures", "excluded_architectures", "focus"):
+            string_list(recipe.get(field), target + "." + field, field == "focus")
+        for field in ("source_prefixes", "admission_prefixes"):
+            directory_prefixes(recipe.get(field), target + "." + field)
+        if any(not any(prefix.startswith(source) for source in recipe["source_prefixes"])
+               for prefix in recipe["admission_prefixes"]):
+            raise PortError("Admission prefix is outside allowed source directories: " + target)
         if recipe.get("pci_device_ids") != []:
             raise PortError("Source recipes cannot grant PCI device admission")
         requirements = recipe.get("requirements")
