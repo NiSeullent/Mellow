@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-30T13:59:54.122655+00:00",
+  "sourceRevision": "06fe75b3d24f01c93dfb65c56d30013bc7f076c9",
+  "revisionScope": "Last committed base at generation; reviewed working-tree sourcePaths include newer uncommitted native components. Do not infer that all files existed at this base revision.",
+  "catalogScope": "All 18 current registry source families plus 26 source-grounded missing families; not an exhaustive marketed-model or PCI-ID catalogue.",
+  "registeredFamilyIds": [
+    "intel-icl",
+    "intel-tgl",
+    "intel-rkl",
+    "intel-adl",
+    "intel-rpl",
+    "intel-dg1",
+    "intel-dg2",
+    "intel-mtl",
+    "intel-arl",
+    "intel-lnl",
+    "intel-bmg",
+    "nvidia-maxwell",
+    "nvidia-pascal",
+    "nvidia-volta",
+    "nvidia-turing",
+    "nvidia-ampere",
+    "nvidia-ada",
+    "nvidia-blackwell"
+  ],
+  "additionalFamilyIds": [
+    "intel-gen2",
+    "intel-gen3",
+    "intel-gen4",
+    "intel-ilk",
+    "intel-snb",
+    "intel-ivb",
+    "intel-vlv",
+    "intel-hsw",
+    "intel-bdw",
+    "intel-chv",
+    "intel-skl",
+    "intel-bxt",
+    "intel-kbl",
+    "intel-glk",
+    "intel-cfl",
+    "intel-cml",
+    "intel-cnl",
+    "intel-ehl",
+    "intel-jsl",
+    "intel-atsm",
+    "intel-pvc",
+    "intel-ptl",
+    "intel-wcl",
+    "intel-nvl",
+    "intel-cri",
+    "nvidia-hopper"
+  ],
+  "sourceSnapshotSha256": {
+    "porting/gpu-families.json": "716d6d4349d8140d4a97b8e2a737f76042f9c86419ef376203300b8e1679d748",
+    "porting/backend-recipes.json": "ac325d6a4ebc2239cf132759b04670118a51c100abbb482a3582e05f594203a5",
+    "Mellow/kern_model.hpp": "4ea086ddc9054aff84daee10f20059bfd674fc0779f8c1ae33e756e0813420f9",
+    "Drivers/NativeNvidia/Probe.cpp": "2fcc074e7f4146cba0a5f251ba353953cf281bfcffbc954553cdaad8c20ecb3d",
+    "docs/GPU-PORT-MACOS-15-26.md": "6f4fac3ea2dae27fe1d1064cc6add81dc37211c82d80a348f1eca7cba3b7b131",
+    "docs/SOURCE-FAMILY-PORTING.md": "dd0e155c81404b5fc1f60af4df62e8bba076939a34de94f5eb49d335fe32b7f6"
+  },
+  "primaryReferencesRead": [
+    "https://raw.githubusercontent.com/torvalds/linux/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+    "https://raw.githubusercontent.com/torvalds/linux/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/nouveau/nvkm/engine/device/base.c",
+    "https://raw.githubusercontent.com/torvalds/linux/master/drivers/gpu/drm/xe/xe_pci.c",
+    "https://raw.githubusercontent.com/torvalds/linux/v4.20/drivers/gpu/drm/i915/i915_pci.c"
+  ],
+  "pciIdPolicy": "Every pciDeviceIds array is empty because no per-device macOS compatibility was physically validated. Source-table IDs and chip/product examples are descriptive only.",
+  "osTargetPolicy": "15 and 26 are development/build targets; these rows do not assert execution on either OS.",
+  "statusVocabulary": {
+    "partial": "Some production components or observation code exist; native hardware owner and full GPU runtime remain incomplete.",
+    "source_intake": "Family/source recipe only; no executable native family backend.",
+    "not_implemented": "Source-grounded missing family profile and native backend; additional planning entry.",
+    "not_run": "No physical native macOS GPU acceptance for this row."
+  },
+  "claims": {
+    "allModelsVerified": false,
+    "nativeMetalVerified": false,
+    "systemWindowServerVerified": false
+  }
+}
