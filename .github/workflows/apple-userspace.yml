@@ -41,6 +41,19 @@ jobs:
           git rev-parse HEAD
           xcodebuild -version
           xcrun --sdk macosx --show-sdk-version
+      - name: Record public render counter attachment declaration
+        run: |
+          python3 - <<'PY'
+          import pathlib, subprocess
+          sdk = pathlib.Path(subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path'], text=True).strip())
+          header = sdk / 'System/Library/Frameworks/Metal.framework/Headers/MTLRenderPass.h'
+          lines = header.read_text().splitlines()
+          marker = '@interface MTLRenderPassSampleBufferAttachmentDescriptorArray'
+          begin = next(i for i, line in enumerate(lines) if marker in line)
+          end = next(i for i in range(begin, len(lines)) if lines[i].strip() == '@end')
+          print('Public SDK declaration:', header)
+          print('\n'.join(lines[max(0, begin - 12):end + 1]))
+          PY
       - name: Compile and link Apple adapters and acceptance clients
         run: |
           python3 Tools/build-apple-userspace.py --out "$RUNNER_TEMP/mellow-apple-userspace-${{ matrix.deployment }}" --deployment-target '${{ matrix.deployment }}'
