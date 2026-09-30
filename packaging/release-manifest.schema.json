@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NiSeullent/Mellow/blob/main/packaging/release-manifest.schema.json",
+  "title": "Mellow compiled development package manifest v1",
+  "type": "object",
+  "required": ["schema_version", "package_name", "asset_name", "architecture", "minimum_macos", "repository", "source_commit", "source_ref", "release_tag", "version", "source_url", "experimental", "binary_compiled", "signed", "developer_id_signed", "notarized", "code_signing", "hardware_support_verified", "system_metal_registered", "windowserver_acceleration_verified", "build", "dependencies", "artifacts", "files"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": 1},
+    "package_name": {"const": "Mellow"},
+    "asset_name": {"const": "Mellow-macos-x86_64.zip"},
+    "architecture": {"const": "x86_64"},
+    "minimum_macos": {"const": "15.0"},
+    "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_ref": {"type": "string", "minLength": 1},
+    "release_tag": {"type": ["string", "null"]},
+    "version": {"type": "string", "minLength": 1},
+    "source_url": {"type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/tree/[0-9a-f]{40}$"},
+    "experimental": {"const": true},
+    "binary_compiled": {"const": true},
+    "signed": {"const": false, "description": "No publisher/Developer ID signature; per-artifact ad-hoc signatures are reported separately."},
+    "developer_id_signed": {"const": false},
+    "notarized": {"const": false},
+    "code_signing": {"const": "mixed-unsigned-and-ad-hoc"},
+    "hardware_support_verified": {"const": false},
+    "system_metal_registered": {"const": false},
+    "windowserver_acceleration_verified": {"const": false},
+    "build": {
+      "type": "object",
+      "required": ["status", "created_utc", "host", "sdk", "compiler", "workflow", "run_id", "run_attempt", "gpu_clients_executed", "kext_loaded", "native_client_build"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {"const": "BUILT_ONLY"},
+        "created_utc": {"type": "string"},
+        "host": {"type": "object", "required": ["system", "machine", "macos_version"], "properties": {"system": {"const": "Darwin"}, "machine": {"const": "x86_64"}, "macos_version": {"type": "string"}}, "additionalProperties": false},
+        "sdk": {"type": "object"},
+        "compiler": {"type": "object"},
+        "workflow": {"type": ["string", "null"]},
+        "run_id": {"type": ["string", "null"]},
+        "run_attempt": {"type": ["string", "null"]},
+        "gpu_clients_executed": {"const": false},
+        "kext_loaded": {"const": false},
+        "native_client_build": {"const": "Tools/NativeMetalClient.mk"}
+      }
+    },
+    "dependencies": {
+      "type": "array", "minItems": 1,
+      "items": {"type": "object", "required": ["identifier", "minimum_version", "version", "path", "provenance", "identity"], "additionalProperties": false,
+        "properties": {"identifier": {"const": "as.vit9696.Lilu"}, "minimum_version": {"type": "string"}, "version": {"type": "string"}, "path": {"const": "dependencies/Lilu.kext"}, "provenance": {"type": "string"}, "identity": {"$ref": "#/$defs/identity"}}}
+    },
+    "artifacts": {
+      "type": "array", "minItems": 12,
+      "items": {"type": "object", "required": ["path", "binary_path", "type", "identity", "code_signing", "compiled_in_this_build"], "additionalProperties": false,
+        "properties": {"path": {"$ref": "#/$defs/path"}, "binary_path": {"$ref": "#/$defs/path"}, "type": {"enum": ["kext", "retained-dependency", "dylib", "framework", "executable"]}, "identity": {"$ref": "#/$defs/identity"}, "code_signing": {"enum": ["unsigned", "ad-hoc"]}, "compiled_in_this_build": {"type": "boolean"}}}
+    },
+    "files": {
+      "type": "array", "minItems": 1,
+      "items": {"type": "object", "required": ["path", "sha256", "size"], "additionalProperties": false,
+        "properties": {"path": {"$ref": "#/$defs/path"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "size": {"type": "integer", "minimum": 0}}}
+    }
+  },
+  "$defs": {
+    "path": {"type": "string", "pattern": "^(Mellow\\.kext|frameworks|bin|dependencies|licenses)/[A-Za-z0-9_.@+-]+(/[A-Za-z0-9_.@+-]+)*$", "description": "Additionally reject dot and dotdot components and duplicate paths. files excludes manifest.json and SHA256SUMS."},
+    "identity": {
+      "type": "object", "required": ["architecture", "cpu_subtype", "platform", "file_type", "flags", "minimum_os", "sdk", "install_names", "dependencies", "rpaths"], "additionalProperties": false,
+      "properties": {"architecture": {"const": "x86_64"}, "cpu_subtype": {"type": "integer", "minimum": 0}, "platform": {"const": "macOS"}, "file_type": {"enum": ["MH_EXECUTE", "MH_DYLIB", "MH_KEXT_BUNDLE"]}, "flags": {"type": "integer", "minimum": 0}, "minimum_os": {"type": ["string", "null"]}, "sdk": {"type": ["string", "null"]}, "install_names": {"type": "array", "items": {"type": "string"}}, "dependencies": {"type": "array", "items": {"type": "string"}}, "rpaths": {"type": "array", "items": {"type": "string"}}}
+    }
+  }
+}

@@ -2,6 +2,11 @@
 
 **Metal Emulation Layer Logic for OpenGL/OpenCL Workloads**
 
+[공식 홈페이지](https://niseullent.github.io/Mellow/) ·
+[검색 가능한 호환성 목록](https://niseullent.github.io/Mellow/#compatibility) ·
+[다운로드](https://niseullent.github.io/Mellow/#download) ·
+[macOS CLI 설치 안내](docs/INSTALLATION.md)
+
 **현재 Mellow의 native macOS GPU 실행·Metal·WindowServer를 실기로 검증해 지원 완료한 기기는 없습니다.**
 아래 표는 2026-09-30 기준 저장소의 구현과 검증 기록을 나타냅니다.
 전체 개발 목표는 macOS 드라이버가 없는 Intel·NVIDIA 기기의 native GPU 드라이버,

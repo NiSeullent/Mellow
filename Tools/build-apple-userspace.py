@@ -232,7 +232,8 @@ def build(report, out, compiler, sdk, env, deployment):
     framework_flags = [flag for name in FRAMEWORKS for flag in ("-framework", name)]
     library = out / "libMellowAppleUserspace.dylib"
     checked(report, "link userspace library", [*base, "-dynamiclib", *library_objects,
-            "-Wl,-install_name,@rpath/" + library.name, *framework_flags, "-o", library], env)
+            "-Wl,-install_name,@rpath/" + library.name,
+            "-Wl,-headerpad_max_install_names", *framework_flags, "-o", library], env)
     record_binary(library, "library")
     for name, (source, filename) in CLIENTS.items():
         client_object = compile_source(source)
