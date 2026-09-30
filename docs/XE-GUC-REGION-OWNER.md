@@ -57,20 +57,46 @@ table or underlying physical page allocator. Numerical DMA-address uniqueness
 alone would not prove physical nonaliasing. CPU/metadata overlap checks provide
 a separate local defense and do not replace that allocation authority.
 
-The kernel factory `makeIOKitPins` uses `XeMemory::makeIOKitPinBackend` and the
-new `resolvePinnedBuffer` helper. The helper verifies the private Resource's
-context, owner, byte length, page count, retained mapper, prepared descriptor and
-DMA command, command/descriptor association and actual descriptor `getLength()`.
-Cleanup-uncertain Resources are refused. `pin.cookie` remains an already trusted
-private kernel handle; this is not validation of arbitrary userspace addresses.
-The existing `kernelBuffer` API is unchanged.
+The kernel factory `makeIOKitPins` uses `XeMemory::makeIOKitPinBackend` and
+`resolveDirectPinnedBuffer`. The helper verifies the private Resource's context,
+owner, complete extent, original CPU pointer, current quota, retained 4 KiB
+mapper, prepared descriptor and exact command preparation range/ID. The command
+must expose the original descriptor rather than a full bounce copy. Each freshly
+enumerated DMA page must match the stored Pin and translate at its first and
+last byte to the original descriptor's physical page. The association, CPU view,
+preparation and quota are checked again after inspection. Inactive mappers and
+cleanup-uncertain Resources are refused. `pin.cookie` remains a trusted private
+kernel handle, not an arbitrary userspace address. The generic `kernelBuffer`,
+`resolvePinnedBuffer` and VM bounce-copy behavior are preserved.
 
 Before a Loader consumes a retained region, synchronization calls the actual
-pin backend's DMA synchronization operation and a CPU barrier. IOKit
-`IODMACommand::synchronize` covers bounce-buffer copies; it does not prove GPU
-engine cache flushing, a direct coherent CTB/fence allocation or job completion.
-This factory therefore does not establish the separate direct-mapping contracts
-required for CTB or GPU-written completion pages.
+pin backend's DMA synchronization operation and a CPU barrier, then checks the
+canonical direct pin, physical admission and actual published PTEs again. Lost
+authority quarantines the region while preserving its firmware/GGTT/pin holds.
+IOKit `IODMACommand::synchronize` covers bounce-buffer copies generally; its
+success does not prove engine cache flushing or job completion. This factory
+now rejects bounced firmware backing, but the physical owner must separately
+prove coherent cache attributes and actual device/IOMMU/GPU-IOTLB readiness.
+Those requirements also apply to a future CTB or GPU-written fence allocation.
+
+Apple's byte-address `mapToPhysicalAddress` can return its input for an unmapped
+address. A matching number alone therefore cannot prove active hardware
+translation. The retained original prepared command and its fresh IOVA receipts
+are required, together with the independent physical ownership proofs. See
+[pinned XNU DMA getters](https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.1.9/iokit/Kernel/IODMACommand.cpp#L443)
+and [pinned AppleVTD fallback](https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/AppleVTD.cpp#L2231).
+
+The separate `XeGuCFirmware::IOKitBinding` constructor now takes the exact
+`XeMemory::IOKitContext` and physical reset epoch. It compares the device's direct
+`iommu-parent` with that context's retained mapper before resolving private pins.
+Retain/publication and synchronization use the same direct inspector;
+synchronization rechecks physical admission, the pin and authoritative GGTT
+publication after the blocking call, then verifies admission once more. The
+read-only pin inspection is followed by admission checks before acquiring a
+hold or calling DMA synchronization, so a successful hold is never hidden by
+a later rejected check.
+An allocation generation is never substituted for the reset epoch. These checks
+do not instantiate the missing physical firmware/VM/context owner.
 
 ## Lifetime and failure behavior
 
@@ -111,6 +137,14 @@ DMA cleanup quarantine, reference lifetime, reverse retirement and distinct
 reset/release authority. A real Loader rejects zero-filled firmware through its
 actual firmware validator and retains all three region holds when consumers are
 not quiescent; no real firmware image or GPU boot success is claimed.
+
+`tests/xe_guc_dma_iokit_tests.cpp` additionally links the production standalone
+IOKit firmware binding, Xe DMA adapter and ForceWake against explicit simulated
+OS/MMIO interfaces. It checks distinct allocation generation/reset epoch,
+foreign pins, descriptor/page bouncing, inactive or unassociated PCI mappers,
+admission loss during inspection and synchronization, publication loss and
+quiescence-gated hold release. The latest targeted source-bound receipt is
+[direct-dma-checkpoint.json](../validation/native-gpu/direct-dma-checkpoint.json).
 
 `tests/xe_dma_completion_tests.cpp` links actual XeMemoryIOKit against a labeled
 host OS shim. Resolver regressions cover wrong context/owner/length/mapper,

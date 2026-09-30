@@ -3,7 +3,10 @@
 namespace XeGuCFirmware {
 bool IOKitBinding::admitted(void *opaque,uint64_t owner,uint64_t epoch) {
     auto &self=*static_cast<IOKitBinding *>(opaque);auto &device=self.device_;
-    if(!owner || !epoch || !self.proofs_.ownsEpoch || !self.proofs_.ownsEpoch(self.proofs_.opaque,owner,epoch) ||
+    if(!owner || !epoch || epoch!=self.epoch_ || !self.proofs_.ownsEpoch ||
+        !self.proofs_.ownsEpoch(self.proofs_.opaque,owner,epoch) || device.isInactive() || !self.pins_.mapper ||
+        self.pins_.mapper->isInactive() ||
+        OSDynamicCast(IOMapper,device.getProperty("iommu-parent"))!=self.pins_.mapper ||
         device.getBusNumber()!=0 || device.getDeviceNumber()!=2 || device.getFunctionNumber()!=0 ||
         device.configRead16(0)!=0x8086 || device.configRead16(2)!=0x7d41)return false;
     const uint16_t command=device.configRead16(4);
@@ -29,20 +32,33 @@ bool IOKitBinding::quiesced(void *opaque,uint64_t owner,uint64_t epoch) {
 bool IOKitBinding::retain(void *opaque,const Region &r,bool writable) {
     auto &s=*static_cast<IOKitBinding *>(opaque);
     const XeMemory::Pin pin{r.pinCookie,r.dmaPages,r.pageCount};
-    // Actual IOBufferMemoryDescriptor identity, in addition to authoritative
-    // GGTT ownership. The current owner must already hold the pin while checked.
-    if(XeMemory::kernelBuffer(pin)!=r.cpu || !s.proofs_.retainGgtt)return false;
+    // Exact original, non-bounced pin from this device context, in addition to
+    // authoritative GGTT ownership. The owner already holds the pin and excludes
+    // reset/mapper/CPU writers across inspection and the retain transaction.
+    if(!r.cpu || !admitted(opaque,r.owner,s.epoch_) ||
+        XeMemory::resolveDirectPinnedBuffer(s.pins_,r.owner,r.bytes,pin)!=r.cpu ||
+        !admitted(opaque,r.owner,s.epoch_) || !s.proofs_.retainGgtt)return false;
     return s.proofs_.retainGgtt(s.proofs_.opaque,r,writable);
 }
 bool IOKitBinding::release(void *opaque,const Region &r) {
     auto &s=*static_cast<IOKitBinding *>(opaque);
     return s.proofs_.releaseGgtt && s.proofs_.releaseGgtt(s.proofs_.opaque,r);
 }
-bool IOKitBinding::synchronize(void *,const Region &r) {
+bool IOKitBinding::synchronize(void *opaque,const Region &r) {
+    auto &s=*static_cast<IOKitBinding *>(opaque);
     const XeMemory::Pin pin{r.pinCookie,r.dmaPages,r.pageCount};
-    if(XeMemory::kernelBuffer(pin)!=r.cpu)return false;
+    if(!r.cpu || !admitted(opaque,r.owner,s.epoch_) ||
+        XeMemory::resolveDirectPinnedBuffer(s.pins_,r.owner,r.bytes,pin)!=r.cpu ||
+        !admitted(opaque,r.owner,s.epoch_))return false;
     if(XeMemory::synchronizeForDevice(pin)!=XeMemory::Status::Ok)return false;
-    __sync_synchronize();return true;
+    __sync_synchronize();
+    // Success from synchronize() alone does not prove the association survived
+    // that blocking call, nor establish GPU completion or cache coherence.
+    return admitted(opaque,r.owner,s.epoch_) &&
+        XeMemory::resolveDirectPinnedBuffer(s.pins_,r.owner,r.bytes,pin)==r.cpu &&
+        admitted(opaque,r.owner,s.epoch_) && s.proofs_.mappingPublished &&
+        s.proofs_.mappingPublished(s.proofs_.opaque,r,s.epoch_) &&
+        admitted(opaque,r.owner,s.epoch_);
 }
 bool IOKitBinding::readPat(void *opaque,uint32_t &value) {
     auto &s=*static_cast<IOKitBinding *>(opaque);
@@ -50,7 +66,11 @@ bool IOKitBinding::readPat(void *opaque,uint32_t &value) {
 }
 bool IOKitBinding::published(void *opaque,const Region &r,uint64_t epoch) {
     auto &s=*static_cast<IOKitBinding *>(opaque);
-    return admitted(opaque,r.owner,epoch) && s.proofs_.mappingPublished && s.proofs_.mappingPublished(s.proofs_.opaque,r,epoch);
+    const XeMemory::Pin pin{r.pinCookie,r.dmaPages,r.pageCount};
+    return r.cpu && admitted(opaque,r.owner,epoch) &&
+        XeMemory::resolveDirectPinnedBuffer(s.pins_,r.owner,r.bytes,pin)==r.cpu &&
+        admitted(opaque,r.owner,epoch) && s.proofs_.mappingPublished &&
+        s.proofs_.mappingPublished(s.proofs_.opaque,r,epoch) && admitted(opaque,r.owner,epoch);
 }
 bool IOKitBinding::ads(void *opaque,const Plan &p,const MellowXe::FirmwareInfo &f) {
     auto &s=*static_cast<IOKitBinding *>(opaque);

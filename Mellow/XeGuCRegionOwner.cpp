@@ -370,7 +370,10 @@ bool Owner::synchronizeRegion(void *p, const XeGuCFirmware::Region &r) {
     if (s.pins_.synchronize(s.pins_.opaque, record->pin, true) != XeMemory::Status::Ok) {
         s.quarantine(*record); return false;
     }
-    __sync_synchronize(); return true;
+    __sync_synchronize();
+    // Synchronization may block or expose a changed DMA association. Re-resolve
+    // the exact pin and published PTEs before admitting firmware consumption.
+    return s.fresh(*record);
 }
 bool Owner::readPat3(void *p, uint32_t &value) {
     auto &s = *static_cast<Owner *>(p);
@@ -389,7 +392,7 @@ XeGuCFirmware::Backend Owner::firmwareBackend(MellowXe::MmioAccess io, uint8_t r
 #ifdef KERNEL
 namespace {
 bool iokitCpu(void *opaque, uint64_t owner, const XeMemory::Pin &pin, uint64_t bytes, uint8_t *&out) {
-    out = opaque ? static_cast<uint8_t *>(XeMemory::resolvePinnedBuffer(
+    out = opaque ? static_cast<uint8_t *>(XeMemory::resolveDirectPinnedBuffer(
         *static_cast<XeMemory::IOKitContext *>(opaque), owner, bytes, pin)) : nullptr;
     return out != nullptr;
 }

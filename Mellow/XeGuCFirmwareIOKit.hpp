@@ -18,17 +18,22 @@ struct IOKitProofs {
 // Real IOKit binding. Caller retains device/MMIO/proofs, holds GT forcewake and
 // one shared sleepable serialization domain. Nothing attaches/runs by default.
 // The owner must prevent reset/power changes while a load/reset call is active.
+// The exact pin context and its device mapper must outlive every region hold.
+// epoch is the retained physical reset epoch, never an allocation generation.
 class IOKitBinding {
 public:
-    IOKitBinding(IOPCIDevice &device,MellowXe::IOKitMmio &mmio,IOKitProofs proofs)
-        : device_(device),mmio_(mmio),proofs_(proofs) {}
+    IOKitBinding(IOPCIDevice &device,MellowXe::IOKitMmio &mmio,
+                 XeMemory::IOKitContext &pins,IOKitProofs proofs,uint64_t epoch)
+        : device_(device),mmio_(mmio),pins_(pins),proofs_(proofs),epoch_(epoch) {}
     IOKitBinding(const IOKitBinding &) = delete;
     IOKitBinding &operator=(const IOKitBinding &) = delete;
     Backend backend();
 private:
     IOPCIDevice &device_;
     MellowXe::IOKitMmio &mmio_;
+    XeMemory::IOKitContext &pins_;
     IOKitProofs proofs_ {};
+    uint64_t epoch_ {};
     static bool admitted(void *,uint64_t,uint64_t);
     static bool quiesced(void *,uint64_t,uint64_t);
     static bool retain(void *,const Region &,bool);

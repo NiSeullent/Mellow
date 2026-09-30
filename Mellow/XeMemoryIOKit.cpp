@@ -11,6 +11,7 @@ struct Resource {
     IODMACommand *command {};
     IOMapper *mapper {};
     IOKitContext *context {};
+    void *cpu {};
     uint64_t *pages {};
     uint64_t owner {}, bytes {};
     size_t pageCount {};
@@ -82,8 +83,10 @@ static Status pinMemory(void *opaque, uint64_t owner, uint64_t bytes, Pin &pin) 
     if (!resource->pages) return failedPin(resource, pin);
     resource->memory = IOBufferMemoryDescriptor::inTaskWithOptions(kernel_task,
         kIODirectionInOut, static_cast<vm_size_t>(bytes), PageSize);
-    if (!resource->memory || !resource->memory->getBytesNoCopy()) return failedPin(resource, pin);
-    bzero(resource->memory->getBytesNoCopy(), static_cast<size_t>(bytes));
+    if (!resource->memory) return failedPin(resource, pin);
+    resource->cpu = resource->memory->getBytesNoCopy();
+    if (!resource->cpu) return failedPin(resource, pin);
+    bzero(resource->cpu, static_cast<size_t>(bytes));
     resource->descriptorAttempted = true;
     if (resource->memory->prepare(kIODirectionInOut) != kIOReturnSuccess)
         return failedPin(resource, pin);
@@ -165,5 +168,78 @@ void *resolvePinnedBuffer(IOKitContext &context, uint64_t owner, uint64_t bytes,
         resource->command->getMemoryDescriptor() != resource->memory)
         return nullptr;
     return resource->memory->getBytesNoCopy();
+}
+
+void *resolveDirectPinnedBuffer(IOKitContext &context, uint64_t owner, uint64_t bytes,
+                               const Pin &pin) {
+    void *const cpu = resolvePinnedBuffer(context, owner, bytes, pin);
+    if (!cpu) return nullptr;
+    auto *const resource = checked(pin);
+    if (!resource || context.pinnedBytes < bytes ||
+        context.pinnedBytes > context.maxPinnedBytes || bytes > context.maxAllocationBytes)
+        return nullptr;
+    auto *const memory = resource->memory;
+    auto *const command = resource->command;
+    auto *const mapper = resource->mapper;
+    const auto *const pages = resource->pages;
+    const size_t pageCount = resource->pageCount;
+    const uintptr_t address = reinterpret_cast<uintptr_t>(cpu);
+    if (cpu != resource->cpu || (address & (PageSize - 1)) ||
+        bytes > UINTPTR_MAX - address || mapper->isInactive() || mapper->getPageSize() != PageSize ||
+        command->getIOMemoryDescriptor() != memory)
+        return nullptr;
+
+    // Public API semantics checked against Apple xnu-12377.1.9:
+    // https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.1.9/iokit/Kernel/IODMACommand.cpp
+    // https://github.com/apple-oss-distributions/xnu/blob/xnu-12377.1.9/iokit/Kernel/IOMemoryDescriptor.cpp
+    // The factory retains an explicit mapper and a kMapped command. Requiring
+    // its original DMA descriptor rejects the full-copy buffer; fresh segment
+    // and physical-page comparisons also reject a changed DMA mapping.
+    const uint64_t preparation = memory->getPreparationID();
+    UInt64 preparedOffset = 0, preparedLength = 0;
+    if (preparation < kIOPreparationIDAlwaysPrepared ||
+        command->getPreparedOffsetAndLength(&preparedOffset, &preparedLength) != kIOReturnSuccess ||
+        preparedOffset != 0 || preparedLength != bytes)
+        return nullptr;
+
+    UInt64 offset = 0;
+    for (size_t i = 0; i < pageCount; ++i) {
+        IODMACommand::Segment64 segment {};
+        UInt32 count = 1;
+        const UInt64 before = offset;
+        if (command->gen64IOVMSegments(&offset, &segment, &count) != kIOReturnSuccess ||
+            count != 1 || segment.fLength != PageSize || offset != before + PageSize ||
+            segment.fIOVMAddr != pages[i] || (segment.fIOVMAddr & (PageSize - 1)) ||
+            segment.fIOVMAddr > DmaLimit - PageSize)
+            return nullptr;
+
+        IOByteCount physicalLength = 0;
+        const uint64_t physical = memory->getPhysicalSegment(
+            static_cast<IOByteCount>(before), &physicalLength, kIOMemoryMapperNone);
+        if (!physical || (physical & (PageSize - 1)) || physicalLength < PageSize ||
+            physical > UINT64_MAX - (PageSize - 1) ||
+            mapper->mapToPhysicalAddress(segment.fIOVMAddr) != physical ||
+            mapper->mapToPhysicalAddress(segment.fIOVMAddr + PageSize - 1) != physical + PageSize - 1)
+            return nullptr;
+    }
+    if (offset != bytes) return nullptr;
+
+    // mapToPhysicalAddress takes byte addresses, not page numbers. AppleVTD
+    // can return an unchanged address when no table entry exists; equality is
+    // therefore not independent evidence of device activation or IOTLB health.
+    // https://github.com/apple-oss-distributions/IOPCIFamily/blob/4822b27a36e2de70e231ecf2bf3021384fab6ec2/AppleVTD.cpp#L2231
+    preparedOffset = preparedLength = 0;
+    if (command->getPreparedOffsetAndLength(&preparedOffset, &preparedLength) != kIOReturnSuccess ||
+        preparedOffset != 0 || preparedLength != bytes ||
+        checked(pin) != resource || resource->memory != memory || resource->command != command ||
+        resource->mapper != mapper || resource->pages != pages || resource->pageCount != pageCount ||
+        context.pinnedBytes < bytes || context.pinnedBytes > context.maxPinnedBytes ||
+        bytes > context.maxAllocationBytes ||
+        resource->cpu != cpu || resolvePinnedBuffer(context, owner, bytes, pin) != cpu ||
+        command->getIOMemoryDescriptor() != memory || mapper->isInactive() ||
+        mapper->getPageSize() != PageSize ||
+        memory->getPreparationID() != preparation)
+        return nullptr;
+    return cpu;
 }
 }

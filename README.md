@@ -16,7 +16,7 @@ Metal 2/3, WindowServer·디스플레이 통합과 안정성 검증까지 완성
 
 | 기기 / PCI ID | 현재 개발 단계 | Mellow에 있는 구현과 남은 작업 | native macOS GPU·Metal·WindowServer 실기 결과 |
 | --- | --- | --- | --- |
-| **Intel `8086:7D41`** — 저장소 식별명: Arrow Lake-U Intel Graphics 4-Core | **부분 구현 · 빌드 기록 있음** | Xe 메모리·GuC·전체 ADS 직렬화·제출/fence/readback·IOKit 연결 소스가 있음. 실제 PCI·펌웨어·VM·context를 소유하고 서비스를 등록하는 통합 드라이버는 미완성 | **모두 미검증 · 지원 완료 전** |
+| **Intel `8086:7D41`** — 저장소 식별명: Arrow Lake-U Intel Graphics 4-Core | **부분 구현 · 빌드 기록 있음** | Xe 메모리·GuC·전체 ADS 직렬화·제출/fence/readback·IOKit 연결과 직접 DMA 공유 검사 소스가 있음. 실제 PCI·펌웨어·VM·context를 소유하고 서비스를 등록하는 통합 드라이버는 미완성 | **모두 미검증 · 지원 완료 전** |
 | Intel `8086:7D40` — Intel Graphics (Meteor Lake) | **식별 테이블 단계** | [기기 식별 코드](Mellow/kern_model.hpp)에 ID가 있음. 기기별 native 실행·firmware·display 검증은 없음 | **모두 미검증** |
 | Intel `8086:7D45` — Intel Graphics (Meteor Lake) | **식별 테이블 단계** | 기기 ID 인식 코드가 있음. 해당 실물의 실행·display 기록 없음 | **모두 미검증** |
 | Intel `8086:7D55` — Intel Arc Graphics (Meteor Lake) | **식별 테이블 단계** | 기기 ID 인식 코드가 있음. 해당 실물의 실행·display 기록 없음 | **모두 미검증** |
@@ -48,6 +48,12 @@ Ice Lake 호환성 연구 경로는 실기 미검증이고 Tiger Lake 경로는 
 40개를 통과했습니다. 원본 자료가 필요한 선택 테스트 1개는 건너뛰었습니다.
 [통합 소스·검증 기록](validation/native-gpu/main-integration-checkpoint.json)은 두 부모 커밋,
 실제 컴파일 의존 파일의 hash와 검사 범위를 기록합니다. GPU·Metal·WindowServer 실기 실행은 포함하지 않습니다.
+
+GuC용 직접 DMA 공유 경로는 원래 CPU 버퍼·준비 범위·페이지 매핑·장치 mapper·reset epoch를
+확인하고, 동기화 후 변경이나 권한 손실을 다시 검사합니다. 실패 시 자원을 보유한 채 제출을
+거절합니다. [직접 DMA 검증 기록](validation/native-gpu/direct-dma-checkpoint.json)은
+sanitizer 호스트 검사 5개 묶음과 Darwin24/25 객체 컴파일 6개의 실제 입력 hash를 기록합니다.
+통합 물리 드라이버와 전체 Metal·WindowServer 구현 및 검증은 계속 필요합니다.
 
 ### NVIDIA 계열별 포팅 범위
 
