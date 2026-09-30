@@ -16,6 +16,12 @@ SUPPORTED = {".c", ".h", ".cc", ".cpp", ".hpp", ".inc"}
 SKIP_CALLS = {"if", "for", "while", "switch", "return", "sizeof", "typeof", "__typeof__", "alignof", "_Static_assert"}
 
 
+def load_recipes():
+    """Return exact registry bytes and the shared source-intake target mapping."""
+    recipe_bytes = RECIPES_PATH.read_bytes()
+    return recipe_bytes, json.loads(recipe_bytes)["recipes"]
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -117,8 +123,7 @@ def inventory(relative, text):
 def prepare(command, source_root, target, revision, files, output, source_url=None, require_ready=False):
     if command not in ("inspect", "plan", "generate"):
         raise PortError("Unknown operation")
-    recipe_bytes = RECIPES_PATH.read_bytes()
-    recipes = json.loads(recipe_bytes)["recipes"]
+    recipe_bytes, recipes = load_recipes()
     if target not in recipes:
         raise PortError("An explicit supported target recipe is required")
     if not re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", revision):

@@ -5,14 +5,14 @@ import json
 from pathlib import Path
 import sys
 
-from mellow_port import PortError, prepare
+from mellow_port import PortError, load_recipes, prepare
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=("inspect", "plan", "generate"))
     parser.add_argument("--source-root", required=True, type=Path)
-    parser.add_argument("--target", required=True, choices=("xe", "amdgpu", "nvidia-open"))
+    parser.add_argument("--target", required=True, choices=sorted(load_recipes()[1]))
     parser.add_argument("--revision", required=True, help="Full 40/64 hex immutable source revision claim; actual file SHA256 is measured")
     parser.add_argument("--source-url", help="Optional upstream provenance URL claim")
     parser.add_argument("--file", action="append", required=True, dest="files", help="Explicit source-relative POSIX allowlist path; repeat as needed")

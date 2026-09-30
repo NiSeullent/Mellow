@@ -19,6 +19,9 @@ program을 재사용합니다. 1,000회 offscreen 렌더링의 3,072,000픽셀�
 Linux Xe 원본 함수는 kext 메모리 경로에 연결되어 있으며, Mellow.kext 0.4.3에는
 명시적으로 켜는 Tahoe PCI·IOUserClient·DMA 진단 경로도 포함했습니다.
 Apple Objective-C Metal ABI, 전체 Metal 2/3, native Tahoe GPU 실행·WindowServer 가속은 구현·검증이 남아 있습니다.
+앱이 명시적으로 선택하는 [macOS Objective-C 호출·창 표시 소스](docs/NATIVE-METAL-WINDOW-PATH.md)를
+추가했습니다. 기존 GPU 제공자를 사용하는 제한된 compute/render와 IOSurface·Core Animation
+경로이며, Apple SDK 빌드·실제 macOS 실행은 아직 검증하지 않았습니다.
 RTX 3080·RTX 3090·RX 9070·8086:7D41 중 어느 장치도 Mellow Metal 가속 성공으로 표시하지 않습니다.
 
 ## 설계의 기준
@@ -156,7 +159,12 @@ python3 Tools/mellow-port.py generate \
   --require-ready
 ```
 
-`--target`은 `xe`, `amdgpu`, `nvidia-open`입니다. 현재 `--require-ready`는
+`--target`은 `xe`, `i915`, `amdgpu`, `nouveau`, `nvidia-open`입니다.
+CLI와 처리 함수는 같은 recipe 설정을 읽습니다. `i915`와 `nouveau`는 각각 Intel과
+NVIDIA의 추가 소스 검토 경로이며, NVIDIA의 `src/nvidia-modeset/`도 검토할 수 있습니다.
+이 변경은 native 드라이버·PCI 지원·Metal 가속을 추가하지 않습니다.
+계열별 계약과 검증 범위는 [GPU 소스 경로](docs/GPU-FAMILY-SOURCE-INTAKE.md)에 기록합니다.
+현재 `--require-ready`는
 보고서를 만든 뒤 exit 2를 반환합니다. 이는 아직 실제 XNU GPU driver를 빌드할 수 없기
 때문입니다. 일반 exit 0은 검토 산출물 생성 성공만 뜻합니다.
 `--revision`은 입력된 출처 표기이며, 파일별 content hash 측정과 commit 귀속 검증은 다릅니다.

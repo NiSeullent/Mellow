@@ -9,6 +9,14 @@
       "pci_device_ids": [],
       "hardware_admission": "Explicit hardware inventory and runtime evidence required; choosing xe does not admit any PCI device."
     },
+    "i915": {
+      "vendor": "Intel",
+      "source_prefixes": ["drivers/gpu/drm/i915/", "include/drm/", "include/linux/"],
+      "admission_prefixes": ["drivers/gpu/drm/i915/"],
+      "focus": ["Generation-specific GGTT/PPGTT ownership", "GuC/HuC/DMC firmware contracts", "Legacy or GuC submission", "Display, interrupt and fence completion"],
+      "pci_device_ids": [],
+      "hardware_admission": "No Intel generation or PCI device admitted; source intake does not supply a Darwin i915 backend."
+    },
     "amdgpu": {
       "vendor": "AMD",
       "source_prefixes": ["drivers/gpu/drm/amd/", "include/drm/", "include/linux/"],
@@ -17,13 +25,21 @@
       "pci_device_ids": [],
       "hardware_admission": "No RX 9070 or other device identity inferred; require measured PCI IDs and ASIC revision."
     },
+    "nouveau": {
+      "vendor": "NVIDIA",
+      "source_prefixes": ["drivers/gpu/drm/nouveau/", "include/drm/", "include/linux/"],
+      "admission_prefixes": ["drivers/gpu/drm/nouveau/"],
+      "focus": ["NVKM memory and channel ownership", "Generation-specific firmware and GSP contracts", "Nouveau kernel and selected userspace UAPI", "Interrupt, fence and reset completion"],
+      "pci_device_ids": [],
+      "hardware_admission": "No Maxwell, Pascal or RTX GPU admitted; firmware, reclocking and userspace contracts require separate review. No Darwin Nouveau backend is supplied."
+    },
     "nvidia-open": {
       "vendor": "NVIDIA",
-      "source_prefixes": ["kernel-open/", "src/nvidia/", "src/common/"],
-      "admission_prefixes": ["kernel-open/", "src/nvidia/"],
+      "source_prefixes": ["kernel-open/", "src/nvidia/", "src/nvidia-modeset/", "src/common/"],
+      "admission_prefixes": ["kernel-open/", "src/nvidia/", "src/nvidia-modeset/"],
       "focus": ["GPU virtual memory ownership", "GSP firmware licensing and protocol", "channel submission", "interrupt and fence completion"],
       "pci_device_ids": [],
-      "hardware_admission": "Open source kernel modules alone do not supply a macOS userspace driver or admit a GPU."
+      "hardware_admission": "Turing and newer only; Maxwell, Pascal and Volta excluded. Matching GSP firmware and userspace versions required. Open source kernel modules alone do not supply a macOS userspace driver or admit a GPU."
     }
   }
 }
