@@ -70,7 +70,8 @@ public:
     Transport &operator=(const Transport &) = delete;
     // Descriptors must already be reset and CTB enabled by the actual mailbox
     // configuration. G2H may already hold unsolicited events after enable;
-    // no writes occur when admission fails. One bind per object.
+    // all descriptor/buffer CPU spans must be disjoint and representable.
+    // No writes occur when admission fails. One bind per object.
     Status attach(const Ring &h2g, const Ring &g2h, const Ops &, uint64_t epoch,
                   const MellowXe::FirmwareInfo &firmware);
     Status send(const Action &, uint64_t now, uint64_t deadline, Cookie &);
@@ -85,7 +86,10 @@ private:
         Reply reply {};
         uint64_t deadline {};
         uint32_t action {}, context {}, mode {}, reservation {};
-        bool used {};
+        // FAST_REQUEST can receive a failure without holding response credits.
+        // Credit ownership alone cannot distinguish its first final response
+        // from a duplicate or a failure arriving after its completion event.
+        bool used {}, terminalReceived {};
     };
     Ring h2g_ {}, g2h_ {};
     Ops ops_ {};

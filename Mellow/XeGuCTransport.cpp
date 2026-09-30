@@ -55,6 +55,23 @@ static bool ringValid(const Ring &r) {
         !(uintptr_t(r.words) & 3) && r.count >= 1024 && r.count <= (1U << 20) &&
         !(r.count & (r.count - 1));
 }
+static bool ringsValid(const Ring &h, const Ring &g) {
+    if (!ringValid(h) || !ringValid(g)) return false;
+    // Exact CPU spans are a structural input constraint, independent of the
+    // trusted adapter's physical GGTT ownership and DMA-coherency proofs.
+    const uintptr_t starts[] = {uintptr_t(h.descriptor), uintptr_t(h.words),
+                                uintptr_t(g.descriptor), uintptr_t(g.words)};
+    const uintptr_t bytes[] = {sizeof(Descriptor), uintptr_t(h.count) * sizeof(uint32_t),
+                               sizeof(Descriptor), uintptr_t(g.count) * sizeof(uint32_t)};
+    uintptr_t ends[4] {};
+    for (unsigned i = 0; i < 4; ++i) {
+        if (bytes[i] > UINTPTR_MAX - starts[i]) return false;
+        ends[i] = starts[i] + bytes[i];
+        for (unsigned j = 0; j < i; ++j)
+            if (starts[i] < ends[j] && starts[j] < ends[i]) return false;
+    }
+    return true;
+}
 static bool abiValid(const MellowXe::FirmwareInfo &f) {
     return f.release.packed() == MellowXe::gucRecommendedRelease &&
         f.submission.packed() == requiredSubmissionAbi;
@@ -66,7 +83,7 @@ Status Transport::clock(uint64_t now) {
 }
 Status Transport::attach(const Ring &h, const Ring &g, const Ops &ops, uint64_t epoch,
                          const MellowXe::FirmwareInfo &f) {
-    if (attached_ || !epoch || !ringValid(h) || !ringValid(g) || !abiValid(f)) return Status::Invalid;
+    if (attached_ || !epoch || !ringsValid(h, g) || !abiValid(f)) return Status::Invalid;
     if (!ops.admitted || !ops.authorizeAction || !ops.acquire || !ops.release || !ops.notify ||
         !ops.admitted(ops.opaque, epoch)) return Status::Unavailable;
     if (!ops.acquire(ops.opaque)) return Status::IoFailure;
@@ -174,6 +191,7 @@ Status Transport::dispatch(const Message &m) {
         if ((m.fence & 0x8000) && type != 6) return fault(Status::Corrupt);
         if (!(m.fence & 0x8000) && !p->reply.creditsHeld) return fault(Status::Corrupt);
     }
+    if (p->terminalReceived) return fault(Status::Corrupt);
     p->reply.count = m.count;
     for (unsigned i = 0; i < m.count; ++i) p->reply.hxg[i] = m.hxg[i];
     const bool timedOut = p->reply.state == ReplyState::TimedOut;
@@ -185,6 +203,7 @@ Status Transport::dispatch(const Message &m) {
         if (p->reservation > maxCredits_ - credits_) return fault(Status::Corrupt);
         credits_ += p->reservation; p->reply.creditsHeld = false;
     }
+    p->terminalReceived = true;
     if (timedOut) p->reply.late = true;
     else p->reply.state = type == 6 ? ReplyState::Failure : type == 5 ? ReplyState::Retry : ReplyState::Success;
     return Status::Ok;
@@ -284,7 +303,7 @@ static bool range(uint64_t base, uint64_t bytes, uint64_t minimum, uint64_t limi
     return base >= minimum && base < limit && bytes <= limit - base;
 }
 Status configureAndEnable(Mailbox &mailbox, const Configuration &c, const Ops &ops) {
-    if (!c.epoch || c.epoch != mailbox.epoch() || !ringValid(c.h2g) || !ringValid(c.g2h) || !abiValid(c.firmware) ||
+    if (!c.epoch || c.epoch != mailbox.epoch() || !ringsValid(c.h2g, c.g2h) || !abiValid(c.firmware) ||
         c.minimumGgtt >= c.limitGgtt || c.limitGgtt > (1ULL << 32)) return Status::Invalid;
     const uint64_t base[] = {c.h2g.descriptorGgtt, c.h2g.bufferGgtt, c.g2h.descriptorGgtt, c.g2h.bufferGgtt};
     const uint64_t size[] = {64, uint64_t(c.h2g.count) * 4, 64, uint64_t(c.g2h.count) * 4};

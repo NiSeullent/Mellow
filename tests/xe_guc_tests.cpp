@@ -9,14 +9,14 @@ struct Fixture {
     Descriptor hd {}, gd {};
     uint32_t hw[1024] {}, gw[2048] {};
     bool admitted {true}, authorized {true}, barriers {true}, notified {true}, stopped {true};
-    unsigned releaseCount {}, notifyCount {}, acquireCount {};
+    unsigned releaseCount {}, notifyCount {}, acquireCount {}, configurationCount {};
     Transport transport;
     static bool admit(void *v, uint64_t epoch) { return static_cast<Fixture*>(v)->admitted && epoch == 7; }
     static bool authorize(void *v, uint64_t, const Action &) { return static_cast<Fixture*>(v)->authorized; }
     static bool acquire(void *v) { auto &f=*static_cast<Fixture*>(v); ++f.acquireCount; return f.barriers; }
     static bool release(void *v) { auto &f=*static_cast<Fixture*>(v); ++f.releaseCount; return f.barriers; }
     static bool notify(void *v) { auto &f=*static_cast<Fixture*>(v); ++f.notifyCount; return f.notified; }
-    static bool config(void *v, const Configuration &) { return static_cast<Fixture*>(v)->stopped; }
+    static bool config(void *v, const Configuration &) { auto &f=*static_cast<Fixture*>(v); ++f.configurationCount; return f.stopped; }
     Ops ops() { return Ops{this, admit, authorize, acquire, release, notify, config}; }
     Ring h() { return Ring{&hd,hw,1024,0x100000,0x101000}; }
     Ring g() { return Ring{&gd,gw,2048,0x100040,0x102000}; }
@@ -148,6 +148,88 @@ static void invalidPaths() {
     Fixture abi; auto fw=Fixture::firmware(); fw.submission.minor=25;
     CHECK(abi.transport.attach(abi.h(),abi.g(),abi.ops(),7,fw)==Status::Invalid);
 }
+static void terminalResponses() {
+    // FAST_REQUEST failures must retire credits once and preserve the first
+    // final result if another response arrives before the cookie is retired.
+    Fixture modeFailure; CHECK(modeFailure.attach()==Status::Ok);
+    const Cookie mc=modeFailure.send(mode());
+    modeFailure.peerMessage(mc.fence,{0xe0120034}); modeFailure.receive();
+    Reply reply;
+    CHECK(modeFailure.transport.query(mc,reply)==Status::Ok && reply.state==ReplyState::Failure &&
+          !reply.creditsHeld && reply.count==1 && reply.hxg[0]==0xe0120034);
+    CHECK(modeFailure.transport.responseCredits()==1023);
+    const uint32_t modeHead=modeFailure.gd.head;
+    modeFailure.peerMessage(mc.fence,{0xe0230045}); Message message;
+    CHECK(modeFailure.transport.receive(7,2,message)==Status::Corrupt && modeFailure.transport.broken());
+    CHECK(modeFailure.gd.head==modeHead && modeFailure.transport.responseCredits()==1023);
+    CHECK(modeFailure.transport.query(mc,reply)==Status::Ok && reply.state==ReplyState::Failure &&
+          !reply.late && reply.hxg[0]==0xe0120034);
+
+    // A mode completion event is terminal even though its CT fence is not the
+    // request cookie. A later cookie-matched failure cannot overwrite success.
+    Fixture completed; CHECK(completed.attach()==Status::Ok);
+    const Cookie cc=completed.send(mode());
+    completed.peerMessage(0,{0x90001002,2,1}); completed.receive();
+    CHECK(completed.transport.query(cc,reply)==Status::Ok && reply.state==ReplyState::Success &&
+          reply.count==3 && !reply.creditsHeld);
+    const uint32_t completedHead=completed.gd.head;
+    completed.peerMessage(cc.fence,{0xe0120034});
+    CHECK(completed.transport.receive(7,2,message)==Status::Corrupt && completed.transport.broken());
+    CHECK(completed.gd.head==completedHead && completed.transport.responseCredits()==1023);
+    CHECK(completed.transport.query(cc,reply)==Status::Ok && reply.state==ReplyState::Success &&
+          reply.count==3 && reply.hxg[0]==0x90001002 && reply.hxg[1]==2 && reply.hxg[2]==1);
+
+    // The first terminal response after a timeout is still consumed, releasing
+    // its reservation while keeping TimedOut; its duplicate cannot replace it.
+    Fixture late; CHECK(late.attach()==Status::Ok);
+    const Cookie lc=late.send(mode()); CHECK(late.transport.expire(100)==Status::Ok);
+    late.peerMessage(lc.fence,{0xe0120034}); late.receive(101);
+    CHECK(late.transport.query(lc,reply)==Status::Ok && reply.state==ReplyState::TimedOut &&
+          reply.late && !reply.creditsHeld && reply.hxg[0]==0xe0120034);
+    const uint32_t lateHead=late.gd.head;
+    late.peerMessage(lc.fence,{0xe0230045});
+    CHECK(late.transport.receive(7,102,message)==Status::Corrupt && late.transport.broken());
+    CHECK(late.gd.head==lateHead && late.transport.responseCredits()==1023);
+    CHECK(late.transport.query(lc,reply)==Status::Ok && reply.state==ReplyState::TimedOut &&
+          reply.late && reply.hxg[0]==0xe0120034);
+
+    // Schedule and register have no success acknowledgment or credit hold, but
+    // each can receive one real failure. SentUnconfirmed is not a final reply.
+    Action registerAction; CHECK(encodeRegister(5,4,3,0x123456789abcdef1ULL,registerAction)==Status::Ok);
+    for (const Action &action : {schedule(),registerAction}) {
+        Fixture fast; CHECK(fast.attach()==Status::Ok); const Cookie fc=fast.send(action);
+        CHECK(fast.transport.query(fc,reply)==Status::Ok && reply.state==ReplyState::SentUnconfirmed &&
+              !reply.creditsHeld && fast.transport.responseCredits()==1023);
+        fast.peerMessage(fc.fence,{0xe0120034}); fast.receive();
+        CHECK(fast.transport.query(fc,reply)==Status::Ok && reply.state==ReplyState::Failure &&
+              reply.count==1 && reply.hxg[0]==0xe0120034 && !reply.creditsHeld);
+        const uint32_t head=fast.gd.head;
+        fast.peerMessage(fc.fence,{0xe0230045});
+        CHECK(fast.transport.receive(7,2,message)==Status::Corrupt && fast.transport.broken());
+        CHECK(fast.gd.head==head && fast.transport.responseCredits()==1023);
+        CHECK(fast.transport.query(fc,reply)==Status::Ok && reply.state==ReplyState::Failure &&
+              reply.hxg[0]==0xe0120034 && !reply.late);
+    }
+
+    // BUSY is intermediate: repeated BUSY and the first final success remain
+    // legal, and a real response after a BUSY timeout is recorded as late.
+    Fixture busy; CHECK(busy.attach()==Status::Ok); const Cookie bc=busy.send(request());
+    busy.peerMessage(bc.fence,{0xb0000001}); busy.receive(1);
+    busy.peerMessage(bc.fence,{0xb0000002}); busy.receive(2);
+    CHECK(busy.transport.query(bc,reply)==Status::Ok && reply.state==ReplyState::Busy &&
+          reply.creditsHeld && busy.transport.responseCredits()==767);
+    busy.peerMessage(bc.fence,{0xf0000000}); busy.receive(3);
+    CHECK(busy.transport.query(bc,reply)==Status::Ok && reply.state==ReplyState::Success &&
+          !reply.creditsHeld && !reply.late && busy.transport.responseCredits()==1023);
+    Fixture lateBusy; CHECK(lateBusy.attach()==Status::Ok); const Cookie lbc=lateBusy.send(request());
+    CHECK(lateBusy.transport.expire(100)==Status::Ok);
+    lateBusy.peerMessage(lbc.fence,{0xb0000001}); lateBusy.receive(101);
+    CHECK(lateBusy.transport.query(lbc,reply)==Status::Ok && reply.state==ReplyState::TimedOut &&
+          reply.creditsHeld && !reply.late);
+    lateBusy.peerMessage(lbc.fence,{0xf0000000}); lateBusy.receive(102);
+    CHECK(lateBusy.transport.query(lbc,reply)==Status::Ok && reply.state==ReplyState::TimedOut &&
+          !reply.creditsHeld && reply.late && lateBusy.transport.responseCredits()==1023);
+}
 struct MmioFixture {
     bool allowed {true}, failRead {}, failWrite {}, stuckClock {}, regress {}, autoReply {true};
     uint64_t now {};
@@ -220,6 +302,48 @@ static void configure() {
     c.epoch=7; MmioFixture rejected; rejected.autoReply=false; rejected.reply=0xf0000000; Mailbox rb(rejected.ops(),7);
     CHECK(configureAndEnable(rb,c,f.ops())==Status::Rejected && rejected.commands.size()==1);
 }
+static std::vector<uint32_t> cpuMemorySnapshot(const Fixture &f) {
+    std::vector<uint32_t> words;
+    for (const Descriptor *descriptor : {&f.hd,&f.gd}) {
+        words.push_back(uint32_t(descriptor->head)); words.push_back(uint32_t(descriptor->tail)); words.push_back(uint32_t(descriptor->status));
+        for (const auto word : descriptor->reserved) words.push_back(word);
+    }
+    for (const auto word : f.hw) words.push_back(word);
+    for (const auto word : f.gw) words.push_back(word);
+    return words;
+}
+static void invalidCpuRanges() {
+    for (unsigned variant=0;variant<7;++variant) {
+        Fixture f; Ring h=f.h(),g=f.g();
+        // Canaries include descriptor reserved words and both ends of each
+        // buffer. Snapshot the entire real backing, including all zero words.
+        f.hd.reserved[0]=17; f.gd.reserved[12]=19;
+        f.hw[0]=23; f.hw[1023]=29; f.gw[0]=31; f.gw[2047]=37;
+        switch (variant) {
+        case 0: g.descriptor=h.descriptor; break;
+        case 1: h.descriptor=reinterpret_cast<Descriptor *>(f.hw+16); break;
+        case 2: g.words=h.words; break;
+        case 3: g.words=h.words+8; break;
+        case 4: h.words=reinterpret_cast<volatile uint32_t *>(&f.gd); break;
+        case 5: h.descriptor=reinterpret_cast<Descriptor *>(UINTPTR_MAX & ~uintptr_t(3)); break;
+        case 6: g.words=reinterpret_cast<volatile uint32_t *>(UINTPTR_MAX & ~uintptr_t(3)); break;
+        }
+        const auto before=cpuMemorySnapshot(f);
+        CHECK(f.transport.attach(h,g,f.ops(),7,Fixture::firmware())==Status::Invalid);
+        CHECK(!f.acquireCount && !f.releaseCount && !f.notifyCount && !f.configurationCount);
+        CHECK(cpuMemorySnapshot(f)==before && !f.transport.broken());
+        // Distinct valid GGTT ranges must not hide aliased or overflowing CPU
+        // spans; rejection precedes both proof callbacks and any mailbox write.
+        Configuration c{h,g,7,0x100000,0xf0000000,Fixture::firmware()};
+        MmioFixture mmio; Mailbox mailbox(mmio.ops(),7);
+        CHECK(configureAndEnable(mailbox,c,f.ops())==Status::Invalid);
+        CHECK(!f.acquireCount && !f.releaseCount && !f.notifyCount && !f.configurationCount);
+        CHECK(cpuMemorySnapshot(f)==before && mmio.commands.empty() && !mmio.notify);
+    }
+    Fixture valid; CHECK(valid.attach()==Status::Ok);
+    Cookie cookie=valid.send(request()); valid.peerMessage(cookie.fence,{0xf0000000}); valid.receive();
+    Reply reply; CHECK(valid.transport.query(cookie,reply)==Status::Ok && reply.state==ReplyState::Success);
+}
 static void exhaustCookies() {
     Fixture f; CHECK(f.attach()==Status::Ok); const Action a=schedule();
     // Real public API exercise: no internal mutation to reach the wire-cookie boundary.
@@ -227,6 +351,6 @@ static void exhaustCookies() {
     Cookie c; CHECK(f.transport.send(a,0,100,c)==Status::Exhausted && !c.epoch);
 }
 int main() {
-    encoders(); requests(); eventAndTimeout(); ringWrapAndCredits(); invalidPaths(); mailbox(); configure(); exhaustCookies();
+    encoders(); requests(); eventAndTimeout(); ringWrapAndCredits(); invalidPaths(); terminalResponses(); mailbox(); configure(); invalidCpuRanges(); exhaustCookies();
     std::printf("{\"assertions\":%u,\"status\":\"passed\",\"gpu_execution\":false}\n",checks);
 }

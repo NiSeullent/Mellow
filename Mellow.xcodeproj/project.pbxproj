@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1EDD20260930000000000001 /* CommandEncoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1EDD20260930000000000002 /* CommandEncoding.cpp */; };
 		D1A625064D41470000000002 /* TahoeDiagnosticProtocol.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D1A625064D414700000000A2 /* TahoeDiagnosticProtocol.cpp */; };
 		D1A625064D41470000000001 /* TahoeDiagnostic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D1A625064D414700000000A1 /* TahoeDiagnostic.cpp */; };
 		C42F5B82067D421096F10001 /* PortedXeBindings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C42F5B82067D421096F10002 /* PortedXeBindings.cpp */; };
@@ -65,6 +66,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1EDD20260930000000000002 /* CommandEncoding.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CommandEncoding.cpp; path = Drivers/PortedNvidia/CommandEncoding.cpp; sourceTree = SOURCE_ROOT; };
+		1EDD20260930000000000003 /* CommandEncoding.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = CommandEncoding.hpp; path = Drivers/PortedNvidia/CommandEncoding.hpp; sourceTree = SOURCE_ROOT; };
 		D1A625064D414700000000A2 /* TahoeDiagnosticProtocol.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TahoeDiagnosticProtocol.cpp; sourceTree = "<group>"; };
 		D1A625064D414700000000A1 /* TahoeDiagnostic.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TahoeDiagnostic.cpp; sourceTree = "<group>"; };
 		C42F5B82067D421096F10002 /* PortedXeBindings.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PortedXeBindings.cpp; sourceTree = "<group>"; };
@@ -159,6 +162,7 @@
 		1C748C1D1C21952C0024EED2 = {
 			isa = PBXGroup;
 			children = (
+				1EDD20260930000000000004 /* PortedNvidia */,
 				1C748C291C21952C0024EED2 /* Mellow */,
 				CE405EC81E49DD7B00AA0B3D /* SDK */,
 				1C748C281C21952C0024EED2 /* Products */,
@@ -173,6 +177,15 @@
 				1C748C271C21952C0024EED2 /* Mellow.kext */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		1EDD20260930000000000004 /* PortedNvidia */ = {
+			isa = PBXGroup;
+			children = (
+				1EDD20260930000000000002 /* CommandEncoding.cpp */,
+				1EDD20260930000000000003 /* CommandEncoding.hpp */,
+			);
+			name = PortedNvidia;
 			sourceTree = "<group>";
 		};
 		1C748C291C21952C0024EED2 /* Mellow */ = {
@@ -405,6 +418,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1EDD20260930000000000001 /* CommandEncoding.cpp in Sources */,
 				D1A625064D41470000000001 /* TahoeDiagnostic.cpp in Sources */,
 				D1A625064D41470000000002 /* TahoeDiagnosticProtocol.cpp in Sources */,
 				C42F5B82067D421096F10001 /* PortedXeBindings.cpp in Sources */,
