@@ -1,0 +1,92 @@
+name: Assemble and verify native development packages
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_run:
+        description: Successful exact-commit Build and validate Mellow run ID
+        required: true
+        type: string
+      userspace_run:
+        description: Successful exact-commit Apple userspace SDK builds run ID
+        required: true
+        type: string
+      release_tag:
+        description: Immutable planned release tag encoded in both real packages
+        required: true
+        type: string
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package:
+    name: Real native package macOS ${{ matrix.target }}
+    runs-on: macos-15-intel
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: '15'
+            sdk: '15.5'
+            developer: '/Applications/Xcode_16.4.app/Contents/Developer'
+          - target: '26'
+            sdk: '26.2'
+            developer: '/Applications/Xcode_26.3.app/Contents/Developer'
+    env:
+      DEVELOPER_DIR: ${{ matrix.developer }}
+      TARGET_OS: ${{ matrix.target }}
+      EXPECTED_SDK: ${{ matrix.sdk }}
+      KERNEL_RUN_ID: ${{ inputs.kernel_run }}
+      USERSPACE_RUN_ID: ${{ inputs.userspace_run }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assemble only verified same-source actual native artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(xcrun --sdk macosx --show-sdk-version)" = "$EXPECTED_SDK"
+          test "$(uname -m)" = x86_64
+          python3 Tools/package-development-release.py \
+            --kernel-run "$KERNEL_RUN_ID" --userspace-run "$USERSPACE_RUN_ID" \
+            --release "$RELEASE_TAG" --target "$TARGET_OS" --out build/development-package
+      - name: Validate real archive and temporary installation using native installer code
+        shell: bash
+        run: |
+          set -euo pipefail
+          sources=(Installer/Package.swift Installer/SafeFS.swift Installer/Store.swift)
+          xcrun swiftc -swift-version 5 -parse-as-library -O -warnings-as-errors \
+            -sdk "$(xcrun --sdk macosx --show-sdk-path)" -target x86_64-apple-macosx15.0 \
+            "${sources[@]}" tests/installer_native_payload_acceptance.swift \
+            -o build/development-package/native-payload-acceptance \
+            -framework Foundation -framework CryptoKit -framework Security
+          package="build/development-package/mellow-development-macos${TARGET_OS}-x86_64.tar"
+          digest=$(shasum -a 256 "$package"); digest=${digest%% *}
+          build/development-package/native-payload-acceptance "$package" "$digest" \
+            "$RELEASE_TAG" "$TARGET_OS" "$(git rev-parse HEAD)" \
+            > build/development-package/native-payload-acceptance.json
+          python3 - <<'PY'
+          import hashlib, json, pathlib, subprocess
+          out = pathlib.Path('build/development-package')
+          report = json.loads((out / 'native-payload-acceptance.json').read_text())
+          assert report['status'] == 'PASSED' and report['sourceCommit'] == subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          for key in ('actualPackageParsed','temporaryInstallationVerified','installedBytesVerified','duplicateInstallRejected','ownedUninstallVerified'):
+              assert report[key] is True
+          for key in ('payloadBinaryExecuted','systemInstallationPerformed','macOS26RuntimeVerified','physicalGPUVerified','systemMetalRegistered','windowServerAccelerationVerified'):
+              assert report[key] is False
+          files = ['Tools/package-development-release.py','tests/installer_native_payload_acceptance.swift','.github/workflows/development-package.yml','Installer/Package.swift','Installer/SafeFS.swift','Installer/Store.swift']
+          (out / 'validation-source-sha256.json').write_text(json.dumps({name: hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest() for name in files},indent=2,sort_keys=True)+'\n')
+          PY
+      - name: Retain validated actual release payloads and evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mellow-installable-development-${{ matrix.target }}
+          path: |
+            build/development-package/mellow-development-macos${{ matrix.target }}-x86_64.tar
+            build/development-package/package-proof.json
+            build/development-package/native-payload-acceptance.json
+            build/development-package/validation-source-sha256.json
+            build/development-package/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30

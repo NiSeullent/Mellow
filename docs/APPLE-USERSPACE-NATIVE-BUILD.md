@@ -2,7 +2,15 @@
 
 The native sources now have an explicit build entry point at `Tools/build-apple-userspace.py`. It builds the actual compute and render Metal-selector adapters, CGL/IOSurface rendering runtime, app presentation bridge and acceptance clients as x86_64 code. It does not install a driver or register a system Metal device.
 
-Native macOS SDK compilation and physical execution are **NOT_RUN** in the development Linux environment. The new runner was authored and its Python syntax checked without executing the runner. The commands below require separate approval before execution because the existing execution approval did not cover this new script.
+Native macOS SDK compilation and linking **PASSED** for commit `e20496aada3ad9fd5ea3390bcf85da578a5afd6e` in [GitHub run 36722621188](https://github.com/NiSeullent/Mellow/actions/runs/36722621188). Xcode 16.4/SDK 15.5 built minimum macOS 15.0; Xcode 26.3/SDK 26.2 built minimum 26.0. Both ran on macOS 15.7.9 Intel. Each target produced the library and four clients, with 34 reported source hashes and 21 artifact hashes independently matched to that exact commit and archive. Physical acceptance remains **NOT_RUN**. The Linux environment did not execute the native builder or downloaded clients. The workflow supplies no GPU execution options and does not install a driver.
+
+## Native SDK CI
+
+`.github/workflows/apple-userspace.yml` compiles and links the production library, acceptance clients and read-only inventory for minimum macOS 15.0 and 26.0. It uses already installed Xcode 16.4 and 26.3 respectively and sets `DEVELOPER_DIR` only in that CI job. It checks the exact installed directory and records Xcode/SDK identity; there is no installation or global developer-tool selection. These toolchains are listed in the [official macOS 15 Intel runner inventory](https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md). Missing tools, compile failures and Mach-O identity failures remain job failures with reports retained.
+
+Successful build-only reports prove the recorded source compiled and linked against the selected public frameworks. They do not establish execution on macOS 15 or 26, unsupported-GPU acceleration, native Metal registration or WindowServer adoption. Kext CI builds a different target and does not cover these Objective-C++ units.
+
+The render adapter rejects counter buffers in every public render-pass sample attachment. Both SDKs omit the previously used capacity symbol. `RenderPassLimits.hpp` records the expected four-slot boundary; a separate CPU-only public descriptor probe checks legal indices and the first invalid index on the CI host. Apple's range check can terminate that isolated negative-control child with its exact index assertion. Only that recorded assertion with SIGABRT, or NSRangeException, is accepted as expected rejection; unrelated failures remain errors. This descriptor probe creates no Metal device or command queue and submits no GPU work. Its host is macOS 15 even for a 26-target library build, so it is not macOS 26 runtime acceptance.
 
 ## Existing native prerequisites
 
@@ -31,6 +39,17 @@ The runner creates object files, `libMellowAppleUserspace.dylib`, `mellow-comput
 The actual library units are `PlatformRuntime`, `OpenCLProvider`, `ShaderJit`, `AirDecoder`, `MetalObjects`, `OpenGLProvider`, `RenderShaderJit`, `RenderObjects`, `SurfaceSnapshot`, `MellowAppleMetal.mm`, `MellowAppleRenderMetal.mm` and `SurfacePresenter.mm`. Framework linkage includes Foundation, Metal, OpenGL, IOSurface, CoreFoundation, QuartzCore, CoreGraphics, AppKit and IOKit. The inventory executable is linked independently of the Mellow library.
 
 The dylib has an `@rpath` install name and clients use `@loader_path`; keep the acceptance executables beside the built library. The runner records exact commands, diagnostics, source and artifact SHA256 hashes, SDK/compiler identity and source-change checks. It reads each linked Mach-O header/load commands and checks the actual x86_64 architecture, macOS minimum and SDK version, library install name and client dependency. This inspection uses Apple's public [Mach-O declarations](https://github.com/apple-oss-distributions/cctools/blob/main/include/mach-o/loader.h). `BUILT_ONLY` means compilation/linking and metadata checks succeeded and no acceptance executable was run. Missing native tools produce `NOT_RUN` and exit 77, with no substitute binary.
+
+The subsequent builder also creates a versioned `MellowAppleUserspace.framework`
+with its own compiled binary and `@rpath/MellowAppleUserspace.framework/Versions/A/MellowAppleUserspace`
+install name, public headers, module map and bundle metadata. A separate public
+header consumer is compiled and linked against that framework without creating
+a GPU device. This framework addition passed both actual SDK targets at
+`06fe75b3d24f01c93dfb65c56d30013bc7f076c9` in
+[run 36725204749](https://github.com/NiSeullent/Mellow/actions/runs/36725204749).
+Each target has seven linked binaries and 35 source/30 artifact hashes checked.
+The e20496a build above predates the framework. The framework supplies the explicit
+app adapters and does not install or register a system Metal/WindowServer provider.
 
 ## Explicit physical acceptance
 

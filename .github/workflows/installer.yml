@@ -1,0 +1,103 @@
+name: Native macOS installer
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['Installer/**', '.github/workflows/installer.yml', 'LICENSE', 'NOTICE']
+  push:
+    paths: ['Installer/**', '.github/workflows/installer.yml', 'LICENSE', 'NOTICE']
+permissions:
+  contents: read
+jobs:
+  native-installer:
+    runs-on: macos-15-intel
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: '15'
+            sdk: '15.5'
+            developer: '/Applications/Xcode_16.4.app/Contents/Developer'
+          - target: '26'
+            sdk: '26.2'
+            developer: '/Applications/Xcode_26.3.app/Contents/Developer'
+    env:
+      DEVELOPER_DIR: ${{ matrix.developer }}
+      TARGET_OS: ${{ matrix.target }}
+      EXPECTED_SDK: ${{ matrix.sdk }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the actual deployment-target CLI and isolated host tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_path=$(xcrun --sdk macosx --show-sdk-path)
+          sdk_version=$(xcrun --sdk macosx --show-sdk-version)
+          test "$sdk_version" = "$EXPECTED_SDK"
+          test "$(uname -m)" = x86_64
+          test "$(sw_vers -productVersion | cut -d. -f1)" = 15
+          mkdir -p build/installer
+          sources=(Installer/Package.swift Installer/SafeFS.swift Installer/Store.swift Installer/Network.swift Installer/SelfTests.swift Installer/Main.swift)
+          binary="build/installer/mellow-installer-macos${TARGET_OS}-x86_64"
+          xcrun swiftc -swift-version 5 -parse-as-library -O -warnings-as-errors -sdk "$sdk_path" -target "x86_64-apple-macosx${TARGET_OS}.0" "${sources[@]}" -o "$binary" -framework Foundation -framework CryptoKit -framework Security
+          # This runner is macOS 15, even when its selected SDK is 26.2. Never
+          # execute the minimum-macOS-26 release binary on this host.
+          xcrun swiftc -swift-version 5 -parse-as-library -Onone -warnings-as-errors -sdk "$sdk_path" -target x86_64-apple-macosx15.0 "${sources[@]}" -o build/installer/isolated-host15-tests -framework Foundation -framework CryptoKit -framework Security
+          build/installer/isolated-host15-tests --self-test > build/installer/self-tests-host15.json
+          build/installer/isolated-host15-tests --help > build/installer/help.txt
+          bash -n Installer/mellow-install.sh
+          bash Installer/mellow-install.sh --help > build/installer/bootstrap-help.txt
+          cp Installer/mellow-install.sh build/installer/mellow-install.sh
+          cp LICENSE NOTICE build/installer/
+          git rev-parse HEAD > build/installer/SOURCE-COMMIT.txt
+          xcrun swiftc --version > build/installer/compiler.txt
+          xcrun otool -l "$binary" > build/installer/macho-load-commands.txt
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, struct, subprocess
+          out = pathlib.Path('build/installer')
+          target = int(os.environ['TARGET_OS'])
+          binary = out / f'mellow-installer-macos{target}-x86_64'
+          raw = binary.read_bytes()
+          magic, cpu, subtype, kind, count, length, flags, reserved = struct.unpack_from('<8I', raw)
+          assert magic == 0xfeedfacf and cpu == 0x01000007 and kind == 2
+          offset, build_versions, signed = 32, [], False
+          for _ in range(count):
+              command, size = struct.unpack_from('<II', raw, offset)
+              assert size >= 8 and size % 8 == 0 and offset + size <= 32 + length
+              if command == 0x32:
+                  platform, minimum, sdk = struct.unpack_from('<III', raw, offset + 8)
+                  build_versions.append((platform, minimum, sdk))
+              if command == 0x1d:
+                  signed = True
+              offset += size
+          sdk_major, sdk_minor = map(int, os.environ['EXPECTED_SDK'].split('.'))
+          assert build_versions == [(1, target << 16, sdk_major << 16 | sdk_minor << 8)]
+          assert offset == 32 + length
+          test = json.loads((out / 'self-tests-host15.json').read_text())
+          assert test['status'] == 'PASSED' and test['checks'] >= 25 and test['hostOSMajor'] == 15
+          assert not any(test[k] for k in ('networkUsed','systemInstallationPerformed','nativeBinaryExecutionVerified','physicalGPUVerified'))
+          source_paths = sorted(pathlib.Path('Installer').rglob('*')) + [pathlib.Path('.github/workflows/installer.yml'), pathlib.Path('LICENSE'), pathlib.Path('NOTICE')]
+          sources = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in source_paths if p.is_file()}
+          artifacts = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in out.iterdir() if p.is_file() and p.name != 'validation.json'}
+          report = dict(schemaVersion=1, sourceCommit=subprocess.check_output(['git','rev-parse','HEAD'], text=True).strip(), architecture='x86_64', targetOSMajor=target, sdkVersion=os.environ['EXPECTED_SDK'], hostOSVersion=subprocess.check_output(['sw_vers','-productVersion'], text=True).strip(), cliSigning='signature-present' if signed else 'unsigned-development', releaseBinaryExecuted=False, testsScope='CPU archive and temporary filesystem tests; minimum 15 host executable', nativeGPUVerified=False, sourceSHA256=sources, artifactSHA256=artifacts)
+          (out / 'validation.json').write_text(json.dumps(report, indent=2, sort_keys=True) + '\n')
+          PY
+          # Exact reviewed sources and redistribution notices accompany binaries.
+          tar -czf build/installer/installer-source.tar.gz Installer .github/workflows/installer.yml LICENSE NOTICE
+      - name: Upload the actual native installer with source and evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mellow-installer-macos${{ matrix.target }}-x86_64
+          path: |
+            build/installer/mellow-installer-macos${{ matrix.target }}-x86_64
+            build/installer/mellow-install.sh
+            build/installer/LICENSE
+            build/installer/NOTICE
+            build/installer/SOURCE-COMMIT.txt
+            build/installer/compiler.txt
+            build/installer/macho-load-commands.txt
+            build/installer/self-tests-host15.json
+            build/installer/help.txt
+            build/installer/bootstrap-help.txt
+            build/installer/validation.json
+            build/installer/installer-source.tar.gz
+          if-no-files-found: error

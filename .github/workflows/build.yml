@@ -10,13 +10,29 @@ permissions:
 
 jobs:
   build:
-    name: Native Intel build and host tests
+    name: Native Intel SDK target ${{ matrix.deployment }}
     runs-on: macos-15-intel
     timeout-minutes: 25
+    env:
+      DEVELOPER_DIR: /Applications/${{ matrix.xcode }}.app/Contents/Developer
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - deployment: '15.0'
+            sdk: '15.5'
+            xcode: Xcode_16.4
+          - deployment: '26.0'
+            sdk: '26.2'
+            xcode: Xcode_26.3
     steps:
       - uses: actions/checkout@v4
       - name: Check pinned dependencies
         run: |
+          test -d "$DEVELOPER_DIR"
+          git rev-parse HEAD
+          xcodebuild -version
+          test "$(xcrun --sdk macosx --show-sdk-version)" = '${{ matrix.sdk }}'
           test -f MacKernelSDK/Library/x86_64/libkmod.a
           test -f Lilu.kext/Contents/Resources/Headers/plugin_start.hpp
           plutil -lint Mellow/Info.plist
@@ -28,7 +44,19 @@ jobs:
           sh -n Tools/collect-boot-evidence.sh
       - name: Build actual kext with Xcode
         run: |
-          bash Tools/cross-build-native.sh Release
+          bash Tools/cross-build-native.sh Release '${{ matrix.deployment }}'
+      - name: Verify recorded target and native toolchain
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          entries = json.loads(pathlib.Path('build/native-Release/build-settings.json').read_text())
+          settings = next(x['buildSettings'] for x in entries if x.get('target') == 'Mellow')
+          assert settings['MACOSX_DEPLOYMENT_TARGET'] == '${{ matrix.deployment }}'
+          assert settings['SDK_VERSION'] == '${{ matrix.sdk }}'
+          assert settings['ARCHS'] == 'x86_64'
+          assert settings['CODE_SIGNING_ALLOWED'] == 'NO'
+          print({key: settings[key] for key in ('MACOSX_DEPLOYMENT_TARGET', 'SDK_VERSION', 'ARCHS', 'CODE_SIGNING_ALLOWED')})
+          PY
       - name: Test evidence parser against the newly built kext
         run: |
           bundle=$(python3 -c 'import json,pathlib; a=json.load(open("build/native-Release/build-settings.json")); s=next(x["buildSettings"] for x in a if x.get("target")=="Mellow"); print(pathlib.Path(s["TARGET_BUILD_DIR"])/s["FULL_PRODUCT_NAME"])')
@@ -47,12 +75,28 @@ jobs:
           cp build/metal-probe build/package/
           cp build/tahoe-diag-client build/package/
           cp build/native-Release/macho-validation.json build/package/
-          printf '%s\n' 'Native build and host tests only. GPU execution on 8086:7D41, Tahoe installation, and Metal acceleration are NOT verified by CI.' > build/package/VALIDATION-SCOPE.txt
+          python3 - <<'PY'
+          import pathlib, shutil, subprocess
+          root = pathlib.Path.cwd()
+          package = root / 'build/package'
+          commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          (package / 'SOURCE-COMMIT.txt').write_text(commit + '\n')
+          (package / 'SOURCE-URL.txt').write_text('https://github.com/NiSeullent/Mellow/tree/' + commit + '\n')
+          for name in ('LICENSE', 'NOTICE'):
+              shutil.copyfile(root / name, package / name)
+          shutil.copytree(root / 'LICENSES', package / 'LICENSES')
+          for source in (root / 'Drivers').rglob('LICENSE*'):
+              if source.is_file():
+                  target = package / source.relative_to(root)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copyfile(source, target)
+          PY
+          printf '%s\n' 'Actual SDK ${{ matrix.sdk }} / minimum macOS ${{ matrix.deployment }} native build and host tests only. Host macOS 15; no macOS 26 runtime claim. GPU execution, firmware bootstrap, Metal, WindowServer and display are NOT verified by CI. PCI match remains opt-in diagnostic 8086:7D41.' > build/package/VALIDATION-SCOPE.txt
           (cd build/package && zip -r ../Mellow-native-development.zip .)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: Mellow-native-development
+          name: Mellow-native-development-${{ matrix.deployment }}
           path: |
             build/Mellow-native-development.zip
             build/native-Release/*.log

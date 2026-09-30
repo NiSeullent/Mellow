@@ -1,0 +1,131 @@
+name: Apple userspace SDK builds
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apple-userspace.yml'
+      - 'Tools/build-apple-userspace.py'
+      - 'Runtime/**'
+      - 'Userspace/**'
+      - 'tests/apple_render_descriptor_bounds.mm'
+  pull_request:
+    paths:
+      - '.github/workflows/apple-userspace.yml'
+      - 'Tools/build-apple-userspace.py'
+      - 'Runtime/**'
+      - 'Userspace/**'
+      - 'tests/apple_render_descriptor_bounds.mm'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: x86_64 Apple SDK target ${{ matrix.deployment }}
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/${{ matrix.xcode }}.app/Contents/Developer
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - deployment: '15.0'
+            xcode: Xcode_16.4
+          - deployment: '26.0'
+            xcode: Xcode_26.3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record exact source and installed developer tools
+        run: |
+          test -d "$DEVELOPER_DIR"
+          git rev-parse HEAD
+          xcodebuild -version
+          xcrun --sdk macosx --show-sdk-version
+      - name: Record public render counter attachment declaration
+        run: |
+          python3 - <<'PY'
+          import pathlib, subprocess
+          sdk = pathlib.Path(subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path'], text=True).strip())
+          header = sdk / 'System/Library/Frameworks/Metal.framework/Headers/MTLRenderPass.h'
+          lines = header.read_text().splitlines()
+          marker = '@interface MTLRenderPassSampleBufferAttachmentDescriptorArray'
+          begin = next(i for i, line in enumerate(lines) if marker in line)
+          end = next(i for i in range(begin, len(lines)) if lines[i].strip() == '@end')
+          print('Public SDK declaration:', header)
+          print('\n'.join(lines[max(0, begin - 12):end + 1]))
+          PY
+      - name: Compile and link Apple adapters and acceptance clients
+        run: |
+          python3 Tools/build-apple-userspace.py --out "$RUNNER_TEMP/mellow-apple-userspace-${{ matrix.deployment }}" --deployment-target '${{ matrix.deployment }}'
+      - name: Check public CPU descriptor index boundary
+        run: |
+          xcrun --sdk macosx clang++ -std=c++17 -fobjc-arc -arch x86_64 -mmacosx-version-min=15.0 tests/apple_render_descriptor_bounds.mm -framework Foundation -framework Metal -o "$RUNNER_TEMP/metal-descriptor-bounds"
+          python3 - <<'PY'
+          import json, os, pathlib, platform, signal, subprocess
+          probe = pathlib.Path(os.environ['RUNNER_TEMP']) / 'metal-descriptor-bounds'
+          first = json.loads(subprocess.check_output([probe, '0'], text=True, timeout=10))
+          capacity = first['expected_capacity']
+          assert 0 < capacity <= 32
+          observations = [first]
+          for index in range(1, capacity):
+              observations.append(json.loads(subprocess.check_output([probe, str(index)], text=True, timeout=10)))
+          invalid = subprocess.run([probe, str(capacity)], capture_output=True, text=True, timeout=10)
+          if invalid.returncode == 0:
+              rejected = json.loads(invalid.stdout)
+              assert rejected['descriptor_available'] is False and rejected['exception'] == 'NSRangeException'
+          else:
+              expected = f'attachmentIndex({capacity}) must be < {capacity}'
+              assert invalid.returncode == -signal.SIGABRT and expected in invalid.stderr, (invalid.returncode, invalid.stderr)
+              rejected = {'index': capacity, 'descriptor_available': False, 'expected_capacity': capacity,
+                          'gpu_submission': False, 'rejection': 'Exact public SDK index-bound assertion',
+                          'exit_code': invalid.returncode, 'diagnostic': invalid.stderr}
+          observations.append(rejected)
+          for index, value in enumerate(observations):
+              assert value['index'] == index and value['expected_capacity'] == capacity
+              assert value['descriptor_available'] == (index < capacity)
+              assert value['gpu_submission'] is False
+          report = {'host_macos': platform.mac_ver()[0], 'scope': 'Public CPU descriptor array on this host; no device, GPU submission or macOS 26 runtime claim', 'observations': observations, 'passed': True}
+          output = pathlib.Path(os.environ['RUNNER_TEMP']) / 'mellow-apple-userspace-${{ matrix.deployment }}' / 'public-descriptor-bounds.json'
+          output.write_text(json.dumps(report, indent=2) + '\n')
+          print(json.dumps(report))
+          PY
+      - name: Show failed native build diagnostics
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'mellow-apple-userspace-${{ matrix.deployment }}' / 'apple-userspace-build.json'
+          if path.is_file():
+              report = json.loads(path.read_text())
+              print(report.get('status'), report.get('reason', ''))
+              for command in report.get('commands', []):
+                  if command.get('exit_code') != 0:
+                      print(command['name'])
+                      print(command.get('stdout', ''))
+                      print(command.get('stderr', ''))
+          PY
+      - name: Retain source identity and redistribution notices
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, shutil, subprocess
+          root = pathlib.Path.cwd()
+          package = pathlib.Path(os.environ['RUNNER_TEMP']) / 'mellow-apple-userspace-${{ matrix.deployment }}'
+          package.mkdir(parents=True, exist_ok=True)
+          commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          (package / 'SOURCE-COMMIT.txt').write_text(commit + '\n')
+          (package / 'SOURCE-URL.txt').write_text('https://github.com/NiSeullent/Mellow/tree/' + commit + '\n')
+          for name in ('LICENSE', 'NOTICE'):
+              shutil.copyfile(root / name, package / name)
+          shutil.copytree(root / 'LICENSES', package / 'LICENSES')
+          PY
+      - name: Retain SDK build evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Mellow-Apple-userspace-${{ matrix.deployment }}
+          path: ${{ runner.temp }}/mellow-apple-userspace-${{ matrix.deployment }}/
+          if-no-files-found: error
+          retention-days: 30

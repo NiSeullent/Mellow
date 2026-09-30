@@ -128,7 +128,7 @@ project/runner files and planning metadata. Exact hashes and local adaptations
 are recorded in `porting/native-owner-snapshot.json`. Its earlier peer tests are
 not used as acceptance of later files; the selected copy is tested independently.
 
-These units are linked into the target as available production components.
+These units are registered in the target as available production components.
 They have no instantiated physical firmware/VM/channel owner in the diagnostic
 service or userspace runtime yet. Merely compiling these objects does not add
 unsupported PCI admission or make the Metal/app runtime use this native queue.
@@ -139,4 +139,7 @@ backing. The GuC-region owner uses that exact ABI, exclusive Loader holds and
 independent consumer quiescence for reverse GGTT/DMA retirement. Its native
 IOKit factory is compiled unchanged against the clearly labeled OS shim in a
 separate host variant; simulated OS execution remains distinct from native KPI
-acceptance. The aggregate approved runner has twenty passing suites.
+acceptance. The a46eb68 aggregate had twenty passing suites. The subsequent
+IOKit execution staging and GSP DMA-owner integration passes twenty-two suites
+with actual compiler-reported local input hashes checked before and after build.
+These remain host/OS-shim checks, not physical GPU acceptance.

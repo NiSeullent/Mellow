@@ -114,3 +114,12 @@ Drivers/PortedNvidiaGsp; the copied NVIDIA copy encoder/sealer retain their
 per-file MIT notices. Existing repository and upstream notices remain controlling.
 No firmware payload, GPU initialization, native Metal registration or system
 WindowServer acceleration is established by software or kernel-object checks.
+
+Execution staging and GSP raw-DMA owner development, 2026-09-30
+------------------------------------------------------------
+Original Xe execution staging connects held IOKit pins to heap copying and DMA
+synchronization. The NVIDIA GSP firmware owner connects pinned upstream formats
+to retained raw-DMA resources and physical bootstrap contracts. Relevant NVIDIA
+copyright and complete MIT permission notices remain under Drivers/PortedNvidiaGsp.
+These components require the actual physical context/firmware owner; no device
+boot, native acceleration, Metal registration or WindowServer success is implied.

@@ -4,6 +4,12 @@ set -euo pipefail
 project_root="$(cd "$(dirname "$0")/.." && pwd)"
 configuration="${1:-Debug}"
 case "$configuration" in Debug|Release) ;; *) echo 'Use Debug or Release' >&2; exit 2 ;; esac
+deployment_target="${2:-}"
+case "$deployment_target" in ''|15.0|26.0) ;; *) echo 'Optional deployment target must be 15.0 or 26.0' >&2; exit 2 ;; esac
+if [ "$#" -gt 2 ]; then
+  echo 'Usage: cross-build-native.sh [Debug|Release] [15.0|26.0]' >&2
+  exit 2
+fi
 if [ "$(uname -s)" != Darwin ]; then
   echo 'Native final linking requires macOS with full Xcode selected by xcode-select.' >&2
   exit 2
@@ -22,6 +28,9 @@ fi
 build_args=(-project "$project_root/Mellow.xcodeproj" -scheme Mellow
   -configuration "$configuration" -derivedDataPath "$build_dir/DerivedData"
   ARCHS=x86_64 ONLY_ACTIVE_ARCH=NO CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
+if [ -n "$deployment_target" ]; then
+  build_args+=("MACOSX_DEPLOYMENT_TARGET=$deployment_target")
+fi
 xcodebuild "${build_args[@]}" build 2>&1 | tee "$build_dir/xcodebuild.log"
 xcodebuild "${build_args[@]}" -showBuildSettings -json > "$build_dir/build-settings.json"
 bundle_path="$(python3 - "$build_dir/build-settings.json" <<'PY'

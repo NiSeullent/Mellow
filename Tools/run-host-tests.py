@@ -40,6 +40,9 @@ def main():
         ('tests/ported_nvidia_test.cpp', ['Drivers/PortedNvidia/CommandEncoding.cpp'], [root]),
         ('tests/ported_nvidia_gsp_radix3_test.cpp', ['Drivers/PortedNvidiaGsp/Radix3.cpp'], [root]),
         ('tests/ported_nvidia_gsp_firmware_test.cpp', ['Drivers/PortedNvidiaGsp/FirmwareImage.cpp'], [root]),
+        ('tests/ported_nvidia_gsp_owner_test.cpp',
+         ['Drivers/PortedNvidiaGsp/FirmwareOwner.cpp', 'Drivers/PortedNvidiaGsp/FirmwareImage.cpp',
+          'Drivers/PortedNvidiaGsp/Radix3.cpp', 'Drivers/NativeGpu/MemoryOwner.cpp'], [root]),
         ('tests/native_nvidia_probe_tests.cpp', ['Drivers/NativeNvidia/Probe.cpp'], [root]),
         ('tests/native_gpu_memory_tests.cpp', ['Drivers/NativeGpu/MemoryOwner.cpp'], [root]),
         ('tests/native_nvidia_queue_tests.cpp',
@@ -67,6 +70,12 @@ def main():
          ['Mellow/XeContextExecution.cpp', 'Mellow/XeContext.cpp', 'Mellow/XeDispatch.cpp',
           'Mellow/XeMemory.cpp', 'Mellow/XeZebin.cpp', 'Mellow/XeGuCTransport.cpp',
           'Mellow/XeFence.cpp', 'Drivers/PortedXe/XePageTable.cpp'], [root / 'Mellow'],
+         [], [], ['compiler-evidence/mellow_evidence_mtl.bin']),
+        ('tests/xe_execution_iokit_tests.cpp',
+         ['Mellow/XeExecutionIOKit.cpp', 'Mellow/XeMemoryIOKit.cpp', 'Mellow/XeMemory.cpp',
+          'Mellow/XeDispatch.cpp', 'Mellow/XeZebin.cpp', 'Mellow/XeContext.cpp',
+          'Mellow/XeContextExecution.cpp', 'Mellow/XeGuCTransport.cpp', 'Mellow/XeFence.cpp',
+          'Drivers/PortedXe/XePageTable.cpp'], [root / 'tests/native_memory_shim', root],
          [], [], ['compiler-evidence/mellow_evidence_mtl.bin']),
     ]
     for suite in suites:

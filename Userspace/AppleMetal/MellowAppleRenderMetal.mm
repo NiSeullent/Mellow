@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #import "MellowAppleRenderMetal.h"
+#include "RenderPassLimits.hpp"
 #import <dispatch/dispatch.h>
 #include "../../Runtime/RenderObjects.hpp"
 #include <cmath>
@@ -289,9 +290,7 @@ bool renderEntries(const std::string &source, std::string &vertex, std::string &
     for (NSUInteger i=1;i<8;++i) if (pass.colorAttachments[i].texture || pass.colorAttachments[i].resolveTexture) {
         commandError=renderFailure(MellowMTL::ErrorCode::Unsupported,@"Only color attachment zero is supported"); return nil;
     }
-    // Use the installed SDK's public declaration. An SDK missing this constant
-    // must fail compilation; a guessed capacity could silently ignore counters.
-    for (NSUInteger i=0;i<MTLMaxRenderPassSampleBuffers;++i) if (pass.sampleBufferAttachments[i].sampleBuffer) {
+    for (NSUInteger i=0;i<MellowAppleRender::CounterAttachmentCount;++i) if (pass.sampleBufferAttachments[i].sampleBuffer) {
         commandError=renderFailure(MellowMTL::ErrorCode::Unsupported,@"Render counter sample buffers are unsupported"); return nil;
     }
     auto color=pass.colorAttachments[0];
