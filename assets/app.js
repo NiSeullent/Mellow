@@ -243,8 +243,8 @@
     $("package-review").hidden = $("package-run-terminal").hidden = !bundle;
     $("package-run-command").textContent = "";
     if (bundle) {
-      state.command = "curl --fail --location --proto '=https' --tlsv1.2 --output install-mellow.sh " +
-        shellQuote(bundle["install-mellow.sh"].browser_download_url) + "\nless ./install-mellow.sh";
+      state.command = "curl --fail --location --proto '=https' --proto-redir '=https' --tlsv1.2 --output install-mellow.sh " +
+        shellQuote(bundle["install-mellow.sh"].browser_download_url) + " &&\nless ./install-mellow.sh";
       state.runCommand = "bash ./install-mellow.sh --version " + shellQuote(release.tag_name);
       $("install-command").textContent = state.command; $("copy-install").disabled = false;
       $("package-run-command").textContent = state.runCommand; $("copy-package-run").disabled = false;
@@ -253,16 +253,23 @@
       return;
     }
     const asset = release.assets.find(item => item.name === "mellow-install.sh");
+    const installable = asset && /^sha256:[0-9a-f]{64}$/.test(asset.digest || "") &&
+      /^[A-Za-z0-9][A-Za-z0-9._-]{0,95}$/.test(release.tag_name) &&
+      [15, 26].every(major => release.assets.some(item => item.name === "mellow-installer-macos" + major + "-x86_64") &&
+        release.assets.some(item => item.name === "mellow-development-macos" + major + "-x86_64.tar"));
     state.command = ""; $("copy-install").disabled = true;
-    if (asset) {
+    if (installable) {
       // Only an actual API-returned asset URL is inserted. No shell execution.
-      state.command = "curl -fL --output mellow-install.sh " + shellQuote(asset.browser_download_url) + "\nbash ./mellow-install.sh --help";
+      state.command = "curl -fL --proto '=https' --proto-redir '=https' --output mellow-install.sh " + shellQuote(asset.browser_download_url) + " &&\n" +
+        "printf '%s  %s\\n' '" + asset.digest.slice(7) + "' 'mellow-install.sh' | shasum -a 256 -c - &&\n" +
+        "bash ./mellow-install.sh --help &&\n" +
+        "bash ./mellow-install.sh --release " + shellQuote(release.tag_name);
       $("install-command").textContent = state.command;
       $("copy-install").disabled = false;
-      $("installer-status").textContent = "선택한 릴리스의 실제 CLI 스크립트 다운로드 명령입니다. 검증 파일과 도움말을 확인한 뒤 실행하세요.";
+      $("installer-status").textContent = "공식 GitHub 자산의 SHA256을 확인한 뒤 도움말과 사용자 폴더 설치를 실행하는 명령입니다. kext 활성화와 시스템 Metal 등록은 수행하지 않습니다.";
     } else {
-      $("install-command").textContent = hasPackageAssets(release) ? "# 새 패키지의 ZIP·체크섬·manifest·설치/제거 도구 업로드가 아직 완성되지 않았습니다." : "# 선택한 릴리스에 mellow-install.sh가 없습니다.\n# 게시된 CLI 바이너리는 위 다운로드 목록에서 확인하세요.";
-      $("installer-status").textContent = "완성된 설치 자산이 확인되지 않았습니다. 존재하지 않거나 부분 업로드된 패키지의 설치 명령은 표시하지 않습니다.";
+      $("install-command").textContent = hasPackageAssets(release) ? "# 새 패키지의 ZIP·체크섬·manifest·설치/제거 도구 업로드가 아직 완성되지 않았습니다." : "# 선택한 릴리스의 설치 도구·두 OS 패키지·SHA256을\n# 모두 확인할 수 없습니다. 게시된 파일은 위에서 확인하세요.";
+      $("installer-status").textContent = "설치에 필요한 실제 자산과 체크섬이 모두 게시된 릴리스에서 설치 명령을 제공합니다.";
     }
   }
   function renderRelease(index) {
@@ -293,7 +300,8 @@
         .map(r => ({tag_name: r.tag_name, name: validText(r.name, 400) ? r.name : r.tag_name, html_url: githubUrl(r.html_url, "release"),
           prerelease: r.prerelease === true, published_at: r.published_at, assets: r.assets.filter(a => a && validText(a.name, 300) &&
             Number.isSafeInteger(a.size) && a.size >= 0 && githubUrl(a.browser_download_url, "asset")).map(a => ({
-              name: a.name, size: a.size, state: a.state, browser_download_url: githubUrl(a.browser_download_url, "asset")}))}));
+              name: a.name, size: a.size, state: a.state, digest: /^sha256:[0-9a-f]{64}$/.test(a.digest || "") ? a.digest : null,
+              browser_download_url: githubUrl(a.browser_download_url, "asset")}))}));
       if (!state.releases.length) throw new Error("No published releases");
       const select = $("release-select"); select.replaceChildren();
       state.releases.forEach((r, i) => { const o = node("option", "", r.name + (r.prerelease ? " · 개발" : "")); o.value = String(i); select.append(o); });
