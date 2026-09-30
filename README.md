@@ -6,11 +6,11 @@ credential input or automatic installation. The chip illustration is original
 CSS and the small brand mark is original SVG.
 
 The HTML, stylesheet and script use relative asset/data URLs. GitHub's API
-reports the repository name as `Mellow`; project Pages ordinarily uses
-`/Mellow/`. Pages was not enabled at the time of the read-only API check.
-The actual published URL must come from repository Pages metadata after the
-repository owner enables it. No deployment or Pages setting was changed by
-the website author.
+reports the repository name as `Mellow`. The official published URL is
+`https://niseullent.github.io/Mellow/`, confirmed with the Pages API and actual
+HTTPS/browser checks. The lowercase `/mellow/` URL returns 404; use the
+capitalized repository path. Publication uses the dedicated `codex/mellow-pages`
+branch and does not merge the driver source PR.
 
 ## Data ownership and scope
 
@@ -53,7 +53,10 @@ Root-planned release assets are `mellow-install.sh`,
 Their links appear only after those actual assets exist. The downloadable
 MellowAppleUserspace.framework is an explicitly selected existing-host app
 adapter, not an Apple system Metal device implementation. The displayed shell
-command downloads an API-returned script URL and prints help. The page never
+command appears only when the bootstrap, both native CLIs/payloads and the
+bootstrap's actual GitHub SHA256 digest are present. It downloads and verifies
+the script, displays help and invokes the user-directory install command.
+The page never
 runs it, automatically activates a kext, changes system settings or claims GPU
 execution.
 
@@ -73,7 +76,10 @@ The workflow never enables Pages automatically.
 No repository scripts were run by the website author. Direct installed Node
 syntax checking and direct Python HTML/data parsing can be used locally.
 Actual responsive/search/download browser verification is delegated to root
-using the already installed browser, without starting a service.
+using the already installed browser, without starting a service. Root's actual
+Chromium checks passed 1440px, 390px and 320px viewports, pagination, full-data
+PCI/OEM search, real owned-repository download URLs and API error/retry. Live
+HTTPS also passed model search and actual anonymous release API rendering.
 
 ## License
 
