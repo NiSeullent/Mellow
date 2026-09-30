@@ -8,6 +8,11 @@ do not implement an unsupported GPU's kernel submission owner, a registered
 system Metal accelerator, or a WindowServer GPU driver. The full Intel/NVIDIA
 port remains incomplete.
 
+The [native GPU boundary](NATIVE-GPU-BOUNDARY.md) now adds real IOKit IPC and
+Xe submission/fence/DMA readback binding source. Its missing concrete hardware
+owner still prevents native GPU service publication; the selector factories
+below continue to use their explicitly selected OpenCL/CGL providers.
+
 ## Implemented source
 
 | Source | Resulting behavior |

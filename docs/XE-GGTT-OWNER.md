@@ -10,9 +10,18 @@ Publication validates and retains immutable device-mapped backing before reading
 
 Consumers retain a precise mapping generation. Retirement requires authoritative quiescence of all consumers, then clears only entries that are still zero or match this manager's expected mapping. It reads zero back and requires invalidation completion before releasing backing. Partial writes, failed readback, unknown mapping contents, uncertain reset state, or failed release retain resources in quarantine rather than returning a success that could cause DMA use-after-free. A quarantine may require a separately proven device reset/space reconstruction; no timer-based automatic recovery is implemented.
 
-## Required trusted adapter — not supplied
+## Native adapter and required physical owner
 
-The backend must own the physical 8086:7D41 / GMD 12.70 device, establish real D0/reset/forcewake serialization, determine actual GGTT size and firmware/display/stolen/WOPCM exclusions, supply exclusively leased ranges, retain valid IOMMU mappings, prove PAT programming, implement ordered hardware PTE reads/writes and all applicable workarounds, observe actual TLB invalidation completion, and prove consumer retirement. The callbacks deliberately have no default success implementation. Their contracts cannot be satisfied with a boot argument or an unrecognized interrupt.
+`Mellow/XeGgttIOKit.*` now supplies actual BAR0 PTE reads/writes, retained-pin
+validation, main MCR/media non-MCR PAT3 programming and main/media TLB
+completion waits. Mutations require both GuCs held in reset with exclusive
+bootstrap authority. Read/publication checks remain available after startup.
+The adapter retains its PCI, authority, wake, ranges and pins on uncertain
+operations. Its new kernel source compiles with the local MacKernelSDK; actual
+physical execution is unverified. See [native GPU boundary](NATIVE-GPU-BOUNDARY.md)
+for its precise limits and pinned source evidence.
+
+The concrete owner must own the physical 8086:7D41 / GMD 12.70 device, establish real D0/reset/forcewake serialization, determine actual GGTT size and firmware/display/stolen/WOPCM exclusions, supply exclusively leased ranges, retain valid IOMMU mappings and prove consumer retirement. It must initialize and retain the adapter with these genuine leases. Those owner callbacks still have no default success implementation. Their contracts cannot be satisfied with a boot argument or an unrecognized interrupt.
 
 This branch does not guess a safe GGTT region or install speculative MMIO writes into the user's initial EFI. The component advances the memory-management implementation but does not close the native GPU-owner or Metal ABI gaps.
 

@@ -16,11 +16,16 @@ MELLOW-UAPI는 `MellowKMD.kext`가 공개하는 IOUserClient ABI다. 설계 원�
 [백포팅 파이프라인](BACKPORT-PIPELINE.md)의 사용자 공간 adapter도 별도 구현 대상이다.
 Apple의 `IOAcceleratorFamily2` 브리지는 [전략 A](METAL-EMULATION.md)용 **선택적** 경로이지 기본이 아니다 —
 125개 vtable 심볼은 찾았지만 selector 번호·vtable 슬롯·구조체 레이아웃은 전부 미확보다.
-**실제 MELLOW-UAPI/IOUserClient는 미구현이다. 별도 Runtime 정책 코드는 위 상태 문서를 따른다.**
+**전체 DRM 형태의 MELLOW-UAPI는 미구현이다.** 별도 TahoeDiagnostic IOUserClient와
+새 [native GPU evidence 경계](NATIVE-GPU-BOUNDARY.md)가 존재한다. 새 경계는 실제
+IOKit 통신·Xe 실행/fence/readback 연결 소스를 구현하지만 이를 인스턴스화하는
+물리 GPU 소유자는 아직 없다. 별도 Runtime 정책 코드는 위 상태 문서를 따른다.
 
 ---
 
-**Status: `PLANNED`. No IOUserClient exists in this repository.**
+**Status: `PLANNED` for the full DRM-shaped UAPI.** The diagnostic and native
+evidence IOUserClients are narrower implemented interfaces; neither implements
+the complete operation groups below or proves native GPU execution.
 
 ## The design decision
 

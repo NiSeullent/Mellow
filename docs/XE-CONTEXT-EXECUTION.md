@@ -1,3 +1,11 @@
+> **Current source update:** failed/timeout results are now terminal; a late fence
+> cannot revive them. The real owner clock is sampled again around blocking
+> staging/synchronization and GuC publication. The current sanitizer regression
+> passes 483 simulated-boundary checks. The native IOKit caller, owned input
+> staging and DMA readback are documented in [NATIVE-GPU-BOUNDARY](NATIVE-GPU-BOUNDARY.md).
+> Physical GPU execution remains unverified. The historical behavior below is
+> superseded where it permits late successful completion after a timeout.
+
 > **Historical record — preserved unedited.** Component documentation for the hand-written
 > Intel Xe backend, which compiles into the kext but has no call path
 > ([Mellow/RuntimeReadiness.hpp:84](../Mellow/RuntimeReadiness.hpp)). Scheduled to move to

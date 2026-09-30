@@ -17,6 +17,9 @@ struct LiveContext {
 };
 struct ExecutionBackend {
     void *opaque {};
+    // Actual monotonic owner clock, in the same units/domain as begin/poll.
+    // Staging/synchronization may block; re-sample before hardware publication.
+    uint64_t (*nowMicros)(void *) {};
     // These driver callbacks are authoritative inspections, never flags or
     // predicates supplied by an IOUserClient. Exact retained GGTT mappings,
     // actual primed context/WA/preemption/PPGTT/TLB/PAT/MOCS/topology, loaded
@@ -28,6 +31,9 @@ struct ExecutionBackend {
     bool (*releaseContext)(void *,const LiveContext &) {};
     // Copy immutable staging to the exact six held VM allocations and perform
     // real DMA/coherency synchronization; must not publish a context or tail.
+    // NativeGpu's fixed-job binding has already staged/synchronized input and
+    // sentinel output; preserve those bytes while copying the four heaps. Other
+    // trusted callers must construct their own input before context publication.
     bool (*stageHeaps)(void *,const LiveContext &,const XeMemory::Handle (&)[6],const XeDispatch::Prepared &) {};
     // Actual direct-coherent ring/LRC visibility barrier after CPU writes.
     bool (*synchronizeContext)(void *,const LiveContext &) {};
@@ -61,7 +67,9 @@ private:
     XeDispatch::Prepared prepared_ {};
     XeGuC::Cookie registration_ {},enable_ {};
     uint64_t deadline_ {},lastNow_ {};ExecutionState state_ {ExecutionState::Idle};
+    ExecutionStatus terminalStatus_ {ExecutionStatus::Quarantined};
     ExecutionStatus fail(ExecutionStatus);
+    ExecutionStatus sampleTime();
     bool releaseVm();
     bool allowed() const;
 };

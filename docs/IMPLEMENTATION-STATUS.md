@@ -10,6 +10,14 @@ The source-bound [render integration record](../validation/render/integration.js
 actual frontend, provider, object, client and report-control evidence.
 Full Apple Metal ABI compatibility, native Tahoe GPU execution and WindowServer remain incomplete.
 
+The [native GPU boundary](NATIVE-GPU-BOUNDARY.md) adds a versioned IOKit
+evidence interface, concrete Xe submission/fence/DMA readback binding and a
+stopped-GuC main/media GGTT/PAT/TLB adapter. All four new kernel units compile
+to x86_64 Darwin24/25 Mach-O objects; the portable session sanitizer tests pass.
+The required concrete retained PCI/firmware/context owner is still missing, so
+the service is not published and physical GPU/Metal/WindowServer execution
+remains unverified. These checks are separate from the historical records below.
+
 ## Implemented and exercised
 
 - `Runtime/RenderShaderJit.*`: checked MSL vertex/fragment source lowers to GLSL330.

@@ -12,7 +12,14 @@ bool EvidenceExecution::releaseVm() {
     }
     return ok;
 }
-ExecutionStatus EvidenceExecution::fail(ExecutionStatus s) {state_=ExecutionState::Failed;return s;}
+ExecutionStatus EvidenceExecution::fail(ExecutionStatus s) {state_=ExecutionState::Failed;terminalStatus_=s;return s;}
+ExecutionStatus EvidenceExecution::sampleTime() {
+    if(!backend_.nowMicros)return fail(ExecutionStatus::Unavailable);
+    const uint64_t current=backend_.nowMicros(backend_.opaque);
+    if(!current || current<lastNow_)return fail(ExecutionStatus::Quarantined);
+    lastNow_=current;
+    return current>=deadline_?fail(ExecutionStatus::Timeout):ExecutionStatus::Ok;
+}
 ExecutionStatus EvidenceExecution::begin(const XeZebin::Image &image,const LiveContext &c,
     const XeMemory::Handle (&handles)[6],const XeDispatch::Policy &p,uint32_t nonce,uint32_t count,
     bool depthWa,uint64_t now,uint64_t deadline) {
@@ -26,7 +33,7 @@ ExecutionStatus EvidenceExecution::begin(const XeZebin::Image &image,const LiveC
        (c.ringBytes&(c.ringBytes-1)) || uint64_t(c.ggttContext)+ImageBytes>(1ULL<<32) ||
        uint64_t(c.ggttRing)+c.ringBytes>(1ULL<<32) || c.descriptor!=(uint64_t(c.ggttContext)|0x119ULL) ||
        (uint64_t(c.ggttContext)<uint64_t(c.ggttRing)+c.ringBytes && uint64_t(c.ggttRing)<uint64_t(c.ggttContext)+ImageBytes) ||
-       depthWa!=c.depthStallWorkaround || deadline<=now || !backend_.freshStopped || !backend_.retainContext || !backend_.releaseContext ||
+       depthWa!=c.depthStallWorkaround || deadline<=now || !backend_.nowMicros || !backend_.freshStopped || !backend_.retainContext || !backend_.releaseContext ||
        !backend_.stageHeaps || !backend_.synchronizeContext || !backend_.quiesced)
         return fail(ExecutionStatus::Invalid);
     if(!allowed() || !backend_.freshStopped(backend_.opaque,context_))return fail(ExecutionStatus::Unavailable);
@@ -56,26 +63,34 @@ ExecutionStatus EvidenceExecution::begin(const XeZebin::Image &image,const LiveC
     if(appendRing(context_.ringCpu,c.ringBytes,0,0,job.words,job.count,next)!=Error::None)
         return fail(ExecutionStatus::Invalid);
     if(fence_.published(c.epoch,1)!=XeFence::Status::Ok)return fail(ExecutionStatus::Unavailable);
+    auto timed=sampleTime();
+    if(timed!=ExecutionStatus::Ok)return timed;
     __sync_synchronize();*context_.lrcTailCpu=next;__sync_synchronize();
     if(!backend_.synchronizeContext(backend_.opaque,context_) || !allowed())return fail(ExecutionStatus::Quarantined);
+    timed=sampleTime();
+    if(timed!=ExecutionStatus::Ok)return timed;
     XeGuC::Action action;
     if(XeGuC::encodeRegister(c.id,0,1,c.descriptor,action)!=XeGuC::Status::Ok)return fail(ExecutionStatus::Invalid);
-    if(guc_.send(action,now,deadline,registration_)!=XeGuC::Status::Ok)return fail(ExecutionStatus::Quarantined);
+    if(guc_.send(action,lastNow_,deadline,registration_)!=XeGuC::Status::Ok)return fail(ExecutionStatus::Quarantined);
     state_=ExecutionState::Registered;
-    return poll(now);
+    timed=sampleTime();
+    if(timed!=ExecutionStatus::Ok)return timed;
+    return poll(lastNow_);
 }
 ExecutionStatus EvidenceExecution::poll(uint64_t now) {
     if(state_==ExecutionState::Completed)return ExecutionStatus::Ok;
     if(state_==ExecutionState::Closed || state_==ExecutionState::Idle)return ExecutionStatus::Invalid;
-    // Failed/time-out jobs may still complete later; no retry can republish work.
+    // A late hardware write does not revive failed/timed-out content. Resources
+    // stay held until close proves actual retirement, even if a fence arrives.
+    if(state_==ExecutionState::Failed)return terminalStatus_;
     if(now<lastNow_)return fail(ExecutionStatus::Quarantined);
     lastNow_=now;
     if(!allowed())return fail(ExecutionStatus::Quarantined);
+    if(now>=deadline_)return fail(ExecutionStatus::Timeout);
     if(state_==ExecutionState::Registered) {
         XeGuC::Reply reply;
         if(guc_.query(registration_,reply)!=XeGuC::Status::Ok || reply.state==XeGuC::ReplyState::Failure)
             return fail(ExecutionStatus::Quarantined);
-        if(now>=deadline_)return fail(ExecutionStatus::Timeout);
         XeGuC::Action mode;
         XeGuC::encodeMode(context_.id,true,mode);
         auto sent=guc_.send(mode,now,deadline_,enable_);
@@ -102,8 +117,7 @@ ExecutionStatus EvidenceExecution::poll(uint64_t now) {
         if(!releaseVm())return fail(ExecutionStatus::Quarantined);
         state_=ExecutionState::Completed;return ExecutionStatus::Ok;
     }
-    if(now>=deadline_)return fail(ExecutionStatus::Timeout);
-    return state_==ExecutionState::Failed ? ExecutionStatus::Quarantined : ExecutionStatus::Pending;
+    return ExecutionStatus::Pending;
 }
 ExecutionStatus EvidenceExecution::close() {
     if(state_==ExecutionState::Closed)return ExecutionStatus::Ok;

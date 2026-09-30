@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A09320260930000000000001 /* NativeGpuSession.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A09320260930000000000011 /* NativeGpuSession.cpp */; };
+		A09320260930000000000002 /* NativeGpuIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A09320260930000000000012 /* NativeGpuIOKit.cpp */; };
+		A09320260930000000000003 /* XeNativeEvidence.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A09320260930000000000013 /* XeNativeEvidence.cpp */; };
+		A09320260930000000000004 /* XeGgttIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A09320260930000000000014 /* XeGgttIOKit.cpp */; };
 		1EDD20260930000000000001 /* CommandEncoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1EDD20260930000000000002 /* CommandEncoding.cpp */; };
 		D1A625064D41470000000002 /* TahoeDiagnosticProtocol.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D1A625064D414700000000A2 /* TahoeDiagnosticProtocol.cpp */; };
 		D1A625064D41470000000001 /* TahoeDiagnostic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D1A625064D414700000000A1 /* TahoeDiagnostic.cpp */; };
@@ -66,6 +70,15 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A09320260930000000000010 /* NativeGpuABI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeGpuABI.h; sourceTree = "<group>"; };
+		A09320260930000000000011 /* NativeGpuSession.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeGpuSession.cpp; sourceTree = "<group>"; };
+		A09320260930000000000012 /* NativeGpuIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeGpuIOKit.cpp; sourceTree = "<group>"; };
+		A09320260930000000000013 /* XeNativeEvidence.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeNativeEvidence.cpp; sourceTree = "<group>"; };
+		A09320260930000000000014 /* XeGgttIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGgttIOKit.cpp; sourceTree = "<group>"; };
+		A09320260930000000000015 /* NativeGpuSession.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NativeGpuSession.hpp; sourceTree = "<group>"; };
+		A09320260930000000000016 /* NativeGpuIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = NativeGpuIOKit.hpp; sourceTree = "<group>"; };
+		A09320260930000000000017 /* XeNativeEvidence.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeNativeEvidence.hpp; sourceTree = "<group>"; };
+		A09320260930000000000018 /* XeGgttIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeGgttIOKit.hpp; sourceTree = "<group>"; };
 		1EDD20260930000000000002 /* CommandEncoding.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CommandEncoding.cpp; path = Drivers/PortedNvidia/CommandEncoding.cpp; sourceTree = SOURCE_ROOT; };
 		1EDD20260930000000000003 /* CommandEncoding.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = CommandEncoding.hpp; path = Drivers/PortedNvidia/CommandEncoding.hpp; sourceTree = SOURCE_ROOT; };
 		D1A625064D414700000000A2 /* TahoeDiagnosticProtocol.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TahoeDiagnosticProtocol.cpp; sourceTree = "<group>"; };
@@ -191,6 +204,15 @@
 		1C748C291C21952C0024EED2 /* Mellow */ = {
 			isa = PBXGroup;
 			children = (
+				A09320260930000000000010 /* NativeGpuABI.h */,
+				A09320260930000000000011 /* NativeGpuSession.cpp */,
+				A09320260930000000000012 /* NativeGpuIOKit.cpp */,
+				A09320260930000000000013 /* XeNativeEvidence.cpp */,
+				A09320260930000000000014 /* XeGgttIOKit.cpp */,
+				A09320260930000000000015 /* NativeGpuSession.hpp */,
+				A09320260930000000000016 /* NativeGpuIOKit.hpp */,
+				A09320260930000000000017 /* XeNativeEvidence.hpp */,
+				A09320260930000000000018 /* XeGgttIOKit.hpp */,
 				D1A625064D414700000000A1 /* TahoeDiagnostic.cpp */,
 				D1A625064D414700000000A2 /* TahoeDiagnosticProtocol.cpp */,
 				C42F5B82067D421096F10002 /* PortedXeBindings.cpp */,
@@ -418,6 +440,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A09320260930000000000001 /* NativeGpuSession.cpp in Sources */,
+				A09320260930000000000002 /* NativeGpuIOKit.cpp in Sources */,
+				A09320260930000000000003 /* XeNativeEvidence.cpp in Sources */,
+				A09320260930000000000004 /* XeGgttIOKit.cpp in Sources */,
 				1EDD20260930000000000001 /* CommandEncoding.cpp in Sources */,
 				D1A625064D41470000000001 /* TahoeDiagnostic.cpp in Sources */,
 				D1A625064D41470000000002 /* TahoeDiagnosticProtocol.cpp in Sources */,
