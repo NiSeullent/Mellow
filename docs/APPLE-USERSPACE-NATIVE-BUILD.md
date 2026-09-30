@@ -10,6 +10,8 @@ Native macOS SDK compilation and physical execution are **NOT_RUN** in the devel
 
 Successful build-only reports prove the recorded source compiled and linked against the selected public frameworks. They do not establish execution on macOS 15 or 26, unsupported-GPU acceleration, native Metal registration or WindowServer adoption. Kext CI builds a different target and does not cover these Objective-C++ units.
 
+The render adapter rejects counter buffers in every public render-pass sample attachment. Both SDKs omit the previously used capacity symbol. `RenderPassLimits.hpp` records the expected four-slot boundary; a separate CPU-only public descriptor probe checks legal indices and the first invalid index on the CI host. Apple's range check can terminate that isolated negative-control child with its exact index assertion. Only that recorded assertion with SIGABRT, or NSRangeException, is accepted as expected rejection; unrelated failures remain errors. This descriptor probe creates no Metal device or command queue and submits no GPU work. Its host is macOS 15 even for a 26-target library build, so it is not macOS 26 runtime acceptance.
+
 ## Existing native prerequisites
 
 Use Python 3.9 or newer and an x86_64 Mac running macOS 15 or 26 with an already installed Xcode or Command Line Tools SDK. The runner discovers the active SDK and `clang++` through `xcrun`, checks the SDK version/frameworks, and performs no download or installation. Apple's [Command Line Tools documentation](https://developer.apple.com/documentation/xcode/installing-the-command-line-tools) identifies the bundled SDK/tools; its [build settings reference](https://developer.apple.com/documentation/xcode/build-settings-reference) documents deployment targets and Objective-C ARC.

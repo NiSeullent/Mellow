@@ -63,14 +63,25 @@ jobs:
         run: |
           xcrun --sdk macosx clang++ -std=c++17 -fobjc-arc -arch x86_64 -mmacosx-version-min=15.0 tests/apple_render_descriptor_bounds.mm -framework Foundation -framework Metal -o "$RUNNER_TEMP/metal-descriptor-bounds"
           python3 - <<'PY'
-          import json, os, pathlib, platform, subprocess
+          import json, os, pathlib, platform, signal, subprocess
           probe = pathlib.Path(os.environ['RUNNER_TEMP']) / 'metal-descriptor-bounds'
           first = json.loads(subprocess.check_output([probe, '0'], text=True, timeout=10))
           capacity = first['expected_capacity']
           assert 0 < capacity <= 32
           observations = [first]
-          for index in range(1, capacity + 1):
+          for index in range(1, capacity):
               observations.append(json.loads(subprocess.check_output([probe, str(index)], text=True, timeout=10)))
+          invalid = subprocess.run([probe, str(capacity)], capture_output=True, text=True, timeout=10)
+          if invalid.returncode == 0:
+              rejected = json.loads(invalid.stdout)
+              assert rejected['descriptor_available'] is False and rejected['exception'] == 'NSRangeException'
+          else:
+              expected = f'attachmentIndex({capacity}) must be < {capacity}'
+              assert invalid.returncode == -signal.SIGABRT and expected in invalid.stderr, (invalid.returncode, invalid.stderr)
+              rejected = {'index': capacity, 'descriptor_available': False, 'expected_capacity': capacity,
+                          'gpu_submission': False, 'rejection': 'Exact public SDK index-bound assertion',
+                          'exit_code': invalid.returncode, 'diagnostic': invalid.stderr}
+          observations.append(rejected)
           for index, value in enumerate(observations):
               assert value['index'] == index and value['expected_capacity'] == capacity
               assert value['descriptor_available'] == (index < capacity)
