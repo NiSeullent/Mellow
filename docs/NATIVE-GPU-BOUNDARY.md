@@ -31,9 +31,16 @@ admission can be expanded.
 The native service derives from an abstract base with no default matching or
 registration. Its concrete owner must retain all PCI, MMIO, firmware, GGTT,
 PPGTT, engine, IRQ and fence objects and serialize their operations with the
-same sleepable lock used by this interface. It supplies operations for the
-newly minted client owner; obtaining those operations must not acquire new
-per-client GPU resources before the session can close them.
+same sleepable lock used by this interface. `prepareNativeDriver` creates an
+accounted transaction for a newly minted client owner. The client/provider
+lifetime lease is established before that callback can allocate or publish.
+Every attempt burns its owner ID. A failed prepare, missing operation or failed
+identity/clock initialization invokes `abortNativeDriver` with that original ID.
+Until abort proves actual retirement, the cold-session transaction retains its
+resources and reciprocal references and blocks all later opens. Failed client
+startup keeps its provider hold; cleanup retries abort rather than calling an
+unopened Session. Successful close/abort releases the client outside the lock.
+The concrete prepare/abort implementation is still required.
 
 Each connection accepts one submission attempt and strictly increasing request
 correlations. Acceptance yields pending state, never readable output. Completion
@@ -71,6 +78,9 @@ changed epoch or destruction of a C++ wrapper cannot release GPU-live memory.
 The IOKit GGTT adapter requires exclusive epoch/range/backing authority from a
 retained PCI owner. It verifies physical PCI identity, D0, bus mastering, both
 graphics/media IPs, forcewake, actual pins and the translated BAR0 layout.
+MTL MMIO `GGC` at `0x108040` must report `GGMS=3` before the adapter trusts
+the 8 MiB GSM/4 GiB addressing layout. The forcewake helper checks both request
+and ACK bits; a pending foreign request cannot be adopted and later cleared.
 Zero PTEs do not establish range ownership. A nonzero write must refer to one of
 the exact held DMA pages; foreign live entries cannot be overwritten or cleared.
 
@@ -101,12 +111,22 @@ covers correlation replay, pending read rejection, every mismatched completion
 field, failed partial readback, first-poll and crossing-deadline timeouts, reset
 loss, clock regression, quarantine before submission, unknown submission and
 retained failed retirement. The Xe context execution regression additionally
-passes 483 checks, including ordinary success, deadline-bound first observation,
+passes 1,266 checks, including ordinary success, deadline-bound first observation,
 late fences after timeout, attempted recovery after a terminal failure and
 deadline crossings during heap staging, context synchronization and GuC notify.
 The required real owner clock is sampled again before tail/register publication
 and after notify; a blocking copy cannot reuse the earlier timestamp as proof.
 Its result explicitly records `gpu_execution=false`.
+
+Close additionally retires the original GuC registration/enable cookies and
+their response credits after actual quiescence. GPU fence completion alone
+cannot retire a pending GuC request. Busy or timeout keeps the cookies and
+remaining context/VM/fence resources until actual late acknowledgement or
+transport retirement permits cleanup. More than the 32-entry pending table's
+capacity is exercised across consecutive jobs to detect resource leakage.
+The actual IOKit method bodies also pass 406 host assertions with a synthetic
+OS boundary, including preparation failure and reciprocal reference counts.
+This is not an IOKit runtime or hardware test.
 
 The new kernel sources compile to x86_64 Mach-O objects with the local
 MacKernelSDK and Clang, separately from a full kext link. The userspace transport's
@@ -115,13 +135,18 @@ execution are not available in this workspace, so the Darwin userspace branch,
 native Metal adapters and IOSurface presenter still need actual builds/runs.
 
 The next native-owner integration must construct real GGTT leases/pins, bootstrap
-exact firmware, construct full ADS/engine state, publish an owned LRC/PPGTT,
+exact firmware, supply authoritative ADS topology/capture state, publish an owned LRC/PPGTT,
 route interrupts and hold reset authority. Full ADS needs separate preload
 initialization and post-load captured golden-LRC publication; a zero bootstrap
 LRC is not a captured golden context. Only that owner can instantiate and
 register the new service. System Metal/compiler/resource integration and
 WindowServer/scanout remain required for the full requested port; these bounded
 IPC and kernel object checks do not establish either.
+
+The [bounded ADS implementation](XE-GUC-ADS.md) now serializes and inspects the
+packed pre-load layout and separately publishes captured post-load golden LRCs.
+Loader `submissionReady` requires fresh hardware health and the separate
+post-load authority. No production owner supplies those proofs yet.
 
 Public IOKit IPC contracts:
 [XNU IOUserClient](https://github.com/apple-oss-distributions/xnu/blob/main/iokit/IOKit/IOUserClient.h),

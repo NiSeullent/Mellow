@@ -54,12 +54,19 @@ bool IOKitBinding::published(void *opaque,const Region &r,uint64_t epoch) {
 }
 bool IOKitBinding::ads(void *opaque,const Plan &p,const MellowXe::FirmwareInfo &f) {
     auto &s=*static_cast<IOKitBinding *>(opaque);
-    return s.proofs_.fullAdsValid && s.proofs_.fullAdsValid(s.proofs_.opaque,p,f);
+    return admitted(opaque,p.owner,p.epoch) && s.proofs_.preloadAdsValid &&
+        s.proofs_.preloadAdsValid(s.proofs_.opaque,p,f);
+}
+bool IOKitBinding::golden(void *opaque,const Plan &p,const MellowXe::FirmwareInfo &f) {
+    auto &s=*static_cast<IOKitBinding *>(opaque);
+    return admitted(opaque,p.owner,p.epoch) && s.proofs_.goldenAdsValid &&
+        s.proofs_.goldenAdsValid(s.proofs_.opaque,p,f);
 }
 Backend IOKitBinding::backend() {
     Backend result {};result.io=mmio_.access();result.physicalRevision=device_.configRead8(8);result.opaque=this;
     result.admitted=admitted;result.quiesced=quiesced;result.retain=retain;result.release=release;
-    result.synchronize=synchronize;result.readPat3=readPat;result.mappingPublished=published;result.fullAdsValid=ads;
+    result.synchronize=synchronize;result.readPat3=readPat;result.mappingPublished=published;
+    result.preloadAdsValid=ads;result.goldenAdsValid=golden;
     return result;
 }
 }

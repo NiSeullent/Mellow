@@ -21,7 +21,8 @@ void MellowNativeGpu::free() {
 }
 MellowNativeGpuStatus MellowNativeGpu::identity(void *opaque, uint64_t owner, NG::Identity &info) {
     auto &service = *static_cast<MellowNativeGpu *>(opaque);
-    auto result = service.driver_.identity(service.driver_.opaque, owner, info);
+    auto &driver = service.activeOperations();
+    auto result = driver.identity(driver.opaque, owner, info);
     if (result != MellowNativeGpuStatusOk) return result;
     auto *pci = OSDynamicCast(IOPCIDevice, service.getProvider());
     // Registry identities refer to this service and its actual direct PCI
@@ -35,53 +36,69 @@ MellowNativeGpuStatus MellowNativeGpu::identity(void *opaque, uint64_t owner, NG
 }
 uint64_t MellowNativeGpu::now(void *opaque) {
     auto &service = *static_cast<MellowNativeGpu *>(opaque);
-    return service.driver_.nowMicros(service.driver_.opaque);
+    auto &driver = service.activeOperations();
+    return driver.nowMicros(driver.opaque);
 }
 MellowNativeGpuStatus MellowNativeGpu::submit(void *opaque, uint64_t owner, uint32_t nonce, uint32_t count,
                                            uint64_t deadline, NG::Job &job) {
     auto &service = *static_cast<MellowNativeGpu *>(opaque);
-    return service.driver_.submit(service.driver_.opaque, owner, nonce, count, deadline, job);
+    auto &driver = service.activeOperations();
+    return driver.submit(driver.opaque, owner, nonce, count, deadline, job);
 }
 MellowNativeGpuStatus MellowNativeGpu::poll(void *opaque, uint64_t owner, const NG::Job &job, NG::Observation &observation) {
     auto &service = *static_cast<MellowNativeGpu *>(opaque);
-    return service.driver_.poll(service.driver_.opaque, owner, job, observation);
+    auto &driver = service.activeOperations();
+    return driver.poll(driver.opaque, owner, job, observation);
 }
 MellowNativeGpuStatus MellowNativeGpu::readback(void *opaque, uint64_t owner, const NG::Job &job,
                                              uint32_t *words, uint32_t count) {
     auto &service = *static_cast<MellowNativeGpu *>(opaque);
-    return service.driver_.readback(service.driver_.opaque, owner, job, words, count);
+    auto &driver = service.activeOperations();
+    return driver.readback(driver.opaque, owner, job, words, count);
 }
 MellowNativeGpuStatus MellowNativeGpu::close(void *opaque, uint64_t owner, const NG::Job &job) {
     auto &service = *static_cast<MellowNativeGpu *>(opaque);
-    return service.driver_.close(service.driver_.opaque, owner, job);
+    auto &driver = service.activeOperations();
+    return driver.close(driver.opaque, owner, job);
 }
 NG::DriverOps MellowNativeGpu::forwardingOperations() {
     return {this, identity, now, submit, poll, readback, close};
 }
 bool MellowNativeGpu::openNative(MellowNativeGpuClient *client, NG::Session &session) {
     if (!lock_ || !client) return false;
+    MellowNativeGpuClient *released = nullptr;
     IOLockLock(lock_);
     bool opened = false;
-    if (!client_ && nextOwner_ && nextOwner_ != UINT64_MAX && nativeDriverOperations(nextOwner_, driver_) &&
-        driver_.identity && driver_.nowMicros && driver_.submit && driver_.poll && driver_.readback && driver_.close) {
-        if (session.initialize(nextOwner_++, forwardingOperations()) == MellowNativeGpuStatusOk) {
-            client_ = client;
-            // Concrete hardware owner and connection retain each other while
-            // resources may be GPU-live. clientClose/stop break this lease only
-            // after actual driver retirement; uncertain teardown keeps it.
-            client_->retain();
-            quarantine_ = false;
+    if (!client_ && nextOwner_ && nextOwner_ != UINT64_MAX) {
+        // Burn the identity even when prepare fails. Never reuse an owner whose
+        // allocation or GPU acceptance could have been partially observed.
+        preparingOwner_ = nextOwner_++;
+        preparing_ = true;
+        candidate_ = {};
+        client_ = client;
+        client_->retain();
+        quarantine_ = true;
+        const auto prepared = prepareNativeDriver(preparingOwner_, candidate_);
+        if (prepared == MellowNativeGpuStatusOk && candidate_.identity && candidate_.nowMicros &&
+            candidate_.submit && candidate_.poll && candidate_.readback && candidate_.close &&
+            session.initialize(preparingOwner_, forwardingOperations()) == MellowNativeGpuStatusOk) {
+            driver_ = candidate_; candidate_ = {};
+            preparing_ = false; preparingOwner_ = 0; quarantine_ = false;
             opened = true;
+        } else if (abortNativeDriver(preparingOwner_) == MellowNativeGpuStatusOk) {
+            released = client_; client_ = nullptr;
+            candidate_ = {}; preparing_ = false; preparingOwner_ = 0; quarantine_ = false;
         }
     }
     IOLockUnlock(lock_);
+    if (released) released->release();
     return opened;
 }
 IOReturn MellowNativeGpu::callNative(MellowNativeGpuClient *client, NG::Session &session, uint32_t selector,
                                    const MellowNativeGpuRequest &request, MellowNativeGpuReply &reply) {
     if (!lock_) return kIOReturnNotReady;
     IOLockLock(lock_);
-    if (client_ != client) { IOLockUnlock(lock_); return kIOReturnNotReady; }
+    if (client_ != client || preparing_) { IOLockUnlock(lock_); return kIOReturnNotReady; }
     const auto result = session.call(selector, request, reply);
     if (session.state() == MellowNativeGpuStateQuarantined ||
         (selector == MellowNativeGpuCloseEvidence && result != MellowNativeGpuStatusOk)) quarantine_ = true;
@@ -99,10 +116,10 @@ IOReturn MellowNativeGpu::closeNative(MellowNativeGpuClient *client, NG::Session
         IOLockUnlock(lock_);
         return held ? kIOReturnNotReady : kIOReturnSuccess;
     }
-    auto result = session.close();
+    const auto result = preparing_ ? abortNativeDriver(preparingOwner_) : session.close();
     if (result == MellowNativeGpuStatusOk) {
         released = client_; client_ = nullptr; quarantine_ = false;
-        driver_ = {};
+        driver_ = {}; candidate_ = {}; preparing_ = false; preparingOwner_ = 0;
     } else quarantine_ = true;
     IOLockUnlock(lock_);
     if (released) released->release(); // May invoke client free; never under lock.
@@ -114,9 +131,10 @@ bool MellowNativeGpu::retryQuarantinedClient() {
     MellowNativeGpuClient *released = nullptr;
     IOLockLock(lock_);
     bool retired = !client_;
-    if (client_ && quarantine_ && client_->nativeSession().close() == MellowNativeGpuStatusOk) {
+    if (client_ && quarantine_ &&
+        (preparing_ ? abortNativeDriver(preparingOwner_) : client_->nativeSession().close()) == MellowNativeGpuStatusOk) {
         released = client_; client_ = nullptr; quarantine_ = false;
-        driver_ = {}; retired = true;
+        driver_ = {}; candidate_ = {}; preparing_ = false; preparingOwner_ = 0; retired = true;
     }
     IOLockUnlock(lock_);
     if (released) released->release();
@@ -150,7 +168,8 @@ bool MellowNativeGpuClient::start(IOService *provider) {
     if (!owner || !IOUserClient::start(provider)) return false;
     owner_ = owner; owner_->retain();
     if (!owner_->openNative(this, session_)) {
-        owner_->release(); owner_ = nullptr;
+        // A failed prepare may still own DMA. Keep our provider hold until
+        // free(); the provider's transaction hold prevents free until abort Ok.
         IOUserClient::stop(provider);
         return false;
     }

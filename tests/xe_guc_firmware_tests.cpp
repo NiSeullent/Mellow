@@ -27,7 +27,9 @@ struct Device {
     uint32_t finalStatus {0x8000f0ec};
     uint64_t now {100}, readyAfter {}, pteXor {};
     unsigned clockCalls {}, pteReads {};
-    bool admitted {true}, quiet {true}, published {true}, fullAds {false};
+    bool admitted {true}, quiet {true}, published {true}, fullAds {false}, goldenAds {false};
+    bool revokeDuringGolden {};
+    unsigned goldenAdsReads {};
     bool resetCompletes {true}, resetClearsDma {true}, dmaCompletes {true}, dmaStarted {}, locksAppear {true};
     bool regressingClock {}, frozenClock {}, unstablePte {}, adsUntouchedAtReset {true};
     Device() {
@@ -95,10 +97,16 @@ struct Device {
     static bool readPat(void *p,uint32_t &v) { auto &s=self(p);++s.patReads;v=s.pat;return true; }
     static bool mapping(void *p,const Region &,uint64_t) { auto &s=self(p);++s.mappingReads;return s.published; }
     static bool ads(void *p,const Plan &,const MellowXe::FirmwareInfo &) { auto &s=self(p);++s.fullAdsReads;return s.fullAds; }
+    static bool golden(void *p,const Plan &,const MellowXe::FirmwareInfo &) {
+        auto &s=self(p);++s.goldenAdsReads;
+        if(s.revokeDuringGolden)s.admitted=false;
+        return s.goldenAds;
+    }
     Backend backend() {
         Backend b {};b.io={this,read,write,clock,delay};b.opaque=this;b.physicalRevision=8;
         b.admitted=admission;b.quiesced=quiescence;b.retain=retain;b.release=release;
-        b.synchronize=sync;b.readPat3=readPat;b.mappingPublished=mapping;b.fullAdsValid=ads;return b;
+        b.synchronize=sync;b.readPat3=readPat;b.mappingPublished=mapping;
+        b.preloadAdsValid=ads;b.goldenAdsValid=golden;return b;
     }
 };
 static void checkRelease(Device &d,Loader &l) {
@@ -110,6 +118,7 @@ static void validBoot() {
     Device d;Loader l(d.backend());CHECK(l.start(d.plan)==Error::None);
     CHECK(l.state()==State::Running);CHECK(l.running(7,11));CHECK(!l.running(8,11));CHECK(!l.running(7,12));
     CHECK(!l.submissionProfile());CHECK(l.heldRegions()==3);CHECK(d.releases.empty());
+    CHECK(!l.submissionReady(7,11) && d.goldenAdsReads==0);
     CHECK(d.syncs==3 && d.fullAdsReads==0 && d.mappingReads==3 && d.patReads==1);
     CHECK(d.adsUntouchedAtReset);CHECK(l.lastStatus()==0x8000f0ec);
     const std::vector<std::pair<uint32_t,uint32_t>> prefix={{0x941c,8},{0xc050,0x3f3000},{0xc340,0x4000},{0xc180,0}};
@@ -196,8 +205,18 @@ static void wopcmAndProfiles() {
     {Device d;d.plan.profile=Profile::Submission;Loader l(d.backend());CHECK(l.start(d.plan)==Error::Unavailable);CHECK(d.writes.empty());CHECK(l.heldRegions()==0);}
     for(bool ccs:{false,true}) {Device d;d.plan.profile=Profile::Submission;d.plan.ccsPresent=ccs;d.fullAds=true;
         Loader l(d.backend());CHECK(l.start(d.plan)==Error::None);CHECK(l.submissionProfile());
+        CHECK(!l.submissionReady(7,11));CHECK(d.goldenAdsReads==1);
+        d.goldenAds=true;CHECK(l.submissionReady(7,11));
+        CHECK(!l.submissionReady(7,12) && !l.submissionReady(8,11));
+        d.goldenAds=false;CHECK(!l.submissionReady(7,11));
+        d.goldenAds=true;d.revokeDuringGolden=true;CHECK(!l.submissionReady(7,11));
+        d.admitted=true;d.revokeDuringGolden=false;
         CHECK(d.regs[0xc188]==((1U<<22)|(ccs?(1U<<11):0)));CHECK(d.regs[0xc18c]==0x01000010);
         CHECK(d.memory[1][0]==0xa5);CHECK(d.fullAdsReads==1);checkRelease(d,l);}
+    {Device d;d.plan.profile=Profile::Submission;d.fullAds=true;
+        auto b=d.backend();b.goldenAdsValid=nullptr;Loader l(b);
+        CHECK(l.start(d.plan)==Error::None && l.running(7,11));
+        CHECK(!l.submissionReady(7,11));checkRelease(d,l);}
 }
 static void timeoutsAndErrors() {
     {Device d;d.resetCompletes=false;Loader l(d.backend());CHECK(l.start(d.plan)==Error::Timeout);CHECK(d.now==5100);CHECK(l.heldRegions()==3);

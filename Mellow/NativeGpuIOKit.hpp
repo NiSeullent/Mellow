@@ -8,7 +8,7 @@ class MellowNativeGpuClient;
 // Native hardware owners derive from this real IOKit boundary. This abstract
 // base never matches/registers a device and never supplies a fake driver.
 // A concrete owner must initialize firmware/VM/context/fences and implement
-// nativeDriverOperations before publishing a service. IOObjectConformsTo sees
+// prepareNativeDriver/abortNativeDriver before publishing a service. IOObjectConformsTo sees
 // the inherited MellowNativeGpu class on that concrete service.
 class MellowNativeGpu : public IOService {
     OSDeclareAbstractStructors(MellowNativeGpu)
@@ -25,9 +25,17 @@ public:
     // all its outstanding DMA is retired. Do not call from IRQ context.
     bool retryQuarantinedClient();
 protected:
-    // Returns bindings to already retained driver objects; no per-client DMA
-    // acquisition/publication happens here. Submit performs those operations.
-    virtual bool nativeDriverOperations(uint64_t clientOwner, MellowNativeGpuKernel::DriverOps &) = 0;
+    // Start an owner-accounted transaction for this newly minted client owner.
+    // The base holds the reciprocal client/provider lifetime lease BEFORE this
+    // callback. Register every allocation/possible publication in private owner
+    // records before its side effect. Return bindings only to those resources;
+    // never relabel another client's VM/context/pins. Failure still needs abort.
+    virtual MellowNativeGpuStatus prepareNativeDriver(uint64_t clientOwner,
+        MellowNativeGpuKernel::DriverOps &candidate) = 0;
+    // Clean up even a partially failed prepare or Session initialization. Ok
+    // proves actual retirement and releases ALL transaction resources; any
+    // other result retains the records/opaque storage for a later retry.
+    virtual MellowNativeGpuStatus abortNativeDriver(uint64_t clientOwner) = 0;
     // The shared sleepable domain must also serialize actual owner's reset,
     // mapping and command operations. DMA preparation can sleep; no workloop
     // gate/interrupt-context calls or callback reentry is allowed.
@@ -36,8 +44,11 @@ private:
     IOLock *lock_ {};
     MellowNativeGpuClient *client_ {};
     MellowNativeGpuKernel::DriverOps driver_ {};
+    MellowNativeGpuKernel::DriverOps candidate_ {};
     uint64_t nextOwner_ {1};
-    bool quarantine_ {};
+    uint64_t preparingOwner_ {};
+    bool quarantine_ {}, preparing_ {};
+    MellowNativeGpuKernel::DriverOps &activeOperations() { return preparing_ ? candidate_ : driver_; }
     MellowNativeGpuKernel::DriverOps forwardingOperations();
     static MellowNativeGpuStatus identity(void *, uint64_t, MellowNativeGpuKernel::Identity &);
     static uint64_t now(void *);

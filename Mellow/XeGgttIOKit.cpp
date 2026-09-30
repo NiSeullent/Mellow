@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Mellow contributors. See Drivers/PortedXe/LICENSE.MIT.
 // Register/layout and operation source: Intel Xe MIT files at Linux revision
 // 0d9ff90a5422cc7509258aaaba1e7481df4d332a, drivers/gpu/drm/xe/{xe_ggtt.c,
-// xe_gt_mcr.c,xe_pat.c,xe_force_wake.c,xe_guc_tlb_inval.c,xe_wa_oob.rules,
+// xe_gt_mcr.c,xe_pat.c,xe_force_wake.c,xe_guc_tlb_inval.c,xe_ttm_stolen_mgr.c,xe_wa_oob.rules,
 // regs/xe_gt_regs.h,regs/xe_guc_regs.h,regs/xe_regs.h,regs/xe_gtt_defs.h}:
 // https://github.com/torvalds/linux/tree/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe
 // The pinned MMIO invalidation path does not wait for hardware clearance.
@@ -20,6 +20,7 @@ constexpr uint32_t media=0x380000, gmd=0xd8c, wakeControl=0xa188, wakeAck=0xdfc;
 constexpr uint32_t semaphore=0xfd0, selector=0xfd4, multicast=1U<<31;
 constexpr uint32_t pat3=0x480c, tlbInvalidate=0xcee8, gucStatus=0xc000;
 constexpr uint32_t postedRead=0x1901f8, gsm=0x800000, aperture=0x1000000;
+constexpr uint32_t ggc=0x108040, ggmsMask=3U<<6;
 constexpr uint64_t first=8ULL*1024*1024, top=0xfee00000ULL;
 constexpr uint64_t dmaMask=((1ULL<<46)-1)&~(PageSize-1);
 constexpr uint64_t patMask=3ULL<<52, present=1;
@@ -61,6 +62,13 @@ bool IOKitBinding::physical(uint64_t epoch,bool allowFault) {
        !mmio_.forceWake().held(MellowXe::WakeDomain::Gt))return false;
     const uint16_t command=device_.configRead16(4);
     if(command==0xffff || (command&6)!=6)return false;
+    // MTL's real MMIO GGC.GGMS must report 3 (8MiB GSM / 4GiB GGTT).
+    // PCI GGC and total DSM/GMS are not substitutes for this table-size check.
+    // Intel source: detect_lmembar_integrated(), xe_ttm_stolen_mgr.c and GGC in
+    // regs/xe_regs.h at the pinned Linux revision cited above; xe_ggtt.c uses
+    // the 8MiB GSM window for graphics>=12.50.
+    uint32_t actualGgc=0;
+    if(!read32(ggc,actualGgc) || (actualGgc&ggmsMask)!=ggmsMask)return false;
     uint32_t mainIp=0,mediaIp=0,ack=0,control=0,vf=0;
     if(!read32(gmd,mainIp) || (mainIp>>22)!=12 || ((mainIp>>14)&255)!=70 ||
        !read32(media+gmd,mediaIp) || (mediaIp>>22)!=13 || ((mediaIp>>14)&255)!=0 ||

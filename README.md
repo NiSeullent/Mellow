@@ -16,7 +16,7 @@ Metal 2/3, WindowServer·디스플레이 통합과 안정성 검증까지 완성
 
 | 기기 / PCI ID | 현재 개발 단계 | Mellow에 있는 구현과 남은 작업 | native macOS GPU·Metal·WindowServer 실기 결과 |
 | --- | --- | --- | --- |
-| **Intel `8086:7D41`** — 저장소 식별명: Arrow Lake-U Intel Graphics 4-Core | **부분 구현 · 빌드 기록 있음** | Xe 메모리·GuC·제출/fence/readback·IOKit 연결 소스가 있음. 실제 PCI·펌웨어·VM·context를 소유하고 서비스를 등록하는 통합 드라이버는 미완성 | **모두 미검증 · 지원 완료 전** |
+| **Intel `8086:7D41`** — 저장소 식별명: Arrow Lake-U Intel Graphics 4-Core | **부분 구현 · 빌드 기록 있음** | Xe 메모리·GuC·전체 ADS 직렬화·제출/fence/readback·IOKit 연결 소스가 있음. 실제 PCI·펌웨어·VM·context를 소유하고 서비스를 등록하는 통합 드라이버는 미완성 | **모두 미검증 · 지원 완료 전** |
 | Intel `8086:7D40` — Intel Graphics (Meteor Lake) | **식별 테이블 단계** | [기기 식별 코드](Mellow/kern_model.hpp)에 ID가 있음. 기기별 native 실행·firmware·display 검증은 없음 | **모두 미검증** |
 | Intel `8086:7D45` — Intel Graphics (Meteor Lake) | **식별 테이블 단계** | 기기 ID 인식 코드가 있음. 해당 실물의 실행·display 기록 없음 | **모두 미검증** |
 | Intel `8086:7D55` — Intel Arc Graphics (Meteor Lake) | **식별 테이블 단계** | 기기 ID 인식 코드가 있음. 해당 실물의 실행·display 기록 없음 | **모두 미검증** |
@@ -37,6 +37,12 @@ GuC transport 105,180회·context execution 483회 sanitizer 호스트 검사도
 있지만 Apple 사용자 공간 SDK 빌드와 실제 macOS 실행은 아직 검증되지 않았습니다.
 Ice Lake 호환성 연구 경로는 실기 미검증이고 Tiger Lake 경로는 폐기 예정(`DEPRECATED`)입니다.
 기기 이름·ID 등록·Recovery 입력에 있는 framebuffer만으로 macOS 버전별 지원을 추정하지 않습니다.
+
+추가한 [GuC ADS 코드](docs/XE-GUC-ADS.md)는 부팅 전 엔진 설정과 부팅 후 실제로
+캡처한 golden context를 구분합니다. 초기화 실패 시 자원 보유·재시도, GuC 요청의
+정리와 forcewake 검사도 보완했습니다. 최신 [소스·빌드·회귀 검증 기록](validation/native-gpu/ads-lifecycle-checkpoint.json)을
+함께 제공합니다. 실제 소유권·context 전환 증거를 제공하는 통합 드라이버는 아직 미완성이며,
+이 변경으로 기기별 실기 지원 상태를 완료로 올리지 않습니다.
 
 ### NVIDIA 계열별 포팅 범위
 

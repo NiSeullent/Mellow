@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A09320260930000000000005 /* XeGuCAds.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A09320260930000000000019 /* XeGuCAds.cpp */; };
 		A09320260930000000000001 /* NativeGpuSession.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A09320260930000000000011 /* NativeGpuSession.cpp */; };
 		A09320260930000000000002 /* NativeGpuIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A09320260930000000000012 /* NativeGpuIOKit.cpp */; };
 		A09320260930000000000003 /* XeNativeEvidence.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A09320260930000000000013 /* XeNativeEvidence.cpp */; };
@@ -70,6 +71,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A09320260930000000000019 /* XeGuCAds.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGuCAds.cpp; sourceTree = "<group>"; };
+		A0932026093000000000001A /* XeGuCAds.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeGuCAds.hpp; sourceTree = "<group>"; };
 		A09320260930000000000010 /* NativeGpuABI.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = NativeGpuABI.h; sourceTree = "<group>"; };
 		A09320260930000000000011 /* NativeGpuSession.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeGpuSession.cpp; sourceTree = "<group>"; };
 		A09320260930000000000012 /* NativeGpuIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = NativeGpuIOKit.cpp; sourceTree = "<group>"; };
@@ -206,6 +209,8 @@
 			children = (
 				A09320260930000000000010 /* NativeGpuABI.h */,
 				A09320260930000000000011 /* NativeGpuSession.cpp */,
+				A09320260930000000000019 /* XeGuCAds.cpp */,
+				A0932026093000000000001A /* XeGuCAds.hpp */,
 				A09320260930000000000012 /* NativeGpuIOKit.cpp */,
 				A09320260930000000000013 /* XeNativeEvidence.cpp */,
 				A09320260930000000000014 /* XeGgttIOKit.cpp */,
@@ -441,6 +446,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A09320260930000000000001 /* NativeGpuSession.cpp in Sources */,
+				A09320260930000000000005 /* XeGuCAds.cpp in Sources */,
 				A09320260930000000000002 /* NativeGpuIOKit.cpp in Sources */,
 				A09320260930000000000003 /* XeNativeEvidence.cpp in Sources */,
 				A09320260930000000000004 /* XeGgttIOKit.cpp in Sources */,

@@ -46,9 +46,14 @@ struct Backend {
     // Expected Xe-LPG PAT3=2 (WB, 1-way coherent); never infer a programmed PAT.
     bool (*readPat3)(void *, uint32_t &) {};
     bool (*mappingPublished)(void *, const Region &, uint64_t epoch) {};
-    // Submission profile only: authoritative inspection of full ADS engine
-    // masks/mapping/regsets/golden contexts and platform WA KLV contents.
-    bool (*fullAdsValid)(void *, const Plan &, const MellowXe::FirmwareInfo &) {};
+    // Submission boot profile: complete pre-load ADS masks/mapping/regsets,
+    // capture/WA lists and reserved golden addresses. Actual golden contexts
+    // are captured AFTER boot; requiring them here would make boot circular.
+    bool (*preloadAdsValid)(void *, const Plan &, const MellowXe::FirmwareInfo &) {};
+    // Fresh post-load capture inspection, with actual WA/NOP context switches,
+    // completed fences and synchronized immutable golden LRC images for every
+    // admitted class. Absent/failed proof blocks general user submissions.
+    bool (*goldenAdsValid)(void *, const Plan &, const MellowXe::FirmwareInfo &) {};
 };
 // Read-only hardware GGTT verifier: BAR0 + 8MiB GSM window, 8-byte PTE per4K,
 // exact 46-bit DMA address + PRESENT + PAT3(bits52/53), no DM/VFID/extra bits.
@@ -74,6 +79,7 @@ public:
     // Profile information is not a fresh hardware-health or CTB-ready proof;
     // admission must also use running(owner, epoch) and the live transport.
     bool submissionProfile() const { return state_ == State::Running && plan_.profile == Profile::Submission; }
+    bool submissionReady(uint64_t owner, uint64_t epoch) const;
     State state() const { return state_; }
     uint32_t lastStatus() const { return lastStatus_; }
     unsigned heldRegions() const { return held_; }

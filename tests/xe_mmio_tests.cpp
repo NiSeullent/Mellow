@@ -7,10 +7,10 @@ using namespace MellowXe;
 static unsigned checks=0;
 #define CHECK(x) do { ++checks; if (!(x)) { std::fprintf(stderr,"line %d: %s\n",__LINE__,#x); std::exit(1); } } while (0)
 struct Device {
-    uint32_t gmd=(12U<<22)|(70U<<14)|(2U<<6)|3U, ack[2]={0,0};
+    uint32_t gmd=(12U<<22)|(70U<<14)|(2U<<6)|3U, ack[2]={0,0},control[2]={0,0};
     uint64_t time=0;
     unsigned writes=0,reads=0,delays=0;
-    bool failRead=false,failWrite=false,allOnes=false,noAckOn=false,noAckOff=false,stalledClock=false,reverseClock=false;
+    bool failRead=false,failControlRead=false,failWrite=false,allOnes=false,noAckOn=false,noAckOff=false,stalledClock=false,reverseClock=false;
     static bool read(void *p,uint32_t reg,uint32_t &out) {
         auto &d=*static_cast<Device *>(p); ++d.reads;
         if (d.failRead) return false;
@@ -18,6 +18,10 @@ struct Device {
         if (reg==0xD8C) out=d.gmd;
         else if (reg==0xDFC) out=d.ack[0];
         else if (reg==0xD84) out=d.ack[1];
+        else if (reg==0xA188 || reg==0xA278) {
+            if (d.failControlRead) return false;
+            out=d.control[reg==0xA278];
+        }
         else return false;
         return true;
     }
@@ -26,6 +30,8 @@ struct Device {
         if (d.failWrite) return false;
         CHECK(reg==0xA188 || reg==0xA278);
         CHECK(value==0x10000 || value==0x10001);
+        auto &control=d.control[reg==0xA278];
+        control=(control&~1U)|(value&1U);
         auto &ack=d.ack[reg==0xA278];
         if (value&1) { if (!d.noAckOn) ack|=1; }
         else if (!d.noAckOff) ack&=~1U;
@@ -52,9 +58,9 @@ int main() {
       CHECK(f.release(static_cast<WakeDomain>(2))==MmioStatus::Invalid);
       CHECK(f.acquire(WakeDomain::Render)==MmioStatus::Busy);
       CHECK(f.release(WakeDomain::Gt)==MmioStatus::Busy);
-      d.ack[0]=2; // Another hardware requester bit must remain untouched.
+      d.ack[0]=d.control[0]=2; // Another requester bit must remain untouched.
       CHECK(f.acquire(WakeDomain::Gt)==MmioStatus::Ok);
-      CHECK(d.ack[0]==3 && d.writes==1);
+      CHECK(d.ack[0]==3 && d.control[0]==3 && d.writes==1);
       CHECK(f.acquire(WakeDomain::Gt)==MmioStatus::Ok && d.writes==1);
       CHECK(f.acquire(WakeDomain::Render)==MmioStatus::Ok);
       CHECK(f.release(WakeDomain::Gt)==MmioStatus::Ok);
@@ -64,7 +70,7 @@ int main() {
       CHECK(f.release(WakeDomain::Render)==MmioStatus::Ok);
       CHECK(f.held(WakeDomain::Render));
       CHECK(f.release(WakeDomain::Render)==MmioStatus::Ok);
-      CHECK(f.release(WakeDomain::Gt)==MmioStatus::Ok && d.ack[0]==2);
+      CHECK(f.release(WakeDomain::Gt)==MmioStatus::Ok && d.ack[0]==2 && d.control[0]==2);
       CHECK(f.canDetach() && !f.held(WakeDomain::Gt));
       CHECK(f.shutdown()==MmioStatus::Ok);
       CHECK(f.acquire(WakeDomain::Gt)==MmioStatus::Unavailable);
@@ -85,6 +91,25 @@ int main() {
       d.ack[0]=1;
       CHECK(f.acquire(WakeDomain::Gt)==MmioStatus::Busy && d.writes==0);
       CHECK(f.canDetach());
+    }
+    for (unsigned domain=0;domain<2;++domain) {
+      ForceWake f; Device d; CHECK(f.initialize(d.access())==MmioStatus::Ok);
+      if (domain) CHECK(f.acquire(WakeDomain::Gt)==MmioStatus::Ok);
+      const unsigned before=d.writes;
+      d.control[domain]=1; // Foreign request is pending, ACK is still clear.
+      CHECK(d.ack[domain]==0);
+      CHECK(f.acquire(domain?WakeDomain::Render:WakeDomain::Gt)==MmioStatus::Busy);
+      CHECK(d.writes==before && d.control[domain]==1);
+      CHECK(!f.held(domain?WakeDomain::Render:WakeDomain::Gt));
+      if (domain) CHECK(f.release(WakeDomain::Gt)==MmioStatus::Ok);
+      CHECK(f.canDetach() && d.control[domain]==1); // Never clear the foreign request.
+    }
+    for (unsigned failure=0;failure<2;++failure) {
+      ForceWake f; Device d; CHECK(f.initialize(d.access())==MmioStatus::Ok);
+      if (failure) d.failControlRead=true;
+      else d.control[0]=UINT32_MAX;
+      CHECK(f.acquire(WakeDomain::Gt)==MmioStatus::IoFailure);
+      CHECK(d.writes==0 && !f.held(WakeDomain::Gt) && f.canDetach());
     }
     for (unsigned stalled=0;stalled<2;++stalled) {
       ForceWake f; Device d; CHECK(f.initialize(d.access())==MmioStatus::Ok);

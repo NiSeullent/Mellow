@@ -17,6 +17,12 @@ to x86_64 Darwin24/25 Mach-O objects; the portable session sanitizer tests pass.
 The required concrete retained PCI/firmware/context owner is still missing, so
 the service is not published and physical GPU/Metal/WindowServer execution
 remains unverified. These checks are separate from the historical records below.
+The additional [GuC ADS implementation](XE-GUC-ADS.md) serializes complete
+bounded pre-load data and separately admits actual captured golden contexts.
+Loader submission admission requires fresh post-load proof. Native connection
+preparation now has retained abort transactions; close retires GuC cookies as
+well as context/fence resources. Current source-bound validation is recorded in
+[the ADS/lifecycle checkpoint](../validation/native-gpu/ads-lifecycle-checkpoint.json).
 
 ## Implemented and exercised
 

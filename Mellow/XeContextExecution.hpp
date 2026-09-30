@@ -55,7 +55,9 @@ public:
         const XeDispatch::Policy &,uint32_t nonce,uint32_t count,bool depthStallWa,uint64_t now,uint64_t deadline);
     ExecutionStatus poll(uint64_t now);
     // Never invents completion. May release after confirmed quiescence even if
-    // command acceptance was unknown. A timeout alone cannot make close pass.
+    // command acceptance was unknown. Pending GuC response ownership keeps
+    // close Busy and unretired cookies/remaining handles available to retry.
+    // A timeout alone cannot make close pass.
     ExecutionStatus close();
     ExecutionState state() const { return state_; }
     unsigned retainedVmUses() const;
@@ -71,6 +73,7 @@ private:
     ExecutionStatus fail(ExecutionStatus);
     ExecutionStatus sampleTime();
     bool releaseVm();
+    ExecutionStatus retireControl();
     bool allowed() const;
 };
 }

@@ -12,7 +12,8 @@ struct IOKitProofs {
     bool (*releaseGgtt)(void *,const Region &) {};
     bool (*mappingPublished)(void *,const Region &,uint64_t) {};
     bool (*readPat3)(void *,uint32_t &) {};
-    bool (*fullAdsValid)(void *,const Plan &,const MellowXe::FirmwareInfo &) {};
+    bool (*preloadAdsValid)(void *,const Plan &,const MellowXe::FirmwareInfo &) {};
+    bool (*goldenAdsValid)(void *,const Plan &,const MellowXe::FirmwareInfo &) {};
 };
 // Real IOKit binding. Caller retains device/MMIO/proofs, holds GT forcewake and
 // one shared sleepable serialization domain. Nothing attaches/runs by default.
@@ -36,5 +37,6 @@ private:
     static bool readPat(void *,uint32_t &);
     static bool published(void *,const Region &,uint64_t);
     static bool ads(void *,const Plan &,const MellowXe::FirmwareInfo &);
+    static bool golden(void *,const Plan &,const MellowXe::FirmwareInfo &);
 };
 }
