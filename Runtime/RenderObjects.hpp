@@ -21,6 +21,11 @@ public:
     static std::shared_ptr<RenderDevice> createOpenGL(Error &, bool visible = false,
                                                     uint32_t windowWidth = 640, uint32_t windowHeight = 480);
     std::shared_ptr<RenderTexture> newTexture(uint32_t width, uint32_t height, Error &);
+#if defined(__APPLE__)
+    // Allocates a nonplanar BGRA8 IOSurface that is written by the CGL GPU
+    // provider. Encoding/allocating alone never makes its content readable.
+    std::shared_ptr<RenderTexture> newIOSurfaceTexture(uint32_t width, uint32_t height, Error &);
+#endif
     std::shared_ptr<RenderLibrary> newLibraryWithSource(const std::string &, Error &);
     std::shared_ptr<RenderPipeline> newRenderPipeline(const std::shared_ptr<RenderFunction> &vertex,
                                                      const std::shared_ptr<RenderFunction> &fragment, Error &);
@@ -35,12 +40,19 @@ private:
 };
 class RenderTexture {
 public:
+    ~RenderTexture();
     uint32_t width() const { return width_; }
     uint32_t height() const { return height_; }
     // Explicit copied RGBA8 result, row zero is the top row. No CPU initializer
     // is accepted as GPU output; read fails before a successful rendered pass.
     std::vector<uint8_t> read(Error &) const;
     uint64_t contentSequence() const;
+#if defined(__APPLE__)
+    // Borrowed completed GPU surface; null before completion or after a failed
+    // write. Keep this texture alive and exclude further writes while using it.
+    // Surface row zero is the bottom row, unlike read()'s top-left RGBA copy.
+    IOSurfaceRef iosurface() const;
+#endif
 private:
     friend class RenderDevice; friend class RenderEncoder; friend class RenderCommandBuffer;
     RenderTexture(std::shared_ptr<RenderDevice>, uint32_t, uint32_t);
@@ -49,6 +61,9 @@ private:
     mutable std::mutex mutex_;
     std::vector<uint8_t> rgba_;
     uint64_t sequence_ {};
+#if defined(__APPLE__)
+    IOSurfaceRef surface_ {};
+#endif
 };
 class RenderLibrary : public std::enable_shared_from_this<RenderLibrary> {
 public:

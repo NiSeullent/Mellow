@@ -16,6 +16,7 @@ public:
     MmioStatus attach(IOPCIDevice *device);
     MmioStatus detach();
     MmioAccess access();
+    uint64_t mappedLength() const { return length_; }
     ForceWake &forceWake() { return wake_; }
 private:
     IOPCIDevice *device_ {};

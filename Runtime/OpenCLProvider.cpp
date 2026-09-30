@@ -20,6 +20,7 @@
 namespace MellowRT {
 using namespace OpenCLAbi;
 namespace {
+struct Unavailable : std::runtime_error { using std::runtime_error::runtime_error; };
 void require(bool condition, const std::string &message) {
     if (!condition) throw std::runtime_error(message);
 }
@@ -36,7 +37,7 @@ public:
 #else
         handle_ = dlopen("libOpenCL.so.1", RTLD_NOW | RTLD_LOCAL);
 #endif
-        require(handle_ != nullptr, "OpenCL loader is unavailable; no driver installation attempted");
+        if (!handle_) throw Unavailable("OpenCL loader is unavailable; no driver installation attempted");
     }
     ~Library() {
         if (handle_) {
@@ -112,6 +113,7 @@ struct OpenCLProvider::Impl {
     }
     void invalidate() {
         ready = false;
+        info.apiObjectIdentityVerified = false;
         provider.verified = 0;
         provider.validationRecord = 0;
         if (epoch != std::numeric_limits<uint64_t>::max()) ++epoch;
@@ -148,7 +150,8 @@ struct OpenCLProvider::Impl {
         }
         UInt count {};
         const auto platformStatus = api.GetPlatformIDs(0, nullptr, &count);
-        require(platformStatus != PlatformNotFound && count, "No OpenCL platform available");
+        if (platformStatus == PlatformNotFound || (platformStatus == Success && !count))
+            throw Unavailable("No OpenCL platform available");
         checked(platformStatus, "clGetPlatformIDs");
         require(count <= 64, "Platform count exceeds probe bound");
         std::vector<Handle> platforms(count);
@@ -165,7 +168,8 @@ struct OpenCLProvider::Impl {
             checked(api.GetDeviceIDs(platform, Gpu, count, current.data(), nullptr), "clGetDeviceIDs(GPU)");
             for (Handle item : current) devices.emplace_back(platform, item);
         }
-        require(gpuIndex < devices.size(), "Requested OpenCL GPU index unavailable; CPU fallback disabled");
+        if (gpuIndex >= devices.size())
+            throw Unavailable("Requested OpenCL GPU index unavailable; CPU fallback disabled");
         Handle platform = devices[gpuIndex].first;
         device = devices[gpuIndex].second;
         info.platform = textInfo(api.GetPlatformInfo, platform, 0x0902);
@@ -179,15 +183,16 @@ struct OpenCLProvider::Impl {
         info.reportedVendorId = scalarInfo<UInt>(api.GetDeviceInfo, device, VendorId);
         info.available = scalarInfo<UInt>(api.GetDeviceInfo, device, DeviceAvailable) != 0;
         info.compilerAvailable = scalarInfo<UInt>(api.GetDeviceInfo, device, CompilerAvailable) != 0;
-        require((info.reportedType & Gpu) && !(info.reportedType & Cpu), "Driver device is not exclusively GPU classified");
-        require(info.available && info.compilerAvailable, "GPU/compiler unavailable");
+        require(info.reportedType == Gpu, "Driver device is not exclusively GPU classified");
+        if (!info.available || !info.compilerAvailable) throw Unavailable("GPU/compiler unavailable");
+        require(info.reportedVendorId != 0, "OpenCL device vendor identifier is missing");
         if (hasExtension(info.extensions, "cl_intel_device_attribute_query")) {
             info.reportedDeviceId = scalarInfo<UInt>(api.GetDeviceInfo, device, IntelDeviceId);
             info.deviceIdFromIntelExtension = true;
-        }
-        require(info.reportedDeviceId && info.reportedDeviceId <= 0xFFFF &&
-                info.reportedVendorId && info.reportedVendorId <= 0xFFFF,
-                "Driver did not expose a usable device ID; policy identity will not be fabricated");
+            require(info.reportedDeviceId && info.reportedDeviceId <= 0xFFFF &&
+                    info.reportedVendorId <= 0xFFFF,
+                    "Advertised device identity extension returned an unusable identifier");
+        } else info.identityScope = IdentityScope::OpenClDeviceObject;
         Int status {};
         context = api.CreateContext(nullptr, 1, &device, nullptr, nullptr, &status);
         checked(status, "clCreateContext");
@@ -204,9 +209,12 @@ struct OpenCLProvider::Impl {
         // OpenCL errors; every such submitted-work failure invalidates the epoch.
         provider = {};
         provider.id = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(queue));
-        provider.device = {static_cast<uint16_t>(info.reportedVendorId),
+        provider.device = {info.reportedVendorId <= 0xFFFF ? static_cast<uint16_t>(info.reportedVendorId) : uint16_t(0),
                            static_cast<uint16_t>(info.reportedDeviceId), 0,
                            static_cast<uint64_t>(reinterpret_cast<uintptr_t>(device))};
+        provider.device.scope = info.identityScope;
+        if (info.identityScope == IdentityScope::OpenClDeviceObject)
+            provider.device.apiVendorId = info.reportedVendorId;
         provider.api = Api::OpenCL;
         provider.kind = ProviderKind::Host;
         provider.execution = Execution::Hardware;
@@ -226,6 +234,7 @@ struct OpenCLProvider::Impl {
         provider.validationRecord = ++record;
         provider.verified = provider.advertised;
         bootstrap.validationRecord = provider.validationRecord;
+        info.apiObjectIdentityVerified = true;
         completion = CompletionTracker {};
         ready = true;
     }
@@ -376,10 +385,27 @@ OpenCLProvider::OpenCLProvider(const OpenCLAbi::Functions &functions) : impl_(st
 #endif
 OpenCLProvider::~OpenCLProvider() = default;
 bool OpenCLProvider::initialize(size_t index, std::string &error) {
-    error.clear();
-    if (impl_->ready) { error = "Provider is already initialized"; return false; }
-    try { impl_->initialize(index); return true; }
-    catch (const std::exception &failure) { error = failure.what(); impl_->invalidate(); return false; }
+    const auto result = initializeDetailed(index);
+    error = result.error;
+    return result.status == OpenCLInitializationStatus::Ready;
+}
+OpenCLInitialization OpenCLProvider::initializeDetailed(size_t index) {
+    OpenCLInitialization result;
+    if (impl_->ready) { result.error = "Provider is already initialized"; return result; }
+    try {
+        impl_->initialize(index);
+        result.status = OpenCLInitializationStatus::Ready;
+    } catch (const Unavailable &failure) {
+        result.error = failure.what();
+        result.status = impl_->bootstrap.submissionAttempted ? OpenCLInitializationStatus::Failure
+                                                            : OpenCLInitializationStatus::Unavailable;
+        impl_->invalidate();
+    } catch (const std::exception &failure) {
+        result.error = failure.what();
+        impl_->invalidate();
+    }
+    result.bootstrapSubmissionAttempted = impl_->bootstrap.submissionAttempted;
+    return result;
 }
 bool OpenCLProvider::executeOpenClC(const std::string &source, const std::string &entry,
                                   const std::vector<uint32_t> &input, const std::vector<uint32_t> &expected,

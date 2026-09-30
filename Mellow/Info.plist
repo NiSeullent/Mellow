@@ -15,11 +15,11 @@
 	<key>CFBundlePackageType</key>
 	<string>KEXT</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.4.3</string>
+	<string>0.4.4</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>0.4.3</string>
+	<string>0.4.4</string>
 	<key>IOKitPersonalities</key>
 	<dict>
 		<key>MellowTahoeDiagnostic</key>
@@ -36,6 +36,8 @@
 			<integer>1000</integer>
 			<key>IOUserClientClass</key>
 			<string>MellowTahoeDiagnosticClient</string>
+			<key>IOMatchCategory</key>
+			<string>MellowReadOnlyDiagnostic</string>
 		</dict>
 		<key>DisplayAppleIDInjection</key>
 		<dict>
@@ -117,6 +119,6 @@
 	<key>MellowDevelopmentBuild</key>
 	<true/>
 	<key>MellowValidationStatus</key>
-	<string>Opt-in Tahoe PCI/MMIO/prepared-DMA diagnostic service; actual kernel loading and GPU/Metal execution unverified</string>
+	<string>Sequoia/Tahoe opt-in physical PCI/BAR0/GMD diagnostic; native GPU submission and system Metal are not implemented</string>
 </dict>
 </plist>

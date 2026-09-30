@@ -104,6 +104,12 @@ stage `physical-provider`, first missing bit `bar0-mapped`; no physical capture 
 
 Recognition in a device table does not imply support of any kind.
 
+The separate [source-family planner](SOURCE-FAMILY-PORTING.md) now accepts
+reviewed Intel i915/Xe and NVIDIA Nouveau/RM family references. Its 18 profiles
+validate source-recipe compatibility and reject incompatible inputs. They do
+not expand this runtime device table or establish any additional hardware
+support, native driver execution or Metal result.
+
 ### Intel — Gen9 through Gen12 (legacy path)
 
 | Family | Backend | Evidence | Status |

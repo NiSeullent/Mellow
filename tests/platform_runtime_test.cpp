@@ -228,8 +228,59 @@ static void cache() {
     changed = key;
     changed.device.vendorId = 0;
     CHECK(!validCacheIdentity(changed));
+    changed = key;
+    changed.device.scope = IdentityScope::OpenClDeviceObject;
+    changed.device.deviceId = 0;
+    changed.device.apiVendorId = 0x10de;
+    CHECK(!validCacheIdentity(changed)); // API object handle is not a persistent cache device identity.
+}
+static void apiObjectIdentity() {
+    auto host = provider(1, Api::OpenCL);
+    host.device = {0x10de, 0, 0, 42, IdentityScope::OpenClDeviceObject, 0x10de};
+    const Step compute {Workload::Compute, 0, 0, WorkloadInput::OpenClC};
+    CHECK(one(host, compute).status == PlanStatus::Ready);
+    auto changed = host;
+    changed.kind = ProviderKind::Mellow;
+    CHECK(one(changed, compute).status == PlanStatus::InvalidInput);
+    changed = host; changed.api = Api::Native;
+    CHECK(one(changed, compute).status == PlanStatus::InvalidInput);
+    changed = host; changed.api = Api::OpenGL;
+    CHECK(one(changed, compute).status == PlanStatus::InvalidInput);
+    changed = host; changed.api = Api::CpuReference; changed.kind = ProviderKind::Reference;
+    changed.execution = Execution::Software;
+    CHECK(one(changed, compute, true).status == PlanStatus::InvalidInput);
+    changed = host; changed.device.deviceId = 0x2204;
+    CHECK(one(changed, compute).status == PlanStatus::InvalidInput); // API-only identity cannot smuggle a device ID.
+    changed = host; changed.device.apiVendorId = 0;
+    CHECK(one(changed, compute).status == PlanStatus::InvalidInput);
+    changed = host; changed.device.vendorId = 0x8086;
+    CHECK(one(changed, compute).status == PlanStatus::InvalidInput);
+    changed = host; changed.device.scope = IdentityScope::ReportedPci;
+    CHECK(one(changed, compute).status == PlanStatus::InvalidInput);
+    changed = host; changed.device.scope = static_cast<IdentityScope>(255);
+    CHECK(one(changed, compute).status == PlanStatus::InvalidInput);
+    changed = host; changed.evidenceEpoch = 0;
+    CHECK(one(changed, compute).status == PlanStatus::InvalidInput);
+    changed = host; changed.verified = 0;
+    CHECK(one(changed, compute).status == PlanStatus::UnsupportedFeatures);
+    changed = host; changed.device.vendorId = 0; changed.device.apiVendorId = 0x10001;
+    CHECK(one(changed, compute).status == PlanStatus::Ready); // Full-width Khronos vendor ID is preserved.
+    CHECK(!sameDevice(host.device, changed.device));
+    changed = host; changed.device.scope = IdentityScope::ReportedPci;
+    CHECK(!sameDevice(host.device, changed.device));
+    SubmissionToken token {1, 42, 5, 7, 10};
+    CompletionTracker tracker;
+    CHECK(tracker.armAfterSubmission(host, token) == CompletionStatus::Accepted);
+    CompletionObservation observation {token, ObservationKind::GpuCompletion, 100, 200, 10, true};
+    CHECK(tracker.observe(observation) == CompletionStatus::Accepted);
+    // Distinct queues/providers with the same API device handle still need a
+    // per-resource transfer contract; identity never establishes interop.
+    ProviderDescriptor pair[] {host, host}; pair[1].id = 2;
+    Step steps[] {compute, compute}; steps[0].requiredProvider = 1; steps[1].requiredProvider = 2;
+    const Dependency edge {0, 1, 99, TransferPolicy::SharedOnly};
+    CHECK(planWorkload(pair, 2, steps, 2, &edge, 1, nullptr, 0).status == PlanStatus::TransferUnavailable);
 }
 int main() {
-    routes(); interop(); completion(); cache();
+    routes(); interop(); completion(); cache(); apiObjectIdentity();
     printf("PASS: %u policy checks (synthetic adapters; no GPU execution or Metal conformance)\n", checks);
 }

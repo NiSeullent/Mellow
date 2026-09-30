@@ -14,22 +14,38 @@ struct Resource {
     uint64_t *pages {};
     uint64_t owner {}, bytes {};
     size_t pageCount {};
-    bool descriptorPrepared {}, charged {};
+    bool descriptorAttempted {}, descriptorPrepared {}, charged {};
+    bool commandAttempted {}, commandPrepared {}, cleanupUncertain {};
 };
 
 // Only called before GPU bind or after the VM backend proved unbind+invalidate.
 static Status releaseResource(Resource *resource) {
+    // XNU clearMemoryDescriptor(true) discards complete() errors. complete may
+    // consume its active count yet fail IOMMU unmap; retry NotReady does not
+    // repair that lost cleanup authority. Retain all backing after uncertainty.
+    if (resource->cleanupUncertain) return Status::BackendFailure;
     if (resource->command) {
+        if (resource->commandAttempted) {
+            const auto status = resource->command->complete(true, true);
+            if (status != kIOReturnSuccess) {
+                resource->cleanupUncertain = true;
+                return Status::BackendFailure;
+            }
+            resource->commandAttempted = resource->commandPrepared = false;
+        }
         if (resource->command->getMemoryDescriptor() &&
-            resource->command->clearMemoryDescriptor(true) != kIOReturnSuccess)
+            (resource->command->clearMemoryDescriptor(false) != kIOReturnSuccess ||
+             resource->command->getMemoryDescriptor()))
             return Status::BackendFailure;
         resource->command->release();
         resource->command = nullptr;
     }
-    if (resource->descriptorPrepared) {
-        if (resource->memory->complete(kIODirectionInOut) != kIOReturnSuccess)
+    if (resource->descriptorAttempted) {
+        if (resource->memory->complete(kIODirectionInOut) != kIOReturnSuccess) {
+            resource->cleanupUncertain = true;
             return Status::BackendFailure;
-        resource->descriptorPrepared = false;
+        }
+        resource->descriptorAttempted = resource->descriptorPrepared = false;
     }
     if (resource->memory) resource->memory->release();
     if (resource->mapper) resource->mapper->release();
@@ -68,6 +84,7 @@ static Status pinMemory(void *opaque, uint64_t owner, uint64_t bytes, Pin &pin) 
         kIODirectionInOut, static_cast<vm_size_t>(bytes), PageSize);
     if (!resource->memory || !resource->memory->getBytesNoCopy()) return failedPin(resource, pin);
     bzero(resource->memory->getBytesNoCopy(), static_cast<size_t>(bytes));
+    resource->descriptorAttempted = true;
     if (resource->memory->prepare(kIODirectionInOut) != kIOReturnSuccess)
         return failedPin(resource, pin);
     resource->descriptorPrepared = true;
@@ -75,8 +92,11 @@ static Status pinMemory(void *opaque, uint64_t owner, uint64_t bytes, Pin &pin) 
     resource->command = IODMACommand::withSpecification(IODMACommand::OutputHost64,
         46, PageSize, IODMACommand::kMapped, bytes, PageSize, resource->mapper);
     if (!resource->command) return failedPin(resource, pin);
-    if (resource->command->setMemoryDescriptor(resource->memory, false) != kIOReturnSuccess ||
-        resource->command->prepare(0, bytes) != kIOReturnSuccess) return failedPin(resource, pin);
+    if (resource->command->setMemoryDescriptor(resource->memory, false) != kIOReturnSuccess)
+        return failedPin(resource, pin);
+    resource->commandAttempted = true;
+    if (resource->command->prepare(0, bytes) != kIOReturnSuccess) return failedPin(resource, pin);
+    resource->commandPrepared = true;
     UInt64 offset = 0;
     for (size_t i = 0; i < resource->pageCount; ++i) {
         IODMACommand::Segment64 segment {};
@@ -116,16 +136,34 @@ Backend makeIOKitPinBackend(IOKitContext &context) {
 }
 Status synchronizeForDevice(const Pin &pin) {
     auto *resource = checked(pin);
-    if (!resource || !resource->command) return Status::Invalid;
+    if (!resource || !resource->command || !resource->commandPrepared || resource->cleanupUncertain)
+        return Status::Invalid;
     return resource->command->synchronize(kIODirectionOut) == kIOReturnSuccess ? Status::Ok : Status::BackendFailure;
 }
 Status synchronizeForCpu(const Pin &pin) {
     auto *resource = checked(pin);
-    if (!resource || !resource->command) return Status::Invalid;
+    if (!resource || !resource->command || !resource->commandPrepared || resource->cleanupUncertain)
+        return Status::Invalid;
     return resource->command->synchronize(kIODirectionIn) == kIOReturnSuccess ? Status::Ok : Status::BackendFailure;
 }
 void *kernelBuffer(const Pin &pin) {
     auto *resource = checked(pin);
-    return resource && resource->memory ? resource->memory->getBytesNoCopy() : nullptr;
+    return resource && resource->memory && resource->commandPrepared && !resource->cleanupUncertain
+        ? resource->memory->getBytesNoCopy() : nullptr;
+}
+void *resolvePinnedBuffer(IOKitContext &context, uint64_t owner, uint64_t bytes, const Pin &pin) {
+    if (!owner || !bytes || (bytes & (PageSize - 1)) || bytes > SIZE_MAX || !context.mapper)
+        return nullptr;
+    auto *resource = checked(pin);
+    if (!resource || resource->context != &context || resource->owner != owner ||
+        resource->bytes != bytes || resource->pageCount != bytes / PageSize ||
+        !resource->pages || !resource->charged || !resource->descriptorAttempted ||
+        !resource->descriptorPrepared || !resource->commandAttempted ||
+        !resource->commandPrepared || resource->cleanupUncertain || !resource->memory ||
+        !resource->command || !resource->mapper || resource->mapper != context.mapper ||
+        resource->memory->getLength() != bytes ||
+        resource->command->getMemoryDescriptor() != resource->memory)
+        return nullptr;
+    return resource->memory->getBytesNoCopy();
 }
 }

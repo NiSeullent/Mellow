@@ -17,10 +17,16 @@ bool sourceSize(size_t count, Error &error) {
 }
 Device::Device() : provider_(std::make_shared<MellowRT::OpenCLProvider>()) {}
 std::shared_ptr<Device> Device::createOpenCL(size_t index, Error &error) {
+    return createOpenCL(index, error, nullptr);
+}
+std::shared_ptr<Device> Device::createOpenCL(size_t index, Error &error, MellowRT::OpenCLInitialization *initialization) {
     error = {};
     auto device = std::shared_ptr<Device>(new Device());
-    std::string failure;
-    if (!device->provider_->initialize(index, failure)) { fail(error, ErrorCode::Execution, failure); return {}; }
+    const auto result = device->provider_->initializeDetailed(index);
+    if (initialization) *initialization = result;
+    if (result.status != MellowRT::OpenCLInitializationStatus::Ready) {
+        fail(error, ErrorCode::Execution, result.error); return {};
+    }
     return device;
 }
 std::shared_ptr<Buffer> Device::newBuffer(const std::vector<uint32_t> &words, Error &error) {

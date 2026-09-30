@@ -1,3 +1,5 @@
+> **Sequoia 255U development branch:** this branch builds an experimental EFI and Mellow 0.4.4, not a full-Metal driver. Physical target boot and GPU execution are unverified; the native submission owner and Apple Metal ABI remain incomplete. See [delivery status](docs/SEQUOIA-255U.md) and [Korean EFI instructions](EFI-255U/README-FIRST.ko.md).
+
 # Mellow
 
 **Metal Emulation Layer Logic for OpenGL/OpenCL Workloads**

@@ -7,6 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1EDD20260930C00000000001 /* FirmwareImage.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1EDD20260930C00000000002 /* FirmwareImage.cpp */; };
+		1EDD20260930B00000000001 /* XeGuCRegionOwner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1EDD20260930B00000000002 /* XeGuCRegionOwner.cpp */; };
+		28D26C4F9D28BAEF8DF7A6E0 /* MemoryOwner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 801DB68AC6BCDFC892A7536D /* MemoryOwner.cpp */; };
+		1E16A0680E14C2A2CBD02FD7 /* Probe.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1046278D0903A798A86E76F6 /* Probe.cpp */; };
+		2C77E10D064F27D2F8336794 /* GpFifoQueue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FD39E19A327DB38BB67B81C0 /* GpFifoQueue.cpp */; };
+		75473EF9EC89DE0D456164A0 /* CopyPushbuffer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 88F58542D3B7FBAF5E1E1709 /* CopyPushbuffer.cpp */; };
+		D3F3DE6450A5FA934F71C017 /* NativeMemoryIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C0C3DBEA96287C9A5407B43B /* NativeMemoryIOKit.cpp */; };
+		B55F50E0BD153F65527C0C30 /* NvidiaMmioIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1CE1C9D8C32804DC2D3FB1CC /* NvidiaMmioIOKit.cpp */; };
+		1EDD20260930A00000000001 /* Radix3.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1EDD20260930A00000000002 /* Radix3.cpp */; };
+		1EDD20260930000000000001 /* CommandEncoding.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1EDD20260930000000000002 /* CommandEncoding.cpp */; };
 		D1A625064D41470000000002 /* TahoeDiagnosticProtocol.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D1A625064D414700000000A2 /* TahoeDiagnosticProtocol.cpp */; };
 		D1A625064D41470000000001 /* TahoeDiagnostic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D1A625064D414700000000A1 /* TahoeDiagnostic.cpp */; };
 		C42F5B82067D421096F10001 /* PortedXeBindings.cpp in Sources */ = {isa = PBXBuildFile; fileRef = C42F5B82067D421096F10002 /* PortedXeBindings.cpp */; };
@@ -40,6 +50,7 @@
 		1612B9BD160818EF65265682 /* XeGuCTransportIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A5EC69B7701AB508DBC0A7F2 /* XeGuCTransportIOKit.cpp */; };
 		958942B747C41BD313B134F0 /* XeZebin.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FEA06EFB6A1FA4C706E7AEED /* XeZebin.cpp */; };
 		F0EDFC58B1C04818A187BD4D /* XeGuCFirmware.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8C08783D431EFF2D805D7E02 /* XeGuCFirmware.cpp */; };
+		044255000000000000000001 /* XeGgtt.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 044255000000000000000002 /* XeGgtt.cpp */; };
 		F15AC567811442834E48303E /* XeGuCFirmwareIOKit.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 08C80C1179A55FA889D654C2 /* XeGuCFirmwareIOKit.cpp */; };
 		07105C39D3A806F8F8C3B7ED /* XeContext.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3663BEC9A333E8DC291412A5 /* XeContext.cpp */; };
 		4482DE84BBE2324C2704B8E2 /* XeDispatch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CFF5ECDCFAF198ED4CA8FFE2 /* XeDispatch.cpp */; };
@@ -64,6 +75,26 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		1EDD20260930C00000000002 /* FirmwareImage.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = FirmwareImage.cpp; path = Drivers/PortedNvidiaGsp/FirmwareImage.cpp; sourceTree = SOURCE_ROOT; };
+		1EDD20260930C00000000003 /* FirmwareImage.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = FirmwareImage.hpp; path = Drivers/PortedNvidiaGsp/FirmwareImage.hpp; sourceTree = SOURCE_ROOT; };
+		1EDD20260930B00000000002 /* XeGuCRegionOwner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = XeGuCRegionOwner.cpp; path = Mellow/XeGuCRegionOwner.cpp; sourceTree = SOURCE_ROOT; };
+		1EDD20260930B00000000003 /* XeGuCRegionOwner.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = XeGuCRegionOwner.hpp; path = Mellow/XeGuCRegionOwner.hpp; sourceTree = SOURCE_ROOT; };
+		801DB68AC6BCDFC892A7536D /* MemoryOwner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = MemoryOwner.cpp; path = Drivers/NativeGpu/MemoryOwner.cpp; sourceTree = SOURCE_ROOT; };
+		647341016CC32AF0A1E73822 /* MemoryOwner.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = MemoryOwner.hpp; path = Drivers/NativeGpu/MemoryOwner.hpp; sourceTree = SOURCE_ROOT; };
+		1046278D0903A798A86E76F6 /* Probe.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Probe.cpp; path = Drivers/NativeNvidia/Probe.cpp; sourceTree = SOURCE_ROOT; };
+		D4414AA61AC5E606D2515171 /* Probe.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = Probe.hpp; path = Drivers/NativeNvidia/Probe.hpp; sourceTree = SOURCE_ROOT; };
+		FD39E19A327DB38BB67B81C0 /* GpFifoQueue.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = GpFifoQueue.cpp; path = Drivers/NativeNvidia/GpFifoQueue.cpp; sourceTree = SOURCE_ROOT; };
+		5C22A09ACBC048AA7799A7C0 /* GpFifoQueue.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = GpFifoQueue.hpp; path = Drivers/NativeNvidia/GpFifoQueue.hpp; sourceTree = SOURCE_ROOT; };
+		88F58542D3B7FBAF5E1E1709 /* CopyPushbuffer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CopyPushbuffer.cpp; path = Drivers/NativeNvidia/CopyPushbuffer.cpp; sourceTree = SOURCE_ROOT; };
+		8140CF253A595967282DE2D6 /* CopyPushbuffer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = CopyPushbuffer.hpp; path = Drivers/NativeNvidia/CopyPushbuffer.hpp; sourceTree = SOURCE_ROOT; };
+		C0C3DBEA96287C9A5407B43B /* NativeMemoryIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NativeMemoryIOKit.cpp; path = Mellow/NativeMemoryIOKit.cpp; sourceTree = SOURCE_ROOT; };
+		F1F0B86FCE7C25AE5D41F5B5 /* NativeMemoryIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = NativeMemoryIOKit.hpp; path = Mellow/NativeMemoryIOKit.hpp; sourceTree = SOURCE_ROOT; };
+		1CE1C9D8C32804DC2D3FB1CC /* NvidiaMmioIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = NvidiaMmioIOKit.cpp; path = Mellow/NvidiaMmioIOKit.cpp; sourceTree = SOURCE_ROOT; };
+		4A41A15513CB257547990198 /* NvidiaMmioIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = NvidiaMmioIOKit.hpp; path = Mellow/NvidiaMmioIOKit.hpp; sourceTree = SOURCE_ROOT; };
+		1EDD20260930A00000000002 /* Radix3.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Radix3.cpp; path = Drivers/PortedNvidiaGsp/Radix3.cpp; sourceTree = SOURCE_ROOT; };
+		1EDD20260930A00000000003 /* Radix3.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = Radix3.hpp; path = Drivers/PortedNvidiaGsp/Radix3.hpp; sourceTree = SOURCE_ROOT; };
+		1EDD20260930000000000002 /* CommandEncoding.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CommandEncoding.cpp; path = Drivers/PortedNvidia/CommandEncoding.cpp; sourceTree = SOURCE_ROOT; };
+		1EDD20260930000000000003 /* CommandEncoding.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; name = CommandEncoding.hpp; path = Drivers/PortedNvidia/CommandEncoding.hpp; sourceTree = SOURCE_ROOT; };
 		D1A625064D414700000000A2 /* TahoeDiagnosticProtocol.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TahoeDiagnosticProtocol.cpp; sourceTree = "<group>"; };
 		D1A625064D414700000000A1 /* TahoeDiagnostic.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TahoeDiagnostic.cpp; sourceTree = "<group>"; };
 		C42F5B82067D421096F10002 /* PortedXeBindings.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PortedXeBindings.cpp; sourceTree = "<group>"; };
@@ -123,6 +154,7 @@
 		FEA06EFB6A1FA4C706E7AEED /* XeZebin.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeZebin.cpp; sourceTree = "<group>"; };
 		E6D80DFA1E4BA5DE2289DD93 /* XeZebin.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeZebin.hpp; sourceTree = "<group>"; };
 		8C08783D431EFF2D805D7E02 /* XeGuCFirmware.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGuCFirmware.cpp; sourceTree = "<group>"; };
+		044255000000000000000002 /* XeGgtt.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGgtt.cpp; sourceTree = "<group>"; };
 		AA9EBAD50983BE81A8D4C209 /* XeGuCFirmware.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeGuCFirmware.hpp; sourceTree = "<group>"; };
 		08C80C1179A55FA889D654C2 /* XeGuCFirmwareIOKit.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = XeGuCFirmwareIOKit.cpp; sourceTree = "<group>"; };
 		39F8A57FECCF0553393B6EE3 /* XeGuCFirmwareIOKit.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = XeGuCFirmwareIOKit.hpp; sourceTree = "<group>"; };
@@ -154,9 +186,36 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		BFF974EEDBE2F7A8EFA151B3 /* NativeGpuSources */ = {
+			isa = PBXGroup;
+			children = (
+				1EDD20260930A00000000002 /* Radix3.cpp */,
+				1EDD20260930C00000000002 /* FirmwareImage.cpp */,
+				1EDD20260930C00000000003 /* FirmwareImage.hpp */,
+				1EDD20260930A00000000003 /* Radix3.hpp */,
+				1EDD20260930B00000000002 /* XeGuCRegionOwner.cpp */,
+				1EDD20260930B00000000003 /* XeGuCRegionOwner.hpp */,
+				801DB68AC6BCDFC892A7536D /* MemoryOwner.cpp */,
+				647341016CC32AF0A1E73822 /* MemoryOwner.hpp */,
+				1046278D0903A798A86E76F6 /* Probe.cpp */,
+				D4414AA61AC5E606D2515171 /* Probe.hpp */,
+				FD39E19A327DB38BB67B81C0 /* GpFifoQueue.cpp */,
+				5C22A09ACBC048AA7799A7C0 /* GpFifoQueue.hpp */,
+				88F58542D3B7FBAF5E1E1709 /* CopyPushbuffer.cpp */,
+				8140CF253A595967282DE2D6 /* CopyPushbuffer.hpp */,
+				C0C3DBEA96287C9A5407B43B /* NativeMemoryIOKit.cpp */,
+				F1F0B86FCE7C25AE5D41F5B5 /* NativeMemoryIOKit.hpp */,
+				1CE1C9D8C32804DC2D3FB1CC /* NvidiaMmioIOKit.cpp */,
+				4A41A15513CB257547990198 /* NvidiaMmioIOKit.hpp */,
+			);
+			name = NativeGpuSources;
+			sourceTree = "<group>";
+		};
 		1C748C1D1C21952C0024EED2 = {
 			isa = PBXGroup;
 			children = (
+				1EDD20260930000000000004 /* PortedNvidia */,
+				BFF974EEDBE2F7A8EFA151B3 /* NativeGpuSources */,
 				1C748C291C21952C0024EED2 /* Mellow */,
 				CE405EC81E49DD7B00AA0B3D /* SDK */,
 				1C748C281C21952C0024EED2 /* Products */,
@@ -173,6 +232,15 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		1EDD20260930000000000004 /* PortedNvidia */ = {
+			isa = PBXGroup;
+			children = (
+				1EDD20260930000000000002 /* CommandEncoding.cpp */,
+				1EDD20260930000000000003 /* CommandEncoding.hpp */,
+			);
+			name = PortedNvidia;
+			sourceTree = "<group>";
+		};
 		1C748C291C21952C0024EED2 /* Mellow */ = {
 			isa = PBXGroup;
 			children = (
@@ -181,6 +249,7 @@
 				C42F5B82067D421096F10002 /* PortedXeBindings.cpp */,
 				1C748C2E1C21952C0024EED2 /* Info.plist */,
 				8C08783D431EFF2D805D7E02 /* XeGuCFirmware.cpp */,
+				044255000000000000000002 /* XeGgtt.cpp */,
 				AA9EBAD50983BE81A8D4C209 /* XeGuCFirmware.hpp */,
 				08C80C1179A55FA889D654C2 /* XeGuCFirmwareIOKit.cpp */,
 				39F8A57FECCF0553393B6EE3 /* XeGuCFirmwareIOKit.hpp */,
@@ -402,10 +471,21 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1EDD20260930000000000001 /* CommandEncoding.cpp in Sources */,
+				1EDD20260930B00000000001 /* XeGuCRegionOwner.cpp in Sources */,
+				28D26C4F9D28BAEF8DF7A6E0 /* MemoryOwner.cpp in Sources */,
+				1E16A0680E14C2A2CBD02FD7 /* Probe.cpp in Sources */,
+				2C77E10D064F27D2F8336794 /* GpFifoQueue.cpp in Sources */,
+				75473EF9EC89DE0D456164A0 /* CopyPushbuffer.cpp in Sources */,
+				D3F3DE6450A5FA934F71C017 /* NativeMemoryIOKit.cpp in Sources */,
+				B55F50E0BD153F65527C0C30 /* NvidiaMmioIOKit.cpp in Sources */,
+				1EDD20260930A00000000001 /* Radix3.cpp in Sources */,
+				1EDD20260930C00000000001 /* FirmwareImage.cpp in Sources */,
 				D1A625064D41470000000001 /* TahoeDiagnostic.cpp in Sources */,
 				D1A625064D41470000000002 /* TahoeDiagnosticProtocol.cpp in Sources */,
 				C42F5B82067D421096F10001 /* PortedXeBindings.cpp in Sources */,
 				F0EDFC58B1C04818A187BD4D /* XeGuCFirmware.cpp in Sources */,
+				044255000000000000000001 /* XeGgtt.cpp in Sources */,
 				F15AC567811442834E48303E /* XeGuCFirmwareIOKit.cpp in Sources */,
 				07105C39D3A806F8F8C3B7ED /* XeContext.cpp in Sources */,
 				4482DE84BBE2324C2704B8E2 /* XeDispatch.cpp in Sources */,
@@ -576,7 +656,7 @@
 				DEAD_CODE_STRIPPING = NO;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				GCC_ENABLE_FLOATING_POINT_LIBRARY_CALLS = NO;
-				GCC_ENABLE_KERNEL_DEVELOPMENT = NO;
+				GCC_ENABLE_KERNEL_DEVELOPMENT = YES;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"MODULE_VERSION=$(MODULE_VERSION)",
@@ -594,15 +674,15 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.3;
+				MODULE_VERSION = 0.4.4;
 				OTHER_CFLAGS = (
-					"-mmmx",
-					"-msse",
-					"-msse2",
-					"-msse3",
-					"-mfpmath=sse",
-					"-mssse3",
-					"-ftree-vectorize",
+					"-mno-mmx",
+					"-mno-sse",
+					"-mno-sse2",
+					"-mno-sse3",
+					"-mno-red-zone",
+					"-fno-slp-vectorize",
+					"-fno-vectorize",
 					"-fno-non-call-exceptions",
 					"-fno-builtin",
 					"-fno-asynchronous-unwind-tables",
@@ -632,7 +712,7 @@
 				DEAD_CODE_STRIPPING = NO;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				GCC_ENABLE_FLOATING_POINT_LIBRARY_CALLS = NO;
-				GCC_ENABLE_KERNEL_DEVELOPMENT = NO;
+				GCC_ENABLE_KERNEL_DEVELOPMENT = YES;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"MODULE_VERSION=$(MODULE_VERSION)",
@@ -649,15 +729,15 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.3;
+				MODULE_VERSION = 0.4.4;
 				OTHER_CFLAGS = (
-					"-mmmx",
-					"-msse",
-					"-msse2",
-					"-msse3",
-					"-mfpmath=sse",
-					"-mssse3",
-					"-ftree-vectorize",
+					"-mno-mmx",
+					"-mno-sse",
+					"-mno-sse2",
+					"-mno-sse3",
+					"-mno-red-zone",
+					"-fno-slp-vectorize",
+					"-fno-vectorize",
 					"-fno-non-call-exceptions",
 					"-fno-builtin",
 					"-fno-asynchronous-unwind-tables",
@@ -745,7 +825,7 @@
 				DEAD_CODE_STRIPPING = NO;
 				DEPLOYMENT_POSTPROCESSING = YES;
 				GCC_ENABLE_FLOATING_POINT_LIBRARY_CALLS = NO;
-				GCC_ENABLE_KERNEL_DEVELOPMENT = NO;
+				GCC_ENABLE_KERNEL_DEVELOPMENT = YES;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"MODULE_VERSION=$(MODULE_VERSION)",
@@ -763,15 +843,15 @@
 				MODULE_NAME = com.NiSeullent.Mellow;
 				MODULE_START = "$(PRODUCT_NAME)_kern_start";
 				MODULE_STOP = "$(PRODUCT_NAME)_kern_stop";
-				MODULE_VERSION = 0.4.3;
+				MODULE_VERSION = 0.4.4;
 				OTHER_CFLAGS = (
-					"-mmmx",
-					"-msse",
-					"-msse2",
-					"-msse3",
-					"-mfpmath=sse",
-					"-mssse3",
-					"-ftree-vectorize",
+					"-mno-mmx",
+					"-mno-sse",
+					"-mno-sse2",
+					"-mno-sse3",
+					"-mno-red-zone",
+					"-fno-slp-vectorize",
+					"-fno-vectorize",
 					"-fno-non-call-exceptions",
 					"-fno-builtin",
 					"-fno-asynchronous-unwind-tables",

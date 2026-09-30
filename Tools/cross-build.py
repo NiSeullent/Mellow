@@ -43,18 +43,82 @@ def expand_plist(value, replacements):
 
 
 def sources_from_project(root):
+    root = root.resolve()
     project = (root / "Mellow.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
     block = project.split("/* Begin PBXSourcesBuildPhase section */", 1)[1]
     block = block.split("/* End PBXSourcesBuildPhase section */", 1)[0]
-    names = re.findall(r"/\* ([A-Za-z0-9_]+\.cpp) in Sources \*/", block)
+    # File-reference identity and declared source trees matter: a portable
+    # Drivers/ implementation can have the same basename as a Mellow/ source.
+    def unique_entries(entries):
+        result = {}
+        for identity, body in entries:
+            if identity in result:
+                raise RuntimeError(f"Duplicated Xcode object identity: {identity}")
+            result[identity] = body
+        return result
+
+    references = unique_entries(re.findall(
+        r"([A-F0-9]{24})\s+(?:/\*(?:(?!\*/)[^\n])*\*/\s+)?=\s*\{isa\s*=\s*PBXFileReference;([^}]+)\};",
+        project))
+    builds = unique_entries(re.findall(
+        r"([A-F0-9]{24})\s+(?:/\*(?:(?!\*/)[^\n])*\*/\s+)?=\s*\{isa\s*=\s*PBXBuildFile;\s*fileRef\s*=\s*([A-F0-9]{24})",
+        project))
+    groups = unique_entries(re.findall(
+        r"([A-F0-9]{24})\s*(?:/\*(?:(?!\*/)[^\n])*\*/\s*)?=\s*\{\s*isa\s*=\s*PBXGroup;(.*?)\n\s*\};",
+        project, re.DOTALL))
+    parents = {}
+    for group_id, body in groups.items():
+        children = re.search(r"children\s*=\s*\((.*?)\);", body, re.DOTALL)
+        if not children:
+            raise RuntimeError(f"Missing Xcode group children: {group_id}")
+        for child in re.findall(r"\b[A-F0-9]{24}\b", children.group(1)):
+            if child in parents:
+                raise RuntimeError(f"Ambiguous Xcode source parent: {child}")
+            parents[child] = group_id
+    main_group = re.findall(r"\bmainGroup\s*=\s*([A-F0-9]{24})", project)
+    if len(main_group) != 1 or main_group[0] not in groups:
+        raise RuntimeError("Ambiguous/missing Xcode main group")
+
+    def field(body, key, default=None):
+        matches = re.findall(r"\b" + key + r"\s*=\s*(\"[^\"]*\"|[^;]+);", body)
+        if len(matches) > 1 or (not matches and default is None):
+            raise RuntimeError(f"Ambiguous/missing Xcode {key}")
+        return matches[0].strip().strip('"') if matches else default
+
+    def location(identity, body, trail=()):
+        if identity in trail:
+            raise RuntimeError("Cyclic Xcode source group")
+        tree = field(body, "sourceTree")
+        relative = Path(field(body, "path", ""))
+        if relative.is_absolute():
+            raise RuntimeError(f"Absolute Xcode source path is unsupported: {relative}")
+        if tree == "SOURCE_ROOT":
+            base = root
+        elif tree == "<group>":
+            if identity == main_group[0]:
+                base = root
+            else:
+                parent = parents.get(identity)
+                if parent not in groups:
+                    raise RuntimeError(f"Missing Xcode source parent: {identity}")
+                base = location(parent, groups[parent], (*trail, identity))
+        else:
+            raise RuntimeError(f"Unsupported Xcode source tree: {tree}")
+        result = (base / relative).resolve()
+        if not result.is_relative_to(root):
+            raise RuntimeError(f"Xcode source leaves checkout: {relative}")
+        return result
+
     paths = []
-    for name in names:
-        candidates = [root / "Mellow" / name,
-                      root / "Lilu.kext/Contents/Resources/Library" / name]
-        matches = [p for p in candidates if p.is_file()]
-        if len(matches) != 1:
-            raise RuntimeError(f"Ambiguous/missing Xcode target source: {name}")
-        paths.append(matches[0])
+    files = re.findall(r"([A-F0-9]{24})\s*/\*[^\n]*? in Sources \*/", block)
+    for build_id in files:
+        reference = builds.get(build_id)
+        if reference not in references:
+            raise RuntimeError(f"Missing Xcode build file reference: {build_id}")
+        path = location(reference, references[reference])
+        if not path.is_file() or path.suffix != ".cpp":
+            raise RuntimeError(f"Missing/non-C++ Xcode target source: {path}")
+        paths.append(path)
     if not paths or len(paths) != len(set(paths)):
         raise RuntimeError("Empty or duplicated Xcode target source list")
     return paths
@@ -62,7 +126,7 @@ def sources_from_project(root):
 
 def input_hashes(root):
     paths = []
-    for folder in ("Mellow", "Drivers/PortedXe", "Lilu.kext/Contents/Resources", "MacKernelSDK"):
+    for folder in ("Mellow", "Drivers", "Lilu.kext/Contents/Resources", "MacKernelSDK"):
         paths.extend(p for p in (root / folder).rglob("*") if p.is_file())
     paths.append(root / "Mellow.xcodeproj/project.pbxproj")
     return {str(p.relative_to(root)).replace("\\", "/"): hashlib.sha256(p.read_bytes()).hexdigest()

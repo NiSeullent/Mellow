@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "scope": "Measured registration names and public application presentation; not an Apple driver ABI declaration",
+  "required_os_major_versions": [15, 26],
+  "measured_private_abi_target": {"version": "26.6.2", "build": "25G83", "architecture": "x86_64", "abi_verified": false},
+  "macos_15_private_abi_measured": false,
+  "inputs": [
+    {"path": "abi-evidence/tahoe-graphics-inventory.json", "sha256": "6787fc9a35402f24a6c43aeb593676499ff40dc7b9a3b8e10d83f22d8b38f01d"},
+    {"path": "abi-evidence/intel-umd-partial.json", "sha256": "cc1513f6d75385ad4318874da14d2d028c80bfe2f34af7bcfd9d7c266a1cef53"},
+    {"path": "docs/TAHOE-ABI.md", "sha256": "bd1cfc4ba8268125a4d4888b8273f3667a99233892bf896fe47632f85dde5110"}
+  ],
+  "observed_objc_definitions": [
+    "-[MTLIOAccelDevice initWithAcceleratorPort:]",
+    "-[MTLIOAccelService initWithAcceleratorPort:deviceClass:]",
+    "-[MTLIOAccelServiceGlobalContext registerService:deviceClass:]",
+    "-[MTLIOAccelDevice registryID]",
+    "-[MTLIOAccelDevice sharedRef]",
+    "-[MTLIOAccelDevice deviceRef]"
+  ],
+  "objc_method_type_encodings_verified": false,
+  "observed_c_symbols": [
+    "_MTLCopyAllDevices", "_MTLCreateSystemDefaultDevice",
+    "_IOAccelDeviceCreate", "_IOAccelDeviceCreateWithAPIProperty",
+    "_CoreDisplay_Display_PresentIOAccelSurfaceWithIOAccelSurfaceInfoAndBufferIndex"
+  ],
+  "private_function_prototypes_verified": false,
+  "observed_kernel_symbols": [
+    "__ZN22IOGraphicsAccelerator213newUserClientEP4taskPvjPP12IOUserClient",
+    "__ZN24IOAccelSharedUserClient212new_resourceEP22IOAccelNewResourceArgsP28IOAccelNewResourceReturnDatayPj",
+    "__ZN24IOAccelSharedUserClient212create_shmemEjP22IOAccelDeviceShmemData",
+    "__ZN24IOAccelSharedUserClient214externalMethodEjP25IOExternalMethodArgumentsP24IOExternalMethodDispatchP8OSObjectPv",
+    "__ZN19IOAccelCommandQueue22submit_command_buffersEPK29IOAccelCommandQueueSubmitArgs",
+    "__ZN16IOAccelResource224newResourceWithIOSurfaceEP22IOGraphicsAccelerator2P14IOAccelShared2P9IOSurfacejj"
+  ],
+  "client_type_selector_dispatch_and_structure_layouts_verified": false,
+  "intel_plugin": {
+    "principal_class": "MTLIGAccelDevice",
+    "declared_executable": "AppleIntelICLGraphicsMTLDriver",
+    "main_executable_acquired": false,
+    "inspected_helper": "libigdmd.dylib",
+    "factory_export_symbols_confirmed": [],
+    "plugin_load_and_initialization_contract_verified": false
+  },
+  "public_source_observed_registry_keys": [
+    "MetalPluginName", "MetalPluginClassName", "IOAccelTypes", "IOAccelRevision",
+    "IOAccelIndex", "IOAccelDisplayPipeCapabilities"
+  ],
+  "registry_property_values_types_or_sufficiency_verified": false,
+  "public_sources": [
+    "https://github.com/WebKit/WebKit/blob/main/Source/WebKit/WebProcess/com.apple.WebProcess.sb.in",
+    "https://commits.webkit.org/231438@main",
+    "https://github.com/apple-oss-distributions/IOGraphics/blob/main/IOGraphicsFamily/IOKit/graphics/IOAccelClientConnect.h",
+    "https://github.com/apple-oss-distributions/IOGraphics/blob/main/IOGraphicsFamily/IOKit/graphics/IOAccelSurfaceConnect.h",
+    "https://github.com/apple-oss-distributions/IOGraphics/blob/main/IOGraphicsFamily/IOKit/graphics/IOAccelTypes.h",
+    "https://github.com/apple-oss-distributions/xnu/blob/main/iokit/IOKit/IOUserClient.h",
+    "https://developer.apple.com/documentation/iosurface/iosurface-functions?language=objc",
+    "https://developer.apple.com/documentation/QuartzCore/CALayer/contents?language=occ",
+    "https://developer.apple.com/library/archive/documentation/GraphicsImaging/Conceptual/drawingwithquartz2d/dq_data_mgr/dq_data_mgr.html"
+  ],
+  "implemented_public_path": "Completed GPU IOSurface -> read-only cache lock -> independent BGRA CGImage snapshot -> main-thread dedicated CALayer contents transaction",
+  "registration_implementation": "BLOCKED_UNRESOLVED_TARGET_PRIVATE_ABI",
+  "native_presentation_compiled_in_this_workspace": false,
+  "native_presentation_executed_in_this_workspace": false,
+  "apple_metal_abi_registered": false,
+  "system_windowserver_acceleration_verified": false,
+  "physical_scanout_verified": false,
+  "source_access": "Read existing local evidence and primary web pages; no additional Apple binaries, SDKs or driver source trees collected",
+  "license_scope": "New presentation code is original MIT code calling public APIs; Apple/WebKit source was referenced rather than copied into this directory"
+}

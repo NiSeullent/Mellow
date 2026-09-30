@@ -12,6 +12,17 @@ bool EvidenceExecution::releaseVm() {
     }
     return ok;
 }
+ExecutionStatus EvidenceExecution::retireControl() {
+    XeGuC::Cookie *cookies[]={&enable_,&registration_};
+    for(auto cookie:cookies) {
+        if(!cookie->epoch)continue;
+        const auto status=guc_.retire(*cookie);
+        if(status==XeGuC::Status::Busy)return ExecutionStatus::Busy;
+        if(status!=XeGuC::Status::Ok)return ExecutionStatus::Quarantined;
+        *cookie={};
+    }
+    return ExecutionStatus::Ok;
+}
 ExecutionStatus EvidenceExecution::fail(ExecutionStatus s) {state_=ExecutionState::Failed;return s;}
 ExecutionStatus EvidenceExecution::begin(const XeZebin::Image &image,const LiveContext &c,
     const XeMemory::Handle (&handles)[6],const XeDispatch::Policy &p,uint32_t nonce,uint32_t count,
@@ -110,6 +121,11 @@ ExecutionStatus EvidenceExecution::close() {
     if(!attempted_)return ExecutionStatus::Invalid;
     if(contextHeld_) {
         if(!backend_.quiesced(backend_.opaque,context_))return ExecutionStatus::Busy;
+        // A completed GPU fence does not release GuC response-credit ownership.
+        // Keep private cookie handles until the transport actually retires them.
+        const auto control=retireControl();
+        if(control==ExecutionStatus::Busy)return control;
+        if(control!=ExecutionStatus::Ok)return fail(control);
         // Fence has its own independent proof of the same hardware quiescence.
         if(fence_.close()!=XeFence::Status::Ok)return ExecutionStatus::Busy;
         if(!releaseVm())return fail(ExecutionStatus::Quarantined);

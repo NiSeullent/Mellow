@@ -25,11 +25,16 @@ static std::string quote(const std::string &text) {
     }
     out << '"'; return out.str();
 }
-static const char Vertex[] = R"GLSL(#version 330 core
+#if defined(__APPLE__)
+#define MELLOW_GLSL_VERSION "#version 410 core\n"
+#else
+#define MELLOW_GLSL_VERSION "#version 330 core\n"
+#endif
+static const char Vertex[] = MELLOW_GLSL_VERSION R"GLSL(
 const vec2 positions[3] = vec2[3](vec2(-1.0,-1.0),vec2(3.0,-1.0),vec2(-1.0,3.0));
 void main() { gl_Position=vec4(positions[gl_VertexID],0.0,1.0); }
 )GLSL";
-static const char Fragment[] = R"GLSL(#version 330 core
+static const char Fragment[] = MELLOW_GLSL_VERSION R"GLSL(
 uniform vec4 mellow_params;
 uniform vec2 mellow_viewport;
 out vec4 color;
@@ -177,7 +182,12 @@ int main(int argc, char **argv) {
     std::ofstream report(reportPath, std::ios::binary);
     report << std::boolalpha << "{\"schema_version\":1,\"passed\":" << passed << ",\"requested_frames\":" << frames
            << ",\"visible_window_requested\":" << visible << ",\"checks\":" << checks << ",\"negative_checks\":" << negativeChecks
-           << ",\"width\":64,\"height\":48,\"row_origin\":\"bottom-left\",\"native_macos_execution\":false,"
+           << ",\"width\":64,\"height\":48,\"row_origin\":\"bottom-left\",\"native_macos_execution\":"
+#if defined(__APPLE__)
+              "true,"
+#else
+              "false,"
+#endif
               "\"windowserver_acceleration_verified\":false,\"display_scanout_verified\":false,\"physical_pci_identity_verified\":false"
            << evidence.str() << "}\n";
     report.close();

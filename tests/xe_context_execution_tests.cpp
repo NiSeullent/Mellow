@@ -12,6 +12,7 @@ struct Fixture {
     uint64_t dma[6]={0x100000,0x101000,0x102000,0x103000,0x104000,0x105000};
     XeGuC::Transport transport;XeGuC::Descriptor h {},g {};uint32_t hw[1024] {},gw[2048] {};
     XeFence::Timeline fence;alignas(8) volatile uint64_t completion=0;
+    XeFence::Timeline *activeFence=&fence;
     uint32_t ring[1024] {},tail=0;uint8_t heaps[4][4096] {};
     bool admit=true,stopped=true,notifyOk=true,stageOk=true,syncOk=true,retained=false;
     unsigned pins=0,binds=0,retains=0,releases=0,stages=0,fenceRetains=0,fenceReleases=0;
@@ -29,7 +30,7 @@ struct Fixture {
             CHECK(f->retained);
             for(unsigned i=0;i<6;++i)CHECK(f->slots[i].activeUses==1);
             std::memcpy(f->heaps[0],s.isa,4096);std::memcpy(f->heaps[1],s.indirect,4096);std::memcpy(f->heaps[2],s.surface,4096);std::memcpy(f->heaps[3],s.batch,4096);return true;};
-        b.synchronizeContext=[](void *p,const LiveContext &){auto f=static_cast<Fixture *>(p);CHECK(f->tail==80 && f->fence.lastPublished()==1);return f->syncOk;};
+        b.synchronizeContext=[](void *p,const LiveContext &){auto f=static_cast<Fixture *>(p);CHECK(f->tail==80 && f->activeFence->lastPublished()==1);return f->syncOk;};
         b.quiesced=[](void *p,const LiveContext &){return static_cast<Fixture *>(p)->stopped;};return b;
     }
     Fixture(){
@@ -43,18 +44,24 @@ struct Fixture {
         XeGuC::Ops op;op.opaque=this;op.acquire=yes;op.release=yes;
         op.admitted=[](void *p,uint64_t e){return e==7 && static_cast<Fixture *>(p)->admit;};
         op.authorizeAction=[](void *p,uint64_t,const XeGuC::Action &a){auto f=static_cast<Fixture *>(p);CHECK(f->retained && f->tail==80);
-            if(a.words[0]==0x1001){CHECK(f->fence.lastPublished()==1);f->stopped=false;}return true;};
+            if(a.words[0]==0x1001){CHECK(f->activeFence->lastPublished()==1);f->stopped=false;}return true;};
         op.notify=[](void *p){return static_cast<Fixture *>(p)->notifyOk;};
         MellowXe::FirmwareInfo fw;fw.release={70,53,0};fw.submission={1,26,0};
         CHECK(transport.attach({&h,hw,1024,0x400000,0x410000},{&g,gw,2048,0x400040,0x420000},op,7,fw)==XeGuC::Status::Ok);
+        bindFence(fence);
+    }
+    void bindFence(XeFence::Timeline &target){
+        activeFence=&target;
         XeFence::Ops fo;fo.opaque=this;
         fo.valid=[](void *p,const XeFence::Slot &s){return static_cast<Fixture *>(p)->admit && s.owner==51 && s.epoch==7;};
         fo.stopped=[](void *p,const XeFence::Slot &){return static_cast<Fixture *>(p)->stopped;};
         fo.retain=[](void *p,const XeFence::Slot &){++static_cast<Fixture *>(p)->fenceRetains;return true;};
         fo.release=[](void *p,const XeFence::Slot &){++static_cast<Fixture *>(p)->fenceReleases;};
-        CHECK(fence.bind({&completion,0x220000,8,51,5,7,0,0},fo)==XeFence::Status::Ok);
+        CHECK(target.bind({&completion,0x220000,8,51,5,7,0,0},fo)==XeFence::Status::Ok);
     }
-    void enableAck(uint64_t now=2){gw[0]=3;gw[1]=0x90001002;gw[2]=5;gw[3]=1;g.tail=4;XeGuC::Message m;CHECK(transport.receive(7,now,m)==XeGuC::Status::Ok);}
+    void enableAck(uint64_t now=2){const auto at=g.tail;
+        gw[at]=3;gw[(at+1)&2047]=0x90001002;gw[(at+2)&2047]=5;gw[(at+3)&2047]=1;g.tail=(at+4)&2047;
+        XeGuC::Message m;CHECK(transport.receive(7,now,m)==XeGuC::Status::Ok);}
 };
 int main(int argc,char **argv){
     const char *path=argc>1?argv[1]:"compiler-evidence/mellow_evidence_mtl.bin";
@@ -88,10 +95,56 @@ int main(int argc,char **argv){
         }else CHECK(result==ExecutionStatus::Unavailable || result==ExecutionStatus::Quarantined);
         if(mode==1)CHECK(f->retains==0 && f->stages==0 && f->tail==0 && f->h.tail==0);
         else CHECK(execution->contextHeld());
+        const XeGuC::Cookie uncertainRegistration{7,uint16_t(f->hw[0]>>16)};
+        XeGuC::Reply uncertainReply;
+        if(mode==4)CHECK(f->transport.query(uncertainRegistration,uncertainReply)==XeGuC::Status::Ok);
         f->admit=true;f->stopped=true;CHECK(execution->close()==ExecutionStatus::Ok);
+        if(mode==4)CHECK(f->transport.query(uncertainRegistration,uncertainReply)==XeGuC::Status::UnknownCookie);
         CHECK(execution->retainedVmUses()==0 && !execution->contextHeld());
         CHECK(execution->begin(image,f->context(),f->handles,f->policy,1,1,false,12,20)==ExecutionStatus::Busy);
         delete execution;delete f;
+    }
+    {
+        auto f=new Fixture;auto execution=new EvidenceExecution(f->vm,f->transport,f->fence,f->backend());
+        CHECK(execution->begin(image,f->context(),f->handles,f->policy,1234,32,false,1,100)==ExecutionStatus::Pending);
+        const XeGuC::Cookie registration{7,uint16_t(f->hw[0]>>16)},enable{7,uint16_t(f->hw[13]>>16)};
+        // GPU completion is independent of the asynchronous control reply.
+        f->completion=1;CHECK(execution->poll(2)==ExecutionStatus::Ok);
+        CHECK(execution->retainedVmUses()==0 && execution->contextHeld());
+        f->stopped=true;CHECK(execution->close()==ExecutionStatus::Busy);
+        XeGuC::Reply reply;
+        CHECK(f->transport.query(enable,reply)==XeGuC::Status::Ok && reply.creditsHeld);
+        CHECK(f->transport.query(registration,reply)==XeGuC::Status::Ok);
+        CHECK(execution->contextHeld() && f->fence.held() && f->releases==0);
+        CHECK(execution->close()==ExecutionStatus::Busy);
+        f->enableAck(3);CHECK(execution->close()==ExecutionStatus::Ok);
+        CHECK(f->transport.query(enable,reply)==XeGuC::Status::UnknownCookie);
+        CHECK(f->transport.query(registration,reply)==XeGuC::Status::UnknownCookie);
+        CHECK(!execution->contextHeld() && !f->fence.held() && f->releases==1);
+        delete execution;delete f;
+    }
+    {
+        auto f=new Fixture;CHECK(f->fence.close()==XeFence::Status::Ok);
+        // More jobs than the bounded pending-cookie table can hold. Every job
+        // uses a fresh fence timeline while sharing one transport/reset epoch.
+        for(unsigned iteration=0;iteration<XeGuC::maxPending+1;++iteration){
+            auto fence=new XeFence::Timeline;f->stopped=true;f->tail=0;f->h.head=f->h.tail;
+            f->bindFence(*fence);
+            const auto at=f->h.tail;const uint64_t now=1+iteration*3;
+            auto execution=new EvidenceExecution(f->vm,f->transport,*fence,f->backend());
+            CHECK(execution->begin(image,f->context(),f->handles,f->policy,1234,32,false,now,now+100)==ExecutionStatus::Pending);
+            const XeGuC::Cookie registration{7,uint16_t(f->hw[at]>>16)},enable{7,uint16_t(f->hw[(at+13)&1023]>>16)};
+            f->enableAck(now+1);f->completion=1;CHECK(execution->poll(now+1)==ExecutionStatus::Ok);
+            f->stopped=true;CHECK(execution->close()==ExecutionStatus::Ok);
+            XeGuC::Reply reply;
+            CHECK(f->transport.query(registration,reply)==XeGuC::Status::UnknownCookie);
+            CHECK(f->transport.query(enable,reply)==XeGuC::Status::UnknownCookie);
+            CHECK(execution->retainedVmUses()==0 && !execution->contextHeld() && !fence->held());
+            CHECK(f->transport.responseCredits()==1023);
+            delete execution;delete fence;
+        }
+        CHECK(f->retains==f->releases && f->fenceRetains==f->fenceReleases);
+        delete f;
     }
     std::printf("XeContextExecution: PASS %zu checks; real VM+GuC+fence code, hardware callbacks simulated\n",checks);
 }

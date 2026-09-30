@@ -133,13 +133,15 @@ def verify_stream(path, seed, count):
     return summary
 
 
-def validate_native(native, seed, count, visible, raw_path):
+def validate_native(native, seed, count, visible, raw_path, *, macos=False):
     errors = []
     def need(condition, message):
         if not condition:
             errors.append(message)
     if type(native) is not dict:
         return ["Native result must be an object"]
+    need(native.get("native_macos_execution") is macos, "Native OS execution mismatch")
+    need(not (macos and visible), "CGL visible presentation unsupported")
     need("error" not in native, "Conflicting successful report contains an error")
     for key, expected in (("schema_version", 1), ("seed", seed), ("requested_frames", count), ("frames_completed", count),
                           ("width", WIDTH), ("height", HEIGHT), ("first_sequence", 1), ("last_sequence", count),
@@ -147,7 +149,7 @@ def validate_native(native, seed, count, visible, raw_path):
         need(type(native.get(key)) is int and native[key] == expected, key + " mismatch")
     for key in ("passed", "portable_mellow_object_api", "all_frame_completions_correlated"):
         need(native.get(key) is True, key + " must be true")
-    for key in ("apple_metal_abi_registered", "native_macos_execution", "windowserver_acceleration_verified",
+    for key in ("apple_metal_abi_registered", "windowserver_acceleration_verified",
                 "display_scanout_verified", "runtime_received_pixel_oracle"):
         need(native.get(key) is False, key + " must be false")
     need(native.get("visible_requested") is visible and native.get("row_origin") == "top-left", "Presentation/row-origin mismatch")
@@ -164,6 +166,9 @@ def validate_native(native, seed, count, visible, raw_path):
         for key in ("accelerated_pixel_format", "core_profile", "software_renderer_rejected"):
             need(device.get(key) is True, "Driver " + key + " missing")
         major, minor = device.get("major"), device.get("minor")
+        if macos:
+            need(type(major) is int and type(minor) is int and (major > 4 or major == 4 and minor >= 1),
+                 "CGL GL4.1 core required")
         need(type(major) is int and type(minor) is int and (major > 3 or major == 3 and minor >= 3), "GL3.3 core required")
     if not raw_path.is_file() or raw_path.stat().st_size != count * FRAME_BYTES:
         errors.append("Missing or wrong-size native RGBA stream")
@@ -213,6 +218,9 @@ def main():
         parser.error("Frames must be 1-10000; timeout 1-180 seconds")
     if args.visible and not args.render:
         parser.error("--visible requires --render")
+    macos = platform.system() == "Darwin"
+    if macos and args.visible:
+        parser.error("macOS CGL is offscreen-only; --visible is unsupported")
     root = Path(__file__).resolve().parents[1]
     args.out = args.out.resolve(); args.out.mkdir(parents=True, exist_ok=True)
     sources = ["Runtime/RenderObjects.hpp", "Runtime/RenderObjects.cpp", "Runtime/RenderShaderJit.hpp", "Runtime/RenderShaderJit.cpp",
@@ -221,7 +229,7 @@ def main():
                "tests/render_fixture.hpp", "tests/render_objects_gpu_tests.cpp", "tests/opencl_runtime_sha256.hpp",
                "Tools/run-render-objects.py"]
     report = dict(schema_version=1, created_utc=datetime.now(timezone.utc).isoformat(),
-                  scope="portable-Mellow-MSL-render-objects-native-Windows-OpenGL-GPU",
+                  scope="portable-Mellow-MSL-render-objects-native-macOS-CGL-GPU" if macos else "portable-Mellow-MSL-render-objects-native-Windows-OpenGL-GPU",
                   os=dict(system=platform.system(), release=platform.release(), version=platform.version()),
                   source_sha256={name: digest(root / name) for name in sources}, requested_frames=args.frames,
                   visible_requested=args.visible, gpu_work_executed=False, passed=False, status="FAILED",
@@ -242,8 +250,10 @@ def main():
                                                   "Runtime/RenderObjects.cpp", "tests/render_objects_gpu_tests.cpp")],
                    "-o", str(executable)]
         command += ["-lopengl32", "-lgdi32", "-luser32", "-static-libgcc", "-static-libstdc++"] if os.name == "nt" else ["-pthread"]
+        if macos:
+            command += ["-framework", "OpenGL", "-framework", "IOSurface", "-framework", "CoreFoundation"]
         build = subprocess.run(command, capture_output=True, text=True, timeout=120, **options)
-        report["build"] = dict(exit_code=build.returncode, stdout=build.stdout, stderr=build.stderr)
+        report["build"] = dict(command=command, exit_code=build.returncode, stdout=build.stdout, stderr=build.stderr)
         if build.returncode:
             print(build.stdout + build.stderr, file=sys.stderr)
             return 1
@@ -251,8 +261,8 @@ def main():
         if not args.render:
             report["status"] = "BUILT_ONLY"
             return 0
-        if os.name != "nt":
-            report.update(status="NOT_AVAILABLE", error="Actual native OpenGL provider is Windows WGL only")
+        if os.name != "nt" and not macos:
+            report.update(status="NOT_AVAILABLE", error="Native OpenGL provider unsupported: requires Windows WGL or macOS CGL")
             return 1
         token = secrets.token_hex(8)
         result_path, raw_path = args.out / (token + ".json"), args.out / (token + ".rgba")
@@ -272,9 +282,10 @@ def main():
         if type(native) is not dict:
             raise ValueError("Worker report is not an object")
         report["native"] = native
+        report["native_macos_execution"] = macos and native.get("native_macos_execution") is True
         report["gpu_work_executed"] = True if type(native.get("frames_completed")) is int and native["frames_completed"] > 0 else None
         result_path.replace(args.out / "render-objects-native.json")
-        report["validation_errors"] = validate_native(native, seed, args.frames, args.visible, raw_path)
+        report["validation_errors"] = validate_native(native, seed, args.frames, args.visible, raw_path, macos=macos)
         oracle = verify_stream(raw_path, seed, args.frames)
         report["independent_pixel_reference"] = oracle
         if raw_path.is_file():

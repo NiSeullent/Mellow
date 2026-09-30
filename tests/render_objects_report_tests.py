@@ -133,6 +133,22 @@ class Controls(unittest.TestCase):
                 changed = copy.deepcopy(native); mutate(changed)
                 self.assertTrue(RUNNER.validate_native(changed, 17, 1, False, path))
 
+    def test_cgl_os_version_and_presentation_scope(self):
+        raw = synthetic_pixels()
+        with tempfile.TemporaryDirectory(prefix="mellow-cgl-report-control-") as directory:
+            path = Path(directory) / "synthetic.rgba"; path.write_bytes(raw)
+            native = native_fixture(raw)
+            self.assertTrue(RUNNER.validate_native(native, 17, 1, False, path, macos=True))
+            native["native_macos_execution"] = True
+            self.assertTrue(RUNNER.validate_native(native, 17, 1, False, path, macos=True))
+            native["device"].update(major=4, minor=1)
+            self.assertEqual(RUNNER.validate_native(native, 17, 1, False, path, macos=True), [])
+            self.assertTrue(RUNNER.validate_native(native, 17, 1, False, path))
+            self.assertTrue(RUNNER.validate_native(native, 17, 1, True, path, macos=True))
+            for key in ("accelerated_pixel_format", "software_renderer_rejected", "core_profile"):
+                changed = copy.deepcopy(native); changed["device"][key] = False
+                self.assertTrue(RUNNER.validate_native(changed, 17, 1, False, path, macos=True))
+
     def test_strict_json(self):
         for text in ('{"passed":true,"passed":false}', '{"x":NaN}', '{"x":Infinity}', '{"x":{"k":1,"k":2}}'):
             with self.assertRaises(ValueError):

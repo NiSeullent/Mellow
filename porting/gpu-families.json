@@ -1,0 +1,224 @@
+{
+  "schema_version": 1,
+  "families": {
+    "intel-icl": {
+      "vendor": "Intel",
+      "architecture": "Gen11 (Ice Lake)",
+      "source_targets": ["i915"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "source_references": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/include/drm/intel/pciids.h"
+      ]
+    },
+    "intel-tgl": {
+      "vendor": "Intel",
+      "architecture": "Xe-LP (Tiger Lake)",
+      "source_targets": ["i915", "xe"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "upstream_dma_address_bits": 39,
+      "upstream_discovery": "pre-gmd-pci-profile",
+      "source_references": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c"
+      ]
+    },
+    "intel-rkl": {
+      "vendor": "Intel",
+      "architecture": "Xe-LP (Rocket Lake)",
+      "source_targets": ["i915", "xe"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "upstream_dma_address_bits": 39,
+      "upstream_discovery": "pre-gmd-pci-profile",
+      "source_references": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c"
+      ]
+    },
+    "intel-adl": {
+      "vendor": "Intel",
+      "architecture": "Xe-LP (Alder Lake)",
+      "source_targets": ["i915", "xe"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "upstream_dma_address_bits": 39,
+      "upstream_discovery": "pre-gmd-pci-profile",
+      "source_references": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c"
+      ]
+    },
+    "intel-rpl": {
+      "vendor": "Intel",
+      "architecture": "Xe-LP (Raptor Lake)",
+      "source_targets": ["i915", "xe"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "upstream_dma_address_bits": 39,
+      "upstream_discovery": "pre-gmd-pci-profile",
+      "source_references": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c"
+      ]
+    },
+    "intel-dg1": {
+      "vendor": "Intel",
+      "architecture": "Xe-LP+ (DG1)",
+      "source_targets": ["i915", "xe"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "upstream_dma_address_bits": 39,
+      "upstream_discovery": "pre-gmd-pci-profile",
+      "source_references": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c"
+      ]
+    },
+    "intel-dg2": {
+      "vendor": "Intel",
+      "architecture": "Xe-HPG (DG2 / Alchemist)",
+      "source_targets": ["i915", "xe"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "upstream_dma_address_bits": 46,
+      "upstream_discovery": "pre-gmd-pci-profile",
+      "source_references": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c"
+      ]
+    },
+    "intel-mtl": {
+      "vendor": "Intel",
+      "architecture": "Xe-LPG (Meteor Lake)",
+      "source_targets": ["xe"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "upstream_dma_address_bits": 46,
+      "upstream_discovery": "gmd-id",
+      "source_references": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/include/drm/intel/pciids.h"
+      ]
+    },
+    "intel-arl": {
+      "vendor": "Intel",
+      "architecture": "Xe-LPG / Xe-LPG+ (Arrow Lake; device-specific IP)",
+      "source_targets": ["xe"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "upstream_dma_address_bits": 46,
+      "upstream_discovery": "gmd-id",
+      "source_references": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/include/drm/intel/pciids.h"
+      ]
+    },
+    "intel-lnl": {
+      "vendor": "Intel",
+      "architecture": "Xe2-LPG (Lunar Lake)",
+      "source_targets": ["xe"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "upstream_dma_address_bits": 46,
+      "upstream_discovery": "gmd-id",
+      "source_references": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/include/drm/intel/pciids.h"
+      ]
+    },
+    "intel-bmg": {
+      "vendor": "Intel",
+      "architecture": "Xe2-HPG (Battlemage)",
+      "source_targets": ["xe"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "upstream_dma_address_bits": 46,
+      "upstream_discovery": "gmd-id",
+      "source_references": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/include/drm/intel/pciids.h"
+      ]
+    },
+    "nvidia-maxwell": {
+      "vendor": "NVIDIA",
+      "architecture": "Maxwell",
+      "source_targets": ["nouveau"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "source_references": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/610/kernel-modules.html"
+      ]
+    },
+    "nvidia-pascal": {
+      "vendor": "NVIDIA",
+      "architecture": "Pascal",
+      "source_targets": ["nouveau"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "source_references": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/610/kernel-modules.html"
+      ]
+    },
+    "nvidia-volta": {
+      "vendor": "NVIDIA",
+      "architecture": "Volta",
+      "source_targets": ["nouveau"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "source_references": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/610/kernel-modules.html"
+      ]
+    },
+    "nvidia-turing": {
+      "vendor": "NVIDIA",
+      "architecture": "Turing",
+      "source_targets": ["nouveau", "nvidia-open"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "source_references": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/README.md"
+      ]
+    },
+    "nvidia-ampere": {
+      "vendor": "NVIDIA",
+      "architecture": "Ampere",
+      "source_targets": ["nouveau", "nvidia-open"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "source_references": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/README.md"
+      ]
+    },
+    "nvidia-ada": {
+      "vendor": "NVIDIA",
+      "architecture": "Ada Lovelace",
+      "source_targets": ["nouveau", "nvidia-open"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "source_references": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/README.md"
+      ]
+    },
+    "nvidia-blackwell": {
+      "vendor": "NVIDIA",
+      "architecture": "Blackwell",
+      "source_targets": ["nouveau", "nvidia-open"],
+      "runtime_device_admission": false,
+      "physical_gpu_verified": false,
+      "source_scope_note": "The cited NVK documentation covers consumer Blackwell; no datacenter device, firmware, or macOS execution is inferred.",
+      "source_references": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/README.md"
+      ]
+    }
+  }
+}

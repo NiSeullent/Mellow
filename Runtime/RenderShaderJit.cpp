@@ -246,7 +246,11 @@ struct Parser {
         CompileResult result;
         result.success = true; result.stage = stage; result.entry = entry;
         result.usesParameters = usesParams; result.usesFragmentPosition = usesPosition;
+        #if defined(__APPLE__)
+        result.glslSource = "#version 410 core\n";
+#else
         result.glslSource = "#version 330 core\n";
+#endif
         if (usesParams) result.glslSource += "uniform vec4 mellow_params;\n";
         if (usesPosition) result.glslSource += "uniform vec2 mellow_viewport;\n";
         if (stage == Stage::Fragment) result.glslSource += "layout(location=0) out vec4 mellow_color;\n";
