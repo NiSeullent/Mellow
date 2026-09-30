@@ -44,8 +44,11 @@ The subsequent builder also creates a versioned `MellowAppleUserspace.framework`
 with its own compiled binary and `@rpath/MellowAppleUserspace.framework/Versions/A/MellowAppleUserspace`
 install name, public headers, module map and bundle metadata. A separate public
 header consumer is compiled and linked against that framework without creating
-a GPU device. This framework addition requires its own later successful CI
-report; the e20496a build above predates it. The framework supplies the explicit
+a GPU device. This framework addition passed both actual SDK targets at
+`06fe75b3d24f01c93dfb65c56d30013bc7f076c9` in
+[run 36725204749](https://github.com/NiSeullent/Mellow/actions/runs/36725204749).
+Each target has seven linked binaries and 35 source/30 artifact hashes checked.
+The e20496a build above predates the framework. The framework supplies the explicit
 app adapters and does not install or register a system Metal/WindowServer provider.
 
 ## Explicit physical acceptance

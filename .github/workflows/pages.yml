@@ -1,0 +1,62 @@
+name: Publish official Mellow website
+# Manual only. Adding or merging this file never deploys the site. The repository
+# owner must first enable GitHub Pages with the Actions source and then dispatch.
+on:
+  workflow_dispatch:
+    inputs:
+      source_directory:
+        description: Static directory (website on source branch, root on publication branch)
+        required: true
+        type: choice
+        default: website
+        options:
+          - website
+          - .
+permissions:
+  contents: read
+concurrency:
+  group: mellow-pages
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    env:
+      SITE_PATH: ${{ inputs.source_directory }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate static site inputs
+        run: |
+          node --check "$SITE_PATH/assets/app.js"
+          python3 - <<'PY'
+          import json, os, pathlib
+          assert os.environ['SITE_PATH'] in ('website', '.')
+          site = pathlib.Path(os.environ['SITE_PATH'])
+          for name in ('index.html', 'assets/app.js', 'assets/style.css', 'assets/mellow.svg'):
+              assert (site / name).is_file(), name
+          data = json.loads((site / 'data/compatibility.json').read_text())
+          assert data['schemaVersion'] == 1 and data['catalogScope'] == 'source-families'
+          assert data['devices'] and len({row['id'] for row in data['devices']}) == len(data['devices'])
+          assert data['claims'] == {'allModelsVerified': False, 'nativeMetalVerified': False, 'systemWindowServerVerified': False}
+          for row in data['devices']:
+              assert row['validationStatus'] == 'not_run' and row['pciDeviceIds'] == []
+          for path in site.rglob('*'):
+              assert not path.is_symlink(), path
+          print('Static inputs present; family catalog is development data, not hardware acceptance.')
+          PY
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: ${{ inputs.source_directory }}
+  deploy:
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # No configure-pages enablement: settings stay an explicit owner action.
+      - name: Deploy the manually requested artifact
+        id: deployment
+        uses: actions/deploy-pages@v4

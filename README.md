@@ -2,6 +2,11 @@
 
 # Mellow
 
+[공식 홈페이지 · GPU 현황 검색 · 다운로드](https://niseullent.github.io/Mellow/)
+에서 계열별 구현 상태와 공식 소스의 개별 모델·PCI/OEM ID 선언을 확인할 수 있습니다.
+macOS 15·26 개발 바이너리의 터미널 설치 절차는 [설치 도구 안내](Installer/README.md)에 있습니다.
+모델 목록이나 바이너리 배포가 해당 GPU의 실행·Metal·WindowServer 지원 완료를 뜻하지는 않습니다.
+
 **Metal Emulation Layer Logic for OpenGL/OpenCL Workloads**
 
 Mellow는 Metal 요청을 자체 객체·셰이더 변환·명령 실행 계층으로 처리하고,

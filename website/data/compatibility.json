@@ -1,0 +1,1651 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-30T13:59:54.122655+00:00",
+  "sourceRevision": "06fe75b3d24f01c93dfb65c56d30013bc7f076c9",
+  "catalogScope": "source-families",
+  "devices": [
+    {
+      "id": "intel-gen2",
+      "vendor": "Intel",
+      "family": "i830 / i845 / i85x / i865",
+      "architectures": [
+        "Gen2 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-gen3",
+      "vendor": "Intel",
+      "family": "i915 / i945 / G33 / Pineview",
+      "architectures": [
+        "Gen3 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-gen4",
+      "vendor": "Intel",
+      "family": "i965 / G45 / GM45",
+      "architectures": [
+        "Gen4 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-ilk",
+      "vendor": "Intel",
+      "family": "Ironlake",
+      "architectures": [
+        "Gen5 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-snb",
+      "vendor": "Intel",
+      "family": "Sandy Bridge",
+      "architectures": [
+        "Gen6 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-ivb",
+      "vendor": "Intel",
+      "family": "Ivy Bridge",
+      "architectures": [
+        "Gen7 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-vlv",
+      "vendor": "Intel",
+      "family": "Valleyview",
+      "architectures": [
+        "Gen7 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-hsw",
+      "vendor": "Intel",
+      "family": "Haswell",
+      "architectures": [
+        "Gen7.5 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-bdw",
+      "vendor": "Intel",
+      "family": "Broadwell",
+      "architectures": [
+        "Gen8 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-chv",
+      "vendor": "Intel",
+      "family": "Cherryview",
+      "architectures": [
+        "Gen8 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-skl",
+      "vendor": "Intel",
+      "family": "Skylake",
+      "architectures": [
+        "Gen9 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-bxt",
+      "vendor": "Intel",
+      "family": "Broxton",
+      "architectures": [
+        "Gen9 LP (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-kbl",
+      "vendor": "Intel",
+      "family": "Kaby Lake / Amber Lake",
+      "architectures": [
+        "Gen9 (upstream i915 classification)"
+      ],
+      "modelExamples": [
+        "Kaby Lake / Amber Lake integrated graphics"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md",
+        "https://github.com/torvalds/linux/blob/v4.20/drivers/gpu/drm/i915/i915_pci.c"
+      ]
+    },
+    {
+      "id": "intel-glk",
+      "vendor": "Intel",
+      "family": "Gemini Lake",
+      "architectures": [
+        "Gen9 LP (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-cfl",
+      "vendor": "Intel",
+      "family": "Coffee Lake / Whiskey Lake",
+      "architectures": [
+        "Gen9 (upstream i915 classification)"
+      ],
+      "modelExamples": [
+        "Coffee Lake / Whiskey Lake integrated graphics"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md",
+        "https://github.com/torvalds/linux/blob/v4.20/drivers/gpu/drm/i915/i915_pci.c"
+      ]
+    },
+    {
+      "id": "intel-cml",
+      "vendor": "Intel",
+      "family": "Comet Lake",
+      "architectures": [
+        "Gen9 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-cnl",
+      "vendor": "Intel",
+      "family": "Cannon Lake",
+      "architectures": [
+        "Gen10 (historical i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 historical i915 소스에 있는 Gen10 계열입니다. 현재 Mellow의 family profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다.",
+        "이 historical upstream reference를 현재 macOS 지원이나 현재 Linux driver 지원으로 취급하지 않습니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/v4.20/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-icl",
+      "vendor": "Intel",
+      "family": "Ice Lake",
+      "architectures": [
+        "Gen11 (Ice Lake)"
+      ],
+      "modelExamples": [
+        "Ice Lake integrated graphics"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "source_intake",
+      "validationStatus": "not_run",
+      "summary": "기존 i915 source-intake profile만 등록됐습니다. 이 계열의 native macOS GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "해당 세대의 실제 DMA·GPUVM·firmware·context·IRQ/fence/reset owner와 Darwin userspace ABI가 필요합니다.",
+        "기존 Apple Ice Lake driver가 발견된 사실을 Mellow의 동작이나 모든 Ice Lake 모델의 미지원으로 분류하지 않습니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md",
+        "docs/LEGACY-DISPOSITION.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/include/drm/intel/pciids.h",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md"
+      ]
+    },
+    {
+      "id": "intel-ehl",
+      "vendor": "Intel",
+      "family": "Elkhart Lake",
+      "architectures": [
+        "Gen11 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-jsl",
+      "vendor": "Intel",
+      "family": "Jasper Lake",
+      "architectures": [
+        "Gen11 (upstream i915 classification)"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "공식 i915 소스에 있는 구형 계열입니다. 현재 Mellow의 계열별 source-intake profile과 native GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "계열별 profile과 실제 세대별 DMA/VM·submission·display·Darwin ABI 구현이 필요합니다.",
+        "해당 macOS build의 기존 Apple driver 유무와 Mellow 동작 검증은 별개입니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-tgl",
+      "vendor": "Intel",
+      "family": "Tiger Lake",
+      "architectures": [
+        "Xe-LP (Tiger Lake)"
+      ],
+      "modelExamples": [
+        "Tiger Lake integrated graphics"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "source_intake",
+      "validationStatus": "not_run",
+      "summary": "기존 i915 / xe source-intake profile만 등록됐습니다. 이 계열의 native macOS GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "해당 세대의 실제 DMA·GPUVM·firmware·context·IRQ/fence/reset owner와 Darwin userspace ABI가 필요합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md"
+      ]
+    },
+    {
+      "id": "intel-rkl",
+      "vendor": "Intel",
+      "family": "Rocket Lake",
+      "architectures": [
+        "Xe-LP (Rocket Lake)"
+      ],
+      "modelExamples": [
+        "Rocket Lake integrated graphics"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "source_intake",
+      "validationStatus": "not_run",
+      "summary": "기존 i915 / xe source-intake profile만 등록됐습니다. 이 계열의 native macOS GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "해당 세대의 실제 DMA·GPUVM·firmware·context·IRQ/fence/reset owner와 Darwin userspace ABI가 필요합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md"
+      ]
+    },
+    {
+      "id": "intel-adl",
+      "vendor": "Intel",
+      "family": "Alder Lake",
+      "architectures": [
+        "Xe-LP (Alder Lake)"
+      ],
+      "modelExamples": [
+        "Alder Lake integrated graphics"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "source_intake",
+      "validationStatus": "not_run",
+      "summary": "기존 i915 / xe source-intake profile만 등록됐습니다. 이 계열의 native macOS GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "해당 세대의 실제 DMA·GPUVM·firmware·context·IRQ/fence/reset owner와 Darwin userspace ABI가 필요합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md"
+      ]
+    },
+    {
+      "id": "intel-rpl",
+      "vendor": "Intel",
+      "family": "Raptor Lake",
+      "architectures": [
+        "Xe-LP (Raptor Lake)"
+      ],
+      "modelExamples": [
+        "Raptor Lake integrated graphics"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "source_intake",
+      "validationStatus": "not_run",
+      "summary": "기존 i915 / xe source-intake profile만 등록됐습니다. 이 계열의 native macOS GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "해당 세대의 실제 DMA·GPUVM·firmware·context·IRQ/fence/reset owner와 Darwin userspace ABI가 필요합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md"
+      ]
+    },
+    {
+      "id": "intel-dg1",
+      "vendor": "Intel",
+      "family": "DG1",
+      "architectures": [
+        "Xe-LP+ (DG1)"
+      ],
+      "modelExamples": [
+        "DG1 discrete graphics"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "source_intake",
+      "validationStatus": "not_run",
+      "summary": "기존 i915 / xe source-intake profile만 등록됐습니다. 이 계열의 native macOS GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "해당 세대의 실제 DMA·GPUVM·firmware·context·IRQ/fence/reset owner와 Darwin userspace ABI가 필요합니다.",
+        "Discrete VRAM/BAR·residency·migration 및 정확한 chip firmware 인증 경로가 필요합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md"
+      ]
+    },
+    {
+      "id": "intel-dg2",
+      "vendor": "Intel",
+      "family": "Arc Alchemist / DG2",
+      "architectures": [
+        "Xe-HPG (DG2 / Alchemist)"
+      ],
+      "modelExamples": [
+        "DG2 G10 / G11 / G12"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "source_intake",
+      "validationStatus": "not_run",
+      "summary": "기존 i915 / xe source-intake profile만 등록됐습니다. 이 계열의 native macOS GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "해당 세대의 실제 DMA·GPUVM·firmware·context·IRQ/fence/reset owner와 Darwin userspace ABI가 필요합니다.",
+        "Discrete VRAM/BAR·residency·migration 및 정확한 chip firmware 인증 경로가 필요합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/i915/i915_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md"
+      ]
+    },
+    {
+      "id": "intel-atsm",
+      "vendor": "Intel",
+      "family": "ATS-M",
+      "architectures": [
+        "Xe-HPG"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "추가 공식 upstream Xe family reference입니다. 현재 Mellow registry profile과 이 계열의 native GPU backend는 없습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "이 항목은 추가 계획 범위이며 기존 18개 source-intake profile에 포함되지 않습니다.",
+        "Upstream master를 2026-09-30 읽은 reference이며 포팅 전에 immutable source revision·실제 IP/stepping·firmware를 확정해야 합니다.",
+        "실제 DMA/VM·firmware·engine·IRQ/fence/reset와 chip별 display 유무를 별도로 확인해야 합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/master/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-pvc",
+      "vendor": "Intel",
+      "family": "Ponte Vecchio / PVC",
+      "architectures": [
+        "Xe-HPC"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "추가 공식 upstream Xe family reference입니다. 현재 Mellow registry profile과 이 계열의 native GPU backend는 없습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "이 항목은 추가 계획 범위이며 기존 18개 source-intake profile에 포함되지 않습니다.",
+        "Upstream master를 2026-09-30 읽은 reference이며 포팅 전에 immutable source revision·실제 IP/stepping·firmware를 확정해야 합니다.",
+        "실제 DMA/VM·firmware·engine·IRQ/fence/reset와 chip별 display 유무를 별도로 확인해야 합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/master/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-mtl",
+      "vendor": "Intel",
+      "family": "Meteor Lake",
+      "architectures": [
+        "Xe-LPG (Meteor Lake)"
+      ],
+      "modelExamples": [
+        "Meteor Lake integrated graphics"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "partial",
+      "validationStatus": "not_run",
+      "summary": "Pin·GGTT·GuC·heap staging 구성요소와 정적 device table이 있습니다. 7D41 연구 경로를 실제 macOS GPU 실행 owner로 연결하지 못했습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "기존 정확한 연구 profile은 8086:7D41/GMD12.70에 한정되며, 같은 계열의 다른 모델로 확장할 수 없습니다.",
+        "full ADS, 실제 PPGTT/LRC/ring·IRQ/fence/reset 및 display owner의 통합이 필요합니다.",
+        "source-table PCI 번호는 인식용 상수이며 실기 호환성 검증 결과가 아닙니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md",
+        "Mellow/kern_model.hpp",
+        "Mellow/XeGuCRegionOwner.cpp",
+        "Mellow/XeExecutionIOKit.cpp",
+        "Mellow/XeContextExecution.cpp"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/include/drm/intel/pciids.h",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md"
+      ]
+    },
+    {
+      "id": "intel-arl",
+      "vendor": "Intel",
+      "family": "Arrow Lake",
+      "architectures": [
+        "Xe-LPG / Xe-LPG+ (Arrow Lake; device-specific IP)"
+      ],
+      "modelExamples": [
+        "Intel Graphics 4-Core (Arrow Lake-U; source-table 8086:7D41)",
+        "Arrow Lake-H / Arrow Lake-S integrated graphics"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "partial",
+      "validationStatus": "not_run",
+      "summary": "Pin·GGTT·GuC·heap staging 구성요소와 정적 device table이 있습니다. 7D41 연구 경로를 실제 macOS GPU 실행 owner로 연결하지 못했습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "기존 정확한 연구 profile은 8086:7D41/GMD12.70에 한정되며, 같은 계열의 다른 모델로 확장할 수 없습니다.",
+        "full ADS, 실제 PPGTT/LRC/ring·IRQ/fence/reset 및 display owner의 통합이 필요합니다.",
+        "source-table PCI 번호는 인식용 상수이며 실기 호환성 검증 결과가 아닙니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md",
+        "Mellow/kern_model.hpp",
+        "Mellow/XeGuCRegionOwner.cpp",
+        "Mellow/XeExecutionIOKit.cpp",
+        "Mellow/XeContextExecution.cpp"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/include/drm/intel/pciids.h",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md"
+      ]
+    },
+    {
+      "id": "intel-lnl",
+      "vendor": "Intel",
+      "family": "Lunar Lake",
+      "architectures": [
+        "Xe2-LPG (Lunar Lake)"
+      ],
+      "modelExamples": [
+        "Lunar Lake integrated graphics"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "source_intake",
+      "validationStatus": "not_run",
+      "summary": "기존 xe source-intake profile만 등록됐습니다. 이 계열의 native macOS GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "해당 세대의 실제 DMA·GPUVM·firmware·context·IRQ/fence/reset owner와 Darwin userspace ABI가 필요합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/include/drm/intel/pciids.h",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md"
+      ]
+    },
+    {
+      "id": "intel-bmg",
+      "vendor": "Intel",
+      "family": "Arc Battlemage",
+      "architectures": [
+        "Xe2-HPG (Battlemage)"
+      ],
+      "modelExamples": [
+        "Battlemage G21"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "source_intake",
+      "validationStatus": "not_run",
+      "summary": "기존 xe source-intake profile만 등록됐습니다. 이 계열의 native macOS GPU backend는 구현되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "해당 세대의 실제 DMA·GPUVM·firmware·context·IRQ/fence/reset owner와 Darwin userspace ABI가 필요합니다.",
+        "Discrete VRAM/BAR·residency·migration 및 정확한 chip firmware 인증 경로가 필요합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/include/drm/intel/pciids.h",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md"
+      ]
+    },
+    {
+      "id": "intel-ptl",
+      "vendor": "Intel",
+      "family": "Panther Lake",
+      "architectures": [
+        "Xe3 LPG; exact GMD_ID unmeasured"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "추가 공식 upstream Xe family reference입니다. 현재 Mellow registry profile과 이 계열의 native GPU backend는 없습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "이 항목은 추가 계획 범위이며 기존 18개 source-intake profile에 포함되지 않습니다.",
+        "Upstream master를 2026-09-30 읽은 reference이며 포팅 전에 immutable source revision·실제 IP/stepping·firmware를 확정해야 합니다.",
+        "실제 DMA/VM·firmware·engine·IRQ/fence/reset와 chip별 display 유무를 별도로 확인해야 합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/master/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-wcl",
+      "vendor": "Intel",
+      "family": "WCL (upstream Xe family)",
+      "architectures": [
+        "Exact GMD_ID unmeasured"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "추가 공식 upstream Xe family reference입니다. 현재 Mellow registry profile과 이 계열의 native GPU backend는 없습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "이 항목은 추가 계획 범위이며 기존 18개 source-intake profile에 포함되지 않습니다.",
+        "Upstream master를 2026-09-30 읽은 reference이며 포팅 전에 immutable source revision·실제 IP/stepping·firmware를 확정해야 합니다.",
+        "실제 DMA/VM·firmware·engine·IRQ/fence/reset와 chip별 display 유무를 별도로 확인해야 합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/master/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-nvl",
+      "vendor": "Intel",
+      "family": "Novalake-S / Novalake-P",
+      "architectures": [
+        "Exact GMD_ID unmeasured"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "추가 공식 upstream Xe family reference입니다. 현재 Mellow registry profile과 이 계열의 native GPU backend는 없습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "이 항목은 추가 계획 범위이며 기존 18개 source-intake profile에 포함되지 않습니다.",
+        "Upstream master를 2026-09-30 읽은 reference이며 포팅 전에 immutable source revision·실제 IP/stepping·firmware를 확정해야 합니다.",
+        "실제 DMA/VM·firmware·engine·IRQ/fence/reset와 chip별 display 유무를 별도로 확인해야 합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/master/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "intel-cri",
+      "vendor": "Intel",
+      "family": "Crescent Island",
+      "architectures": [
+        "Exact GMD_ID unmeasured"
+      ],
+      "modelExamples": [],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "not_implemented",
+      "validationStatus": "not_run",
+      "summary": "추가 공식 upstream Xe family reference입니다. 현재 Mellow registry profile과 이 계열의 native GPU backend는 없습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "이 항목은 추가 계획 범위이며 기존 18개 source-intake profile에 포함되지 않습니다.",
+        "Upstream master를 2026-09-30 읽은 reference이며 포팅 전에 immutable source revision·실제 IP/stepping·firmware를 확정해야 합니다.",
+        "실제 DMA/VM·firmware·engine·IRQ/fence/reset와 chip별 display 유무를 별도로 확인해야 합니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "docs/SOURCE-FAMILY-PORTING.md",
+        "docs/GPU-PORT-MACOS-15-26.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/master/drivers/gpu/drm/xe/xe_pci.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/SOURCE-FAMILY-PORTING.md"
+      ]
+    },
+    {
+      "id": "nvidia-maxwell",
+      "vendor": "NVIDIA",
+      "family": "Maxwell",
+      "architectures": [
+        "Maxwell"
+      ],
+      "modelExamples": [
+        "GM107 / GM204"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "partial",
+      "validationStatus": "not_run",
+      "summary": "PCI/BAR와 BOOT0/BOOT1 chipset 관찰 코드가 있습니다. Nouveau 초기화·실제 native GPU 제출 경로는 연결되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "Maxwell/Pascal/Volta는 NVIDIA open RM 대상이 아니며 해당 Nouveau NVKM/Falcon/ACR·GPUVM·channel 경로가 필요합니다.",
+        "chipset 인식은 device 지원이나 firmware/engine 초기화 성공을 뜻하지 않습니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md",
+        "Drivers/NativeNvidia/Probe.cpp",
+        "Mellow/NvidiaMmioIOKit.cpp",
+        "docs/NATIVE-GPU-OWNER.md"
+      ],
+      "sourceLinks": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/610/kernel-modules.html",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/nouveau/nvkm/engine/device/base.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NATIVE-GPU-OWNER.md"
+      ]
+    },
+    {
+      "id": "nvidia-pascal",
+      "vendor": "NVIDIA",
+      "family": "Pascal",
+      "architectures": [
+        "Pascal"
+      ],
+      "modelExamples": [
+        "GP102 / GP104"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "partial",
+      "validationStatus": "not_run",
+      "summary": "PCI/BAR와 BOOT0/BOOT1 chipset 관찰 코드가 있습니다. Nouveau 초기화·실제 native GPU 제출 경로는 연결되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "Maxwell/Pascal/Volta는 NVIDIA open RM 대상이 아니며 해당 Nouveau NVKM/Falcon/ACR·GPUVM·channel 경로가 필요합니다.",
+        "chipset 인식은 device 지원이나 firmware/engine 초기화 성공을 뜻하지 않습니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md",
+        "Drivers/NativeNvidia/Probe.cpp",
+        "Mellow/NvidiaMmioIOKit.cpp",
+        "docs/NATIVE-GPU-OWNER.md"
+      ],
+      "sourceLinks": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/610/kernel-modules.html",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/nouveau/nvkm/engine/device/base.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NATIVE-GPU-OWNER.md"
+      ]
+    },
+    {
+      "id": "nvidia-volta",
+      "vendor": "NVIDIA",
+      "family": "Volta",
+      "architectures": [
+        "Volta"
+      ],
+      "modelExamples": [
+        "GV100"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "partial",
+      "validationStatus": "not_run",
+      "summary": "PCI/BAR와 BOOT0/BOOT1 chipset 관찰 코드가 있습니다. Nouveau 초기화·실제 native GPU 제출 경로는 연결되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "Maxwell/Pascal/Volta는 NVIDIA open RM 대상이 아니며 해당 Nouveau NVKM/Falcon/ACR·GPUVM·channel 경로가 필요합니다.",
+        "chipset 인식은 device 지원이나 firmware/engine 초기화 성공을 뜻하지 않습니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md",
+        "Drivers/NativeNvidia/Probe.cpp",
+        "Mellow/NvidiaMmioIOKit.cpp",
+        "docs/NATIVE-GPU-OWNER.md"
+      ],
+      "sourceLinks": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://docs.nvidia.com/datacenter/tesla/driver-installation-guide/610/kernel-modules.html",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/nouveau/nvkm/engine/device/base.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NATIVE-GPU-OWNER.md"
+      ]
+    },
+    {
+      "id": "nvidia-turing",
+      "vendor": "NVIDIA",
+      "family": "Turing",
+      "architectures": [
+        "Turing"
+      ],
+      "modelExamples": [
+        "TU102 / TU104 / TU106"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "partial",
+      "validationStatus": "not_run",
+      "summary": "Chipset 관찰과 공통 GSP image/signature/boot-binary/WPR DMA lifetime 코드가 있습니다. 실제 chip별 GSP 인증·부팅·RPC owner는 연결되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "실제 chip/HAL 선택, FWSEC/FRTS/RISC-V/Booter, WPR 소유권과 성공한 GSP_INIT_DONE RPC 증거가 필요합니다.",
+        "Nouveau/NVK와 NVIDIA RM의 memory/channel/userspace ABI는 서로 바꿔 쓸 수 없습니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md",
+        "Drivers/NativeNvidia/Probe.cpp",
+        "Mellow/NvidiaMmioIOKit.cpp",
+        "docs/NATIVE-GPU-OWNER.md",
+        "Drivers/PortedNvidiaGsp/FirmwareOwner.cpp",
+        "Drivers/PortedNvidiaGsp/FirmwareImage.cpp",
+        "Drivers/PortedNvidiaGsp/Radix3.cpp",
+        "docs/NVIDIA-GSP-FIRMWARE-OWNER.md"
+      ],
+      "sourceLinks": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/README.md",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/nouveau/nvkm/engine/device/base.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NATIVE-GPU-OWNER.md",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NVIDIA-GSP-FIRMWARE-OWNER.md"
+      ]
+    },
+    {
+      "id": "nvidia-ampere",
+      "vendor": "NVIDIA",
+      "family": "Ampere",
+      "architectures": [
+        "Ampere"
+      ],
+      "modelExamples": [
+        "GA100 / GA102 / GA104",
+        "GeForce RTX 3080 / RTX 3090 (GA102 examples)"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "partial",
+      "validationStatus": "not_run",
+      "summary": "Chipset 관찰과 공통 GSP image/signature/boot-binary/WPR DMA lifetime 코드가 있습니다. 실제 chip별 GSP 인증·부팅·RPC owner는 연결되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "실제 chip/HAL 선택, FWSEC/FRTS/RISC-V/Booter, WPR 소유권과 성공한 GSP_INIT_DONE RPC 증거가 필요합니다.",
+        "Nouveau/NVK와 NVIDIA RM의 memory/channel/userspace ABI는 서로 바꿔 쓸 수 없습니다.",
+        "첫 queue/copy slice는 실제로 협상한 일반 C56F/C6B5 channel에만 한정되며 Ampere 모델 전체의 동작을 뜻하지 않습니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md",
+        "Drivers/NativeNvidia/Probe.cpp",
+        "Mellow/NvidiaMmioIOKit.cpp",
+        "docs/NATIVE-GPU-OWNER.md",
+        "Drivers/PortedNvidiaGsp/FirmwareOwner.cpp",
+        "Drivers/PortedNvidiaGsp/FirmwareImage.cpp",
+        "Drivers/PortedNvidiaGsp/Radix3.cpp",
+        "docs/NVIDIA-GSP-FIRMWARE-OWNER.md",
+        "Drivers/NativeNvidia/GpFifoQueue.cpp",
+        "Drivers/NativeNvidia/CopyPushbuffer.cpp"
+      ],
+      "sourceLinks": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/README.md",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/nouveau/nvkm/engine/device/base.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NATIVE-GPU-OWNER.md",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NVIDIA-GSP-FIRMWARE-OWNER.md"
+      ]
+    },
+    {
+      "id": "nvidia-hopper",
+      "vendor": "NVIDIA",
+      "family": "Hopper",
+      "architectures": [
+        "Hopper / GH100"
+      ],
+      "modelExamples": [
+        "GH100"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "partial",
+      "validationStatus": "not_run",
+      "summary": "기존 production Probe는 Hopper chipset을 구분합니다. 현재 source-intake family profile과 실제 GH100 bootstrap·채널 owner는 없습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "Hopper의 FSP/GSP·secure WPR/HAL·RPC와 실제 VM/channel 소유권이 필요합니다.",
+        "공통 GSP DMA 준비 코드와 확장 packet encoder를 GH100 native 실행 지원으로 취급하지 않습니다.",
+        "Datacenter GPU의 display/WindowServer 경로를 consumer 모델에서 추정하지 않습니다."
+      ],
+      "sourcePaths": [
+        "Drivers/NativeNvidia/Probe.cpp",
+        "Drivers/PortedNvidiaGsp/FirmwareOwner.cpp",
+        "Drivers/PortedNvidia/CommandEncoding.cpp",
+        "docs/NATIVE-GPU-OWNER.md",
+        "docs/NVIDIA-GSP-FIRMWARE-OWNER.md"
+      ],
+      "sourceLinks": [
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/nouveau/nvkm/engine/device/base.c",
+        "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/src/nvidia/src/kernel/gpu/gsp/arch/hopper/kernel_gsp_gh100.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NVIDIA-GSP-FIRMWARE-OWNER.md"
+      ]
+    },
+    {
+      "id": "nvidia-ada",
+      "vendor": "NVIDIA",
+      "family": "Ada Lovelace",
+      "architectures": [
+        "Ada Lovelace"
+      ],
+      "modelExamples": [
+        "AD102 / AD104 / AD106"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "partial",
+      "validationStatus": "not_run",
+      "summary": "Chipset 관찰과 공통 GSP image/signature/boot-binary/WPR DMA lifetime 코드가 있습니다. 실제 chip별 GSP 인증·부팅·RPC owner는 연결되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "실제 chip/HAL 선택, FWSEC/FRTS/RISC-V/Booter, WPR 소유권과 성공한 GSP_INIT_DONE RPC 증거가 필요합니다.",
+        "Nouveau/NVK와 NVIDIA RM의 memory/channel/userspace ABI는 서로 바꿔 쓸 수 없습니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md",
+        "Drivers/NativeNvidia/Probe.cpp",
+        "Mellow/NvidiaMmioIOKit.cpp",
+        "docs/NATIVE-GPU-OWNER.md",
+        "Drivers/PortedNvidiaGsp/FirmwareOwner.cpp",
+        "Drivers/PortedNvidiaGsp/FirmwareImage.cpp",
+        "Drivers/PortedNvidiaGsp/Radix3.cpp",
+        "docs/NVIDIA-GSP-FIRMWARE-OWNER.md"
+      ],
+      "sourceLinks": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/README.md",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/nouveau/nvkm/engine/device/base.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NATIVE-GPU-OWNER.md",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NVIDIA-GSP-FIRMWARE-OWNER.md"
+      ]
+    },
+    {
+      "id": "nvidia-blackwell",
+      "vendor": "NVIDIA",
+      "family": "Blackwell",
+      "architectures": [
+        "Blackwell"
+      ],
+      "modelExamples": [
+        "GB100 / GB102 (datacenter source examples)",
+        "GB202 / GB203 (consumer source examples)"
+      ],
+      "pciDeviceIds": [],
+      "osTargets": [
+        15,
+        26
+      ],
+      "implementationStatus": "partial",
+      "validationStatus": "not_run",
+      "summary": "Chipset 관찰과 공통 GSP image/signature/boot-binary/WPR DMA lifetime 코드가 있습니다. 실제 chip별 GSP 인증·부팅·RPC owner는 연결되지 않았습니다.",
+      "blockers": [
+        "macOS 15·26에서 이 계열의 실제 GPU 제출·독립 readback·reset 검증이 없습니다.",
+        "시스템 Metal 등록, WindowServer 가속과 display scanout은 미검증입니다.",
+        "osTargets는 개발·빌드 대상이며, 동작하는 OS/GPU 조합을 뜻하지 않습니다.",
+        "개별 PCI/subsystem ID와 stepping의 호환성은 미확인입니다.",
+        "실제 chip/HAL 선택, FWSEC/FRTS/RISC-V/Booter, WPR 소유권과 성공한 GSP_INIT_DONE RPC 증거가 필요합니다.",
+        "Nouveau/NVK와 NVIDIA RM의 memory/channel/userspace ABI는 서로 바꿔 쓸 수 없습니다.",
+        "Consumer GB20x와 datacenter GB10x의 HAL·firmware·채널·display 경로를 별도로 검증해야 합니다.",
+        "기존 NVK family reference의 consumer 범위를 datacenter GPU 지원으로 확장하지 않습니다."
+      ],
+      "sourcePaths": [
+        "porting/gpu-families.json",
+        "porting/backend-recipes.json",
+        "docs/GPU-PORT-MACOS-15-26.md",
+        "Drivers/NativeNvidia/Probe.cpp",
+        "Mellow/NvidiaMmioIOKit.cpp",
+        "docs/NATIVE-GPU-OWNER.md",
+        "Drivers/PortedNvidiaGsp/FirmwareOwner.cpp",
+        "Drivers/PortedNvidiaGsp/FirmwareImage.cpp",
+        "Drivers/PortedNvidiaGsp/Radix3.cpp",
+        "docs/NVIDIA-GSP-FIRMWARE-OWNER.md"
+      ],
+      "sourceLinks": [
+        "https://docs.mesa3d.org/drivers/nvk.html",
+        "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/README.md",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/GPU-PORT-MACOS-15-26.md",
+        "https://github.com/torvalds/linux/blob/0d9ff90a5422cc7509258aaaba1e7481df4d332a/drivers/gpu/drm/nouveau/nvkm/engine/device/base.c",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NATIVE-GPU-OWNER.md",
+        "https://github.com/NiSeullent/Mellow/blob/main/docs/NVIDIA-GSP-FIRMWARE-OWNER.md"
+      ]
+    }
+  ],
+  "claims": {
+    "allModelsVerified": false,
+    "nativeMetalVerified": false,
+    "systemWindowServerVerified": false
+  }
+}
