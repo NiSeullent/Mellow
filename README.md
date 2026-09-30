@@ -44,7 +44,8 @@ unavailable states. No cached fixture or invented download is presented.
 The page reads the unauthenticated official GitHub releases API, with at most
 30 recent releases and a link to the complete release history. Only actual
 published API assets have download links. The selector chooses the newest
-listed release with a recognizable native development asset when available;
+complete compiled package described below when available, otherwise a
+recognizable native development asset;
 users can choose any other returned release.
 
 Root-planned release assets are `mellow-install.sh`,
@@ -60,6 +61,51 @@ execution.
 Current installer and newer scope-document source links target
 `codex/mellow-gpu-port-1edd` because source PR 3 has not yet been merged.
 The release descriptions and source checkpoint in each payload are controlling.
+
+### Additive compiled ZIP contract
+
+The parallel family-routing build defines a stock-tools installer and one
+macOS 15/26 Intel x86_64 package, published only after its required binary
+build succeeds. Its five required assets are `Mellow-macos-x86_64.zip`,
+`Mellow-macos-x86_64.zip.sha256`, `manifest.json`, `install-mellow.sh` and
+`uninstall-mellow.sh`.
+The page enables this package's CTA only when all five names occur exactly
+once, have nonzero uploaded API assets and belong to the selected official
+release tag. A partial upload cannot enable package or installer controls.
+Among complete packages, the newest valid `published_at` is selected first;
+the older `mellow-install.sh`/per-OS tar contract remains available unchanged.
+
+The new installer UI has two separate command/copy boxes: save and review
+`install-mellow.sh`, then run `bash ./install-mellow.sh --version TAG` after
+review. API-returned URLs and tags are shell-quoted, never executed by the page.
+The default prefix is `~/Library/Mellow`. External ZIP and internal payload
+checksums are verified by the installer. System kext/dependency installation,
+kmutil preparation and GPU acceptance are separate explicit steps; downloading
+or installing a compiled package does not verify GPU/Metal/WindowServer support.
+Its installation-document link uses the exact selected release tag. Package
+availability is discovered live, not inferred from build source or CI progress.
+
+### Cross-session publication ownership
+
+This additive integration starts from the actual public
+`codex/mellow-pages@5435ff5dddddca9c0e57ece0af123403f1295e68` parent in the isolated
+`codex/mellow-download-integration-20260930` branch. Only `assets/app.js` and
+this README are changed; the 44-family/838-declaration data, provenance,
+homepage markup, styling and MIT notice are preserved. The family-routing
+session's separate 26-entry site is a reviewed alternative, not the currently
+published catalog. Publication owners must review the current public parent
+and coordinate one deployment before updating the shared Pages branch/config;
+independent automatic deployments must not overwrite each other's site.
+The family-routing source records this handoff in
+`docs/PUBLICATION-COORDINATION.md`; that record does not imply acknowledgment
+by an independent peer session.
+
+Review complete/missing/zero-size/non-uploaded/duplicate/cross-tag package
+assets, newest-package selection, API failure and release switching. Confirm
+the native run box disappears when switching to an older installer, both old
+and new command contracts remain correct, and all catalog validation claims
+stay false. Direct syntax/data/browser checks and publication are performed by
+the parent coordinator; no repository scripts were run for this integration.
 
 ## Publication
 

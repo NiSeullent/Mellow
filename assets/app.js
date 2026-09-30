@@ -5,7 +5,7 @@
   const GITHUB = "https://github.com/" + REPO;
   const API = "https://api.github.com/repos/" + REPO + "/releases?per_page=30";
   const statuses = {partial: "부분 구현", source_intake: "소스 검토", not_implemented: "미구현"};
-  const state = {catalog: null, models: null, mode: "family", visibleLimit: 24, releases: [], command: ""};
+  const state = {catalog: null, models: null, mode: "family", visibleLimit: 24, releases: [], command: "", runCommand: ""};
   const $ = id => document.getElementById(id);
   const node = (tag, className, value) => {
     const result = document.createElement(tag);
@@ -28,7 +28,7 @@
     if (!safe) return null;
     const url = new URL(safe);
     const prefix = "/" + REPO + "/releases/" + (kind === "asset" ? "download/" : "tag/");
-    return url.hostname === "github.com" && url.pathname.startsWith(prefix) && !url.search && !url.hash ? url.href : null;
+    return url.origin === "https://github.com" && url.pathname.startsWith(prefix) && !url.search && !url.hash ? url.href : null;
   };
   function link(label, href, className) {
     const a = node("a", className, label);
@@ -166,7 +166,33 @@
       showState($("catalog-grid"), "현재 계열 정보를 확인할 수 없습니다. 아래 개발 문서 또는 데이터 원본을 확인하세요.", loadCatalog);
     }
   }
+  const PACKAGE_ZIP = "Mellow-macos-x86_64.zip";
+  const PACKAGE_REQUIRED = [PACKAGE_ZIP, PACKAGE_ZIP + ".sha256", "manifest.json", "install-mellow.sh", "uninstall-mellow.sh"];
+  const PACKAGE_ASSETS = new Set(PACKAGE_REQUIRED);
+  const shellQuote = value => "'" + value.replace(/'/g, "'\\''") + "'";
+  function completePackage(release) {
+    if (!validText(release.tag_name, 200) || /[\s\x00-\x1f\x7f]/.test(release.tag_name) ||
+        !Number.isFinite(Date.parse(release.published_at))) return null;
+    const result = {};
+    for (const name of PACKAGE_REQUIRED) {
+      const matches = release.assets.filter(asset => asset.name === name);
+      if (matches.length !== 1) return null;
+      const asset = matches[0], safe = githubUrl(asset.browser_download_url, "asset");
+      if (!safe || asset.state !== "uploaded" || !Number.isSafeInteger(asset.size) || asset.size <= 0) return null;
+      // Bind every required asset to this release tag and exact filename.
+      // Merely sharing the official repository prefix is insufficient.
+      const parts = new URL(safe).pathname.slice(("/" + REPO + "/releases/download/").length).split("/");
+      try {
+        if (parts.length !== 2 || decodeURIComponent(parts[0]) !== release.tag_name || decodeURIComponent(parts[1]) !== name) return null;
+      } catch { return null; }
+      result[name] = asset;
+    }
+    return result;
+  }
+  const hasPackageAssets = release => release.assets.some(asset => PACKAGE_ASSETS.has(asset.name) && asset.name !== "manifest.json");
   const assetKind = name => {
+    if (name === PACKAGE_ZIP) return "coherent_bundle";
+    if (name === "install-mellow.sh") return "installer";
     if (name === "mellow-install.sh" || /^mellow-installer-macos(15|26)-x86_64$/.test(name)) return "installer";
     if (/^mellow-development-macos(15|26)-x86_64\.tar$/.test(name)) return "bundle";
     if (/source/i.test(name) && /\.(zip|tar|gz)$/i.test(name)) return "source";
@@ -180,29 +206,63 @@
     const labels = {
       installer: ["CLI INSTALLER", "터미널 설치 도구", "버전별 사용자 설치를 위한 도구입니다. 설치만으로 GPU 가속이나 드라이버 활성화가 검증되지는 않습니다."],
       bundle: ["DEVELOPMENT BUNDLE", /macos26/.test(asset.name) ? "macOS 26 개발 패키지" : "macOS 15 개발 패키지", "실제 kext·앱용 프레임워크·진단 도구 묶음입니다. GPU 실기 지원과 시스템 Metal 등록은 별도 검증이 필요합니다."],
+      coherent_bundle: ["COMPILED DEVELOPMENT PACKAGE", "macOS 15 / 26 · Intel x86_64", "Mellow.kext·앱용 framework·CLI의 실험용 바이너리입니다. Developer ID 서명·공증과 native GPU·시스템 Metal·WindowServer 실기 검증은 완료되지 않았습니다."],
       source: ["SOURCE CODE", "소스 코드", "해당 릴리스의 구현, 문서와 고지 사항을 직접 확인할 수 있습니다."],
       kernel: ["NATIVE DEVELOPMENT", "개발용 커널 패키지", "게시된 네이티브 개발 자산입니다. kext 빌드와 실제 적재·GPU 가속은 서로 다른 검증입니다."],
       framework: ["APP FRAMEWORK", "앱용 그래픽 프레임워크", "기존 호스트 GPU를 사용하는 명시적 앱 어댑터입니다. 시스템 Metal 드라이버가 아닙니다."]
     };
-    const content = labels[kind], card = node("article", "download-card" + (kind === "bundle" ? " featured" : ""));
+    const content = labels[kind], card = node("article", "download-card" + (["bundle", "coherent_bundle"].includes(kind) ? " featured" : ""));
     card.append(node("p", "download-kind", content[0]), node("h3", "", content[1]), node("p", "", content[2]));
     card.append(node("div", "asset-name", asset.name + " · " + size(asset.size)));
     const a = link("다운로드", asset.browser_download_url, "download-button"); a.append(node("span", "", "↓")); card.append(a);
     return card;
   }
+  async function copyCommand(button, command) {
+    if (!command) return;
+    try { await navigator.clipboard.writeText(command); button.textContent = "복사됨"; }
+    catch { button.textContent = "직접 선택"; }
+    window.setTimeout(() => { button.textContent = "복사"; }, 2000);
+  }
+  function packageRunTerminal() {
+    if ($("package-run-terminal")) return;
+    const review = node("p", "source-caption", "첫 번째 명령으로 스크립트를 내려받아 읽고, 확인한 뒤 두 번째 설치 명령을 별도로 실행하세요.");
+    review.id = "package-review"; review.hidden = true;
+    const terminal = node("div", "terminal"), bar = node("div", "terminal-bar"), button = node("button", "", "복사");
+    terminal.id = "package-run-terminal"; terminal.hidden = true;
+    button.id = "copy-package-run"; button.type = "button"; button.disabled = true;
+    button.setAttribute("aria-label", "선택한 버전 설치 명령 복사");
+    button.addEventListener("click", () => copyCommand(button, state.runCommand));
+    bar.append(node("span", "", "선택한 버전 설치"), button);
+    const pre = node("pre"), code = node("code"); code.id = "package-run-command"; pre.append(code);
+    terminal.append(bar, pre); $("installer-status").before(review, terminal);
+  }
   function installer(release) {
+    packageRunTerminal();
+    const bundle = completePackage(release);
+    state.runCommand = ""; $("copy-package-run").disabled = true;
+    $("package-review").hidden = $("package-run-terminal").hidden = !bundle;
+    $("package-run-command").textContent = "";
+    if (bundle) {
+      state.command = "curl --fail --location --proto '=https' --tlsv1.2 --output install-mellow.sh " +
+        shellQuote(bundle["install-mellow.sh"].browser_download_url) + "\nless ./install-mellow.sh";
+      state.runCommand = "bash ./install-mellow.sh --version " + shellQuote(release.tag_name);
+      $("install-command").textContent = state.command; $("copy-install").disabled = false;
+      $("package-run-command").textContent = state.runCommand; $("copy-package-run").disabled = false;
+      $("installer-status").replaceChildren(node("span", "", "기본 설치 위치는 ~/Library/Mellow입니다. 외부 ZIP·내부 payload 체크섬을 검사하며, GPU 실행·시스템 kext 설치·보안 변경·재부팅은 자동 실행하지 않습니다. "));
+      $("installer-status").append(link("선택한 버전 설치 문서 ↗", GITHUB + "/blob/" + encodeURIComponent(release.tag_name) + "/docs/INSTALLATION.md"));
+      return;
+    }
     const asset = release.assets.find(item => item.name === "mellow-install.sh");
     state.command = ""; $("copy-install").disabled = true;
     if (asset) {
       // Only an actual API-returned asset URL is inserted. No shell execution.
-      const url = asset.browser_download_url.replace(/'/g, "'\\''");
-      state.command = "curl -fL --output mellow-install.sh '" + url + "'\nbash ./mellow-install.sh --help";
+      state.command = "curl -fL --output mellow-install.sh " + shellQuote(asset.browser_download_url) + "\nbash ./mellow-install.sh --help";
       $("install-command").textContent = state.command;
       $("copy-install").disabled = false;
       $("installer-status").textContent = "선택한 릴리스의 실제 CLI 스크립트 다운로드 명령입니다. 검증 파일과 도움말을 확인한 뒤 실행하세요.";
     } else {
-      $("install-command").textContent = "# 선택한 릴리스에 mellow-install.sh가 없습니다.\n# 게시된 CLI 바이너리는 위 다운로드 목록에서 확인하세요.";
-      $("installer-status").textContent = "CLI 스크립트가 아직 게시되지 않은 릴리스입니다. 존재하지 않는 다운로드 명령은 표시하지 않습니다.";
+      $("install-command").textContent = hasPackageAssets(release) ? "# 새 패키지의 ZIP·체크섬·manifest·설치/제거 도구 업로드가 아직 완성되지 않았습니다." : "# 선택한 릴리스에 mellow-install.sh가 없습니다.\n# 게시된 CLI 바이너리는 위 다운로드 목록에서 확인하세요.";
+      $("installer-status").textContent = "완성된 설치 자산이 확인되지 않았습니다. 존재하지 않거나 부분 업로드된 패키지의 설치 명령은 표시하지 않습니다.";
     }
   }
   function renderRelease(index) {
@@ -212,11 +272,13 @@
     $("release-status").textContent = (release.prerelease ? "개발 프리릴리스" : "게시된 릴리스") + " · " +
       (Number.isNaN(date.valueOf()) ? release.tag_name : date.toLocaleDateString("ko-KR")) + " · 실제 자산 " + release.assets.length + "개";
     const grid = $("download-grid"); grid.replaceChildren(); grid.setAttribute("aria-busy", "false");
-    const primary = release.assets.filter(a => assetKind(a.name) !== "other");
+    const bundle = completePackage(release), pendingPackage = hasPackageAssets(release) && !bundle;
+    const visibleAssets = release.assets.filter(a => !pendingPackage || !PACKAGE_ASSETS.has(a.name));
+    const primary = visibleAssets.filter(a => assetKind(a.name) !== "other");
     if (primary.length) for (const a of primary) grid.append(downloadCard(a));
-    else showState(grid, "이 릴리스에는 분류 가능한 kext·프레임워크·설치 도구·소스 패키지가 없습니다. 실제 자산과 릴리스 설명을 확인하세요.");
+    else showState(grid, pendingPackage ? "새 바이너리 패키지 업로드가 아직 완성되지 않았습니다. ZIP·체크섬·manifest·설치/제거 도구가 모두 게시되면 다운로드가 활성화됩니다." : "이 릴리스에는 분류 가능한 kext·프레임워크·설치 도구·소스 패키지가 없습니다. 실제 자산과 릴리스 설명을 확인하세요.");
     const other = $("other-assets"); other.replaceChildren();
-    for (const asset of release.assets.filter(a => assetKind(a.name) === "other")) {
+    for (const asset of visibleAssets.filter(a => assetKind(a.name) === "other")) {
       const a = link("", asset.browser_download_url); a.append(node("span", "asset-label", asset.name), node("span", "asset-size", size(asset.size) + " ↓")); other.append(a);
     }
     if (!other.children.length) other.append(node("p", "", "별도의 기타 자산이 없습니다."));
@@ -231,17 +293,25 @@
         .map(r => ({tag_name: r.tag_name, name: validText(r.name, 400) ? r.name : r.tag_name, html_url: githubUrl(r.html_url, "release"),
           prerelease: r.prerelease === true, published_at: r.published_at, assets: r.assets.filter(a => a && validText(a.name, 300) &&
             Number.isSafeInteger(a.size) && a.size >= 0 && githubUrl(a.browser_download_url, "asset")).map(a => ({
-              name: a.name, size: a.size, browser_download_url: githubUrl(a.browser_download_url, "asset")}))}));
+              name: a.name, size: a.size, state: a.state, browser_download_url: githubUrl(a.browser_download_url, "asset")}))}));
       if (!state.releases.length) throw new Error("No published releases");
       const select = $("release-select"); select.replaceChildren();
       state.releases.forEach((r, i) => { const o = node("option", "", r.name + (r.prerelease ? " · 개발" : "")); o.value = String(i); select.append(o); });
-      const preferred = state.releases.findIndex(r => r.assets.some(a => ["bundle", "kernel", "framework"].includes(assetKind(a.name))));
+      const newestPackage = state.releases.reduce((best, release, index) => completePackage(release) &&
+        (best < 0 || Date.parse(release.published_at) > Date.parse(state.releases[best].published_at)) ? index : best, -1);
+      const preferred = newestPackage >= 0 ? newestPackage : state.releases.findIndex(r => r.assets.some(a => ["bundle", "kernel", "framework"].includes(assetKind(a.name))));
       select.value = String(preferred >= 0 ? preferred : 0); select.disabled = false; renderRelease(Number(select.value));
     } catch {
       $("release-status").textContent = "GitHub API에 연결하지 못했습니다. 네트워크나 API 요청 제한을 확인하세요.";
       $("release-select").disabled = true;
       showState($("download-grid"), "다운로드 파일을 확인할 수 없습니다. '모든 릴리스'에서 GitHub의 실제 게시 파일을 확인하세요.", loadReleases);
       $("other-assets").replaceChildren(link("GitHub 릴리스에서 확인 ↗", GITHUB + "/releases"));
+      state.command = state.runCommand = ""; $("copy-install").disabled = true;
+      $("install-command").textContent = "# 공개 릴리스 자산을 확인하지 못했습니다.";
+      $("installer-status").textContent = "공개 릴리스 자산을 확인할 수 없어 설치 명령을 비활성화했습니다. GitHub의 릴리스 설명과 실제 파일을 확인하세요.";
+      if ($("package-run-terminal")) {
+        $("package-review").hidden = $("package-run-terminal").hidden = true; $("copy-package-run").disabled = true;
+      }
     }
   }
   $("catalog-filters").addEventListener("submit", event => event.preventDefault());
@@ -250,11 +320,6 @@
   $("model-mode").addEventListener("click", () => { if (state.models) { state.mode = "model"; state.visibleLimit = 24; renderCatalog(); } });
   $("catalog-more").addEventListener("click", () => { state.visibleLimit += 24; renderCatalog(); });
   $("release-select").addEventListener("change", () => renderRelease(Number($("release-select").value)));
-  $("copy-install").addEventListener("click", async () => {
-    if (!state.command) return;
-    try { await navigator.clipboard.writeText(state.command); $("copy-install").textContent = "복사됨"; }
-    catch { $("copy-install").textContent = "직접 선택"; }
-    window.setTimeout(() => { $("copy-install").textContent = "복사"; }, 2000);
-  });
+  $("copy-install").addEventListener("click", () => copyCommand($("copy-install"), state.command));
   loadCatalog(); loadReleases();
 })();
