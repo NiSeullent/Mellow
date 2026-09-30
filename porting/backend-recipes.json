@@ -3,25 +3,96 @@
   "recipes": {
     "xe": {
       "vendor": "Intel",
+      "adapter_contract": "intel-xe",
+      "implementation_status": "source-intake-only",
+      "architecture_scope": "upstream-source-reference-only",
+      "architectures": ["intel-tgl", "intel-rkl", "intel-adl", "intel-rpl", "intel-dg1", "intel-dg2", "intel-mtl", "intel-arl", "intel-lnl", "intel-bmg"],
+      "excluded_architectures": [],
       "source_prefixes": ["drivers/gpu/drm/xe/", "include/drm/", "include/linux/"],
       "admission_prefixes": ["drivers/gpu/drm/xe/"],
       "focus": ["GGTT/PPGTT memory ownership", "GuC firmware provenance and authentication", "context submission", "interrupt and fence completion"],
+      "requirements": {
+        "architecture": ["Family references are nonexhaustive source inventory, not device admission.", "Resolve the measured PCI/subsystem identity and stepping against the selected immutable Xe source, configuration and hardware description."],
+        "firmware": ["Pin required GuC/HuC/DMC images, versions, hashes and redistribution terms for the selected device.", "Prove authentication, DMA ownership, reset and reload before hardware execution; source inspection does not perform them."],
+        "userspace": ["Select and port a compatible compiler/winsys and measured Darwin resource/submission ABI.", "An i915 userspace ABI or existing host GL/CL provider is not automatically an Xe native backend."],
+        "source_provenance": ["Record immutable upstream commit, per-file SHA256 and build configuration.", "Verify revision membership and review the full dependency/license closure; a supplied revision label is not an attestation."]
+      },
       "pci_device_ids": [],
       "hardware_admission": "Explicit hardware inventory and runtime evidence required; choosing xe does not admit any PCI device."
     },
+    "i915": {
+      "vendor": "Intel",
+      "adapter_contract": "intel-i915",
+      "implementation_status": "source-intake-only",
+      "architecture_scope": "upstream-source-reference-only",
+      "architectures": ["intel-icl", "intel-tgl", "intel-rkl", "intel-adl", "intel-rpl", "intel-dg1", "intel-dg2"],
+      "excluded_architectures": [],
+      "source_prefixes": ["drivers/gpu/drm/i915/", "include/drm/", "include/uapi/drm/", "include/linux/", "include/uapi/linux/"],
+      "admission_prefixes": ["drivers/gpu/drm/i915/"],
+      "focus": ["GGTT/PPGTT memory and residency ownership", "GuC/HuC/DMC firmware and legacy submission selection", "execution contexts and engine submission", "interrupt, fence and reset completion"],
+      "requirements": {
+        "architecture": ["Family references are nonexhaustive source inventory, not device admission.", "Resolve the measured PCI/subsystem identity and stepping against the selected immutable i915 source and configuration; do not infer support from the Intel vendor ID."],
+        "firmware": ["Identify which selected i915 execution/display path requires GuC, HuC or DMC and pin its versions, hashes and terms.", "Validate firmware loading/authentication and reset semantics per device rather than assuming the Xe firmware contract applies."],
+        "userspace": ["Select a compatible i915 compiler/winsys contract and implement its Darwin memory, context and synchronization interface.", "An Xe or Apple Intel user/kernel ABI is not interchangeable with the selected i915 ABI."],
+        "source_provenance": ["Record immutable upstream commit, per-file SHA256 and build configuration.", "Verify revision membership and review the full DRM/Linux dependency/license closure before integration."]
+      },
+      "pci_device_ids": [],
+      "hardware_admission": "i915 source intake does not supply a macOS GPU or Metal driver; measured device identity and physical acceptance are required."
+    },
     "amdgpu": {
       "vendor": "AMD",
+      "adapter_contract": "amdgpu",
+      "implementation_status": "source-intake-only",
+      "architecture_scope": "must-be-established-from-selected-upstream-source",
+      "architectures": [],
+      "excluded_architectures": [],
       "source_prefixes": ["drivers/gpu/drm/amd/", "include/drm/", "include/linux/"],
       "admission_prefixes": ["drivers/gpu/drm/amd/amdgpu/", "drivers/gpu/drm/amd/include/"],
       "focus": ["GPUVM and GART ownership", "PSP/SMU firmware contracts", "ring submission", "interrupt and fence completion"],
+      "requirements": {
+        "architecture": ["Resolve measured PCI/subsystem IDs, ASIC/IP versions and stepping against the selected immutable amdgpu configuration.", "No AMD architecture or device is admitted by this generic source-intake recipe."],
+        "firmware": ["Pin the selected ASIC's PSP/SMU/engine/display firmware, versions, hashes and redistribution terms.", "Implement and validate authentication, power management, reset and reload before physical execution."],
+        "userspace": ["Select a compatible Mesa/compiler/winsys and implement the measured Darwin GPUVM, ring and synchronization ABI.", "Upstream Linux userspace or source-path matches do not establish macOS, Metal or WindowServer compatibility."],
+        "source_provenance": ["Record immutable upstream commit, per-file SHA256 and build configuration.", "Review the complete DRM/TTM/scheduler/Linux dependency and license closure, preserving each file's original notices."]
+      },
       "pci_device_ids": [],
       "hardware_admission": "No RX 9070 or other device identity inferred; require measured PCI IDs and ASIC revision."
     },
+    "nouveau": {
+      "vendor": "NVIDIA",
+      "adapter_contract": "nouveau-nvk",
+      "implementation_status": "source-intake-only",
+      "architecture_scope": "upstream-source-reference-only",
+      "architectures": ["nvidia-maxwell", "nvidia-pascal", "nvidia-volta", "nvidia-turing", "nvidia-ampere", "nvidia-ada", "nvidia-blackwell"],
+      "excluded_architectures": [],
+      "source_prefixes": ["drivers/gpu/drm/nouveau/", "include/drm/", "include/uapi/drm/", "include/linux/", "include/uapi/linux/"],
+      "admission_prefixes": ["drivers/gpu/drm/nouveau/"],
+      "focus": ["NVKM initialization and GPU virtual memory ownership", "Falcon/ACR or GSP firmware selection per architecture", "Nouveau channel, VM-bind and submission ABI", "interrupt, fence, power and reset completion", "Mesa NVK compiler/winsys integration"],
+      "requirements": {
+        "architecture": ["Maxwell through Blackwell entries identify upstream source references only, not macOS support or universal device coverage.", "Distinguish Maxwell generations and measured chipset/stepping; consumer Blackwell NVK references do not admit every Blackwell product."],
+        "firmware": ["Select the chipset's Falcon/ACR or GSP boot protocol from pinned Nouveau sources and pin the required image versions, hashes and terms.", "Do not assume pre-Turing GPUs can use GSP or that source access proves reclocking, authentication, reset or display operation."],
+        "userspace": ["Pin a compatible Mesa NVK/Nouveau winsys and its exact kernel memory, VM-bind, channel, submission and synchronization requirements.", "Port Linux DRM interfaces to a reviewed Darwin contract; NVIDIA RM/UAPI is not a drop-in Nouveau ABI.", "Vulkan or OpenGL upstream capability is not Apple Metal registration or WindowServer acceleration."],
+        "source_provenance": ["Pin Linux Nouveau and Mesa NVK independently, with immutable commits, per-file hashes and selected build configurations.", "Verify source membership and review the complete NVKM/DRM/Linux/Mesa dependency and license closure before integration."]
+      },
+      "pci_device_ids": [],
+      "hardware_admission": "Nouveau/NVK source intake supplies no executable Darwin NVIDIA backend and admits no PCI device or Metal capability."
+    },
     "nvidia-open": {
       "vendor": "NVIDIA",
-      "source_prefixes": ["kernel-open/", "src/nvidia/", "src/common/"],
+      "adapter_contract": "nvidia-rm",
+      "implementation_status": "source-intake-only",
+      "architecture_scope": "upstream-source-reference-only",
+      "architectures": ["nvidia-turing", "nvidia-ampere", "nvidia-ada", "nvidia-blackwell"],
+      "excluded_architectures": ["nvidia-maxwell", "nvidia-pascal", "nvidia-volta"],
+      "source_prefixes": ["kernel-open/", "src/nvidia/", "src/nvidia-modeset/", "src/common/"],
       "admission_prefixes": ["kernel-open/", "src/nvidia/"],
       "focus": ["GPU virtual memory ownership", "GSP firmware licensing and protocol", "channel submission", "interrupt and fence completion"],
+      "requirements": {
+        "architecture": ["The open RM kernel module source supports Turing and newer; Maxwell, Pascal and Volta are excluded from this adapter contract.", "Listed RTX-era families are nonexhaustive upstream references; verify measured device/stepping against the pinned RM release without admitting hardware from a recipe match."],
+        "firmware": ["Require GSP firmware from the exact selected NVIDIA RM release, with measured hashes, boot/RPC protocol and redistribution terms.", "Implement and validate the XNU DMA, memory, interrupt, reset and firmware lifetime contract; an extracted GSP image does not establish Nouveau ABI equivalence."],
+        "userspace": ["The upstream RM release requires matching NVIDIA userspace components; source availability does not provide a compatible Darwin userspace implementation.", "Select and implement the reviewed RM/UAPI compiler/resource/channel interface; Mesa NVK/Nouveau is not interchangeable with RM.", "Port modeset/IOFramebuffer and accelerator/Metal/IOSurface/WindowServer integration as separately validated stages."],
+        "source_provenance": ["Record the immutable NVIDIA release commit, per-file SHA256 and selected build configuration.", "Verify revision membership and review OS-interface, RM, modeset, firmware and userspace dependency/license closure; preserve original notices."]
+      },
       "pci_device_ids": [],
       "hardware_admission": "Open source kernel modules alone do not supply a macOS userspace driver or admit a GPU."
     }
