@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "component": "NVIDIA GSP firmware ELF extraction and LibOS embedded image Radix3 table serialization",
+  "upstream_repository": "https://github.com/NVIDIA/open-gpu-kernel-modules",
+  "revision": "e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb",
+  "upstream_release": "610.57.04",
+  "license": "MIT",
+  "sources": [
+    {
+      "path": "src/nvidia/src/kernel/gpu/gsp/kernel_gsp.c",
+      "symbols": ["kgspCreateRadix3_IMPL", "_kgspPrepareGspRmBinaryImage", "_kgspFwContainerGetSection", "_kgspFwContainerVerifyVersion", "_kgspGetSectionNameForPrefix", "_kgspCreateSignatureMemdesc"],
+      "source_lines": "5483-5635; 5240-5480; 5638-5723",
+      "url": "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/src/nvidia/src/kernel/gpu/gsp/kernel_gsp.c"
+    },
+    {
+      "path": "src/common/uproc/os/common/include/libos_init_args.h",
+      "symbols": ["LIBOS_MEMORY_REGION_RADIX_PAGE_SIZE", "LIBOS_MEMORY_REGION_RADIX_PAGE_LOG2"],
+      "source_lines": "43-44",
+      "url": "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/src/common/uproc/os/common/include/libos_init_args.h"
+    },
+    {
+      "path": "src/common/uproc/os/common/include/libelf.h",
+      "symbols": ["LibosElf64Header", "LibosElf64SectionHeader", "LibosElf64ProgramHeader"],
+      "source_lines": "49-65; 81-91; 122-134",
+      "url": "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/src/common/uproc/os/common/include/libelf.h"
+    },
+    {
+      "path": "src/nvidia/generated/g_kernel_gsp_nvoc.h",
+      "symbols": ["GSP_VERSION_SECTION_NAME", "GSP_IMAGE_SECTION_NAME", "GSP_SIGNATURE_SECTION_NAME_PREFIX", "GSP_CC_SIGNATURE_SECTION_NAME_PREFIX", "GSP_BUILD_ID_SECTION_NAME"],
+      "source_lines": "253-258",
+      "url": "https://github.com/NVIDIA/open-gpu-kernel-modules/blob/e4a5faa2567f28c8eabe0ebb6422b6d0abcf37eb/src/nvidia/generated/g_kernel_gsp_nvoc.h"
+    }
+  ],
+  "adaptations": [
+    "Embedded-image form only; no separate memory-descriptor mode",
+    "Checked subtract-first ceiling divisions and CPU address interval validation",
+    "Exact caller-supplied AT_GPU DMA page lists with complete-page address-width checks",
+    "Caller scratch heap sort audits DMA aliases without dynamic allocation",
+    "Explicit little-endian address bytes and transactional firmware output",
+    "ELF64 little-endian byte decoding avoids upstream struct casts and inclusive-end range errors",
+    "Canonical ordinary header indexes, whole-container nonempty-name and file-range audits; SHT_NOBITS has no contents",
+    "Caller supplies matching release, measured full HAL/chip/CC signature name and parse resource budgets",
+    "Borrowed raw version/image/signature/build-id-note views; no GNU descriptor decoding or authentication"
+  ],
+  "elf_validation_references": [
+    "https://gabi.xinuos.com/elf/02-eheader.html",
+    "https://gabi.xinuos.com/elf/03-sheader.html",
+    "https://gabi.xinuos.com/elf/04-strtab.html"
+  ],
+  "source_access": "Primary pinned web source reading only; no source download or full-file hash measured",
+  "physical_gpu_execution_verified": false,
+  "firmware_boot_verified": false,
+  "native_driver_ready": false
+}

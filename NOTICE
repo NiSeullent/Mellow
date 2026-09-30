@@ -104,3 +104,13 @@ contracts from a parallel local worktree. Original licenses and notices remain
 controlling. New per-file MIT notices apply only to those original files.
 No complete unsupported-GPU driver, system Metal registration, WindowServer
 acceleration or native hardware acceptance is implied by this source checkpoint.
+
+Native GPU owner and firmware-format development, 2026-09-30
+----------------------------------------------------------
+Selected local peer source adds real IOKit pin/MMIO adapters and bounded native
+DMA, NVIDIA queue/copy and Intel GuC-region lifetime components. NVIDIA GSP
+LibOS Radix3 format source attribution and MIT text are retained under
+Drivers/PortedNvidiaGsp; the copied NVIDIA copy encoder/sealer retain their
+per-file MIT notices. Existing repository and upstream notices remain controlling.
+No firmware payload, GPU initialization, native Metal registration or system
+WindowServer acceleration is established by software or kernel-object checks.

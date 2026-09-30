@@ -2,7 +2,7 @@
 
 대상은 사용자가 지정한 Intel 미지원 그래픽 전체와 NVIDIA Maxwell 이후 전체이며, 운영체제는 macOS 15와 26이다. 이 범위는 개발 목표다. 현재 모든 모델의 가속을 제공하는 드라이버가 완성된 상태는 아니다.
 
-이 작업 사본은 `codex/mellow-gpu-port-1edd`이며, 기준 commit은 `18d576866d6c2ae3543b5df2551c34dff8b8a45f`이다. 본 채팅은 Intel GuC transport, NVIDIA 명령 인코더, macOS용 Metal 호출 어댑터와 IOSurface 앱 표시 경로를 구현한다. 병렬 채팅의 source-family 계약 commit `cd187f4`는 비교 검토 후 `659ce58`로 통합했다. 아직 변경 중인 native memory/channel 코드는 해당 채팅의 소유 범위로 두고 후속 통합 대상으로 기록한다.
+이 작업 사본은 `codex/mellow-gpu-port-1edd`이며, 기준 commit은 `18d576866d6c2ae3543b5df2551c34dff8b8a45f`이다. 본 채팅은 Intel GuC transport, NVIDIA 명령 인코더, macOS용 Metal 호출 어댑터와 IOSurface 앱 표시 경로를 구현한다. 병렬 채팅의 source-family 계약 commit `cd187f4`는 비교 검토 후 `659ce58`로 통합했다. native memory/probe/queue/copy 및 IOKit 코드 34개 파일은 변경 전후 해시가 일치하는 로컬 소스 스냅샷으로 선택 통합했다. 원본 작업 공간은 수정하지 않았으며 Intel GGTT bridge와 NVIDIA MMU의 별도 개발은 해당 채팅에 남겨 두었다.
 
 ## 계열별 실행 경계
 
@@ -30,6 +30,18 @@ NVIDIA의 독립 명령 인코더는 검토한 공식 class header의 GPFIFO와 
 GuC와 NVIDIA 인코더 변경은 로컬 commit `52d35fa`에 보존했다. GuC production source는 105,180개 호스트 검사를 통과하고, 수정 전 소스에 같은 새 검사를 적용하면 중복 terminal 응답에서 실패한다. NVIDIA 인코더는 131,616개 검사를 통과한다. 두 모듈은 Clang 메모리 오류 검사와 macOS 15/26용 Darwin kernel object 컴파일을 통과했다. 이는 kext 링크·적재·실행 또는 OS별 ABI 검증 결과가 아니다.
 
 실행 context의 종료 경로는 commit `f804910`에서 GuC 요청 기록을 반환하도록 수정했다. GPU 완료와 GuC 응답 credit 반환을 각각 확인하며, 아직 응답을 소유한 요청과 context/fence 핸들은 재시도할 수 있게 유지한다. 같은 transport에서 33개 작업을 완료하는 검사를 포함한 954개 검사가 Clang 메모리 오류 검사와 함께 통과했다. 원본 종료 코드에 새 검사를 적용하면 완료 후 요청 기록이 남는 문제가 재현된다. 변경된 context source도 두 OS 대상 kernel object 컴파일을 통과했다.
+
+## 네이티브 소유자 통합 체크포인트
+
+`Drivers/NativeGpu/MemoryOwner`는 DMA pin, 할당 제한, GPU mapping, 제출 참조와 역순 정리를 관리한다. `NativeMemoryIOKit`은 실제 IOKit descriptor·IOMapper·IODMACommand에 연결하고, bounce·coherency·ownership을 검증한다. 물리 VM 생성, TLB 완료와 기기 quiescence는 실제 하드웨어 소유자가 제공해야 하며 누락된 callback을 성공 처리하지 않는다.
+
+`NativeNvidia/Probe`와 `NvidiaMmioIOKit`은 실제 NVIDIA PCI/BAR와 BOOT0/BOOT1을 관찰한다. 인식된 계열이 명령 채널 활성화를 의미하지 않는다. `GpFifoQueue`는 실제 소유한 ring에 GPFIFO를 쓰고 GP_PUT 순서와 현재 work token, GPU semaphore의 완료 수명을 관리한다. 첫 구현은 협상된 C56F 일반 채널과 coherent system memory에 한정된다. `CopyPushbuffer`는 소유한 가상 주소의 44-byte 복사를 검증하고 WFI·system barrier·GPU semaphore를 붙인다. 실제 firmware/engine/channel/VM 초기화와 MMIO publication callback 연결은 남아 있다.
+
+기존 Intel `XeMemoryIOKit`은 DMA complete 오류를 descriptor clear의 성공으로 숨기지 않게 수정했다. 정리 결과가 불확실하면 pin과 IOMMU 자원의 소유권을 보존하며, 이후 NotReady나 GPU reset으로 이를 해제하지 않는다. 복사 시점의 정확한 출처·파일 해시는 `porting/native-owner-snapshot.json`에 있다.
+
+`PortedNvidiaGsp/Radix3`는 공식 GSP LibOS 이미지의 3단계 DMA scatter 주소표를 검증해 직렬화한다. `FirmwareImage`는 동일 release의 ELF 컨테이너에서 실제 chip/HAL이 선택한 서명 섹션과 이미지·버전·원시 build-id note를 추출한다. 컨테이너는 빌린 읽기 전용 메모리이며, 일치하는 문자열과 서명 바이트를 cryptographic 인증으로 취급하지 않는다. 이 파서는 Clang 메모리 오류 검사와 GCC에서 각각 2,369개 검사를 통과했다. 실제 주소 소유권과 firmware 인증·boot는 제공하지 않는다. 195개 직렬화 검사가 Clang 메모리 오류 검사와 GCC에서 통과했다. 전체 호스트 검사 20개 묶음은 통과했으며 compiler가 보고한 실제 로컬 의존 파일의 변경 여부도 확인한다. 실제 PCI 거래·DMA·GPU 작업과 시스템 Metal·WindowServer는 미검증이다.
+
+`XeGuCRegionOwner`는 기존의 실제 XeMemory pin, GGTT reserve/publish/readback, GuC Loader hold와 역순 해제를 연결한다. 로더가 영역을 중복 보유할 수 없게 하고, reset을 허용하는 조건과 실제 GuC/GPU/display consumer가 멈춘 조건을 별도로 검사한다. 정확한 IOKit resolver는 context·owner·크기·descriptor 길이·mapper와 DMA preparation을 확인한다. 실제 reset/전원·range lease·PAT/PTE·invalidate 하드웨어 콜백은 필수이며 full ADS와 service startup은 아직 연결되지 않았다. Host portable 175,056개, 실제 factory 코드를 OS shim에 연결한 175,069개, DMA 경계 8,296개 검사가 Clang 메모리 오류 검사와 함께 통과했다. IOVM 주소 숫자만으로 물리 backing의 비중첩을 입증한다고 주장하지 않는다.
 
 ## 현재 구현한 macOS 사용자 공간 경로
 
